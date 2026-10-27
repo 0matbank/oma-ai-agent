@@ -1,9 +1,11 @@
 """
 Multi-AI Architecture: Smart Model Router & Failover Engine
-Orchestrates model selection, live local discovery, quota fallback, and state preservation.
+Orchestrates model selection, live local discovery, finite quota fallback, and state preservation.
+Prevents infinite loops, recursion, and nested context accumulation.
 """
 import time
 import os
+import re
 import json
 from typing import Dict, Any, List, Optional
 from multi_ai.models import ProviderConfig, ModelInfo, TaskCheckpoint
@@ -12,6 +14,21 @@ from multi_ai.adapters.claude_code import ClaudeCodeAdapter
 from multi_ai.adapters.ollama import OllamaAdapter
 from multi_ai.adapters.openai_compat import OpenAICompatAdapter
 from multi_ai.providers import provider_mgr, get_secret, SETTINGS_FILE
+
+def clean_user_prompt(text: str) -> str:
+    """Strips any nested Context: ... Request: ... or failure wrappers to isolate raw user request."""
+    if not text:
+        return ""
+    text = re.split(r'\n(?:A )?[Pp]revious (?:try )?failed:', text)[0]
+    parts = re.split(r'\bRequest:\s*', text)
+    if len(parts) > 1:
+        text = parts[-1].strip()
+    while True:
+        stripped = re.sub(r'^(?:Context|Earlier|Memory|Integrations|Saved workflow|About the user|Front app)[^:\n]*:\s*.*?(?:\n|\.\s+|$)', '', text, flags=re.S | re.I).strip()
+        if stripped == text:
+            break
+        text = stripped
+    return text.strip()
 
 class ModelRouter:
     def __init__(self):
@@ -89,13 +106,19 @@ class ModelRouter:
         """Returns live status of all providers using provider_mgr."""
         return provider_mgr.get_full_overview()
 
-    def execute(self, prompt: str, task_id: Optional[str] = None, event_callback=None) -> Dict[str, Any]:
+    def execute(self, prompt: str, task_id: Optional[str] = None, event_callback=None, exclude_providers: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Executes a task through the intelligent multi-AI fallback chain.
-        Emits live execution events if callback provided.
+        Guarantees:
+        - Never attempts excluded or already failed providers
+        - Cleans prompt to prevent recursive Context: wrapping
+        - Maximum 3 candidate attempts per request
+        - Clean terminal error message when exhausted
         """
+        excluded = set(exclude_providers or [])
+        clean_prompt = clean_user_prompt(prompt)
         task_id = task_id or f"task_{int(time.time() * 1000)}"
-        journal.create_task(task_id, prompt)
+        journal.create_task(task_id, clean_prompt)
 
         def emit(stage, detail, pct=None):
             if event_callback:
@@ -104,7 +127,7 @@ class ModelRouter:
                 except Exception:
                     pass
 
-        emit("received", f"Command received: {prompt}", 10)
+        emit("received", f"Command received: {clean_prompt}", 10)
         emit("analyzing", "Analyzing task and building model candidates...", 25)
 
         # Read active configuration
@@ -125,70 +148,87 @@ class ModelRouter:
         ollama_models = provider_mgr.discover_local_ollama_models()
         best_ollama_model = ollama_models[0]["name"] if ollama_models else "qwen3-vl:8b"
 
+        # Check recursion context: if inside Atticus or fallback, exclude claude_code
+        if os.environ.get("OMA_IN_ATTICUS") == "1" or os.environ.get("OMA_ROUTER_FALLBACK") == "1":
+            excluded.add("claude_code")
+
         if mode == "local_only" or active_model == "local_only":
             emit("model_selected", f"Local Only Mode: Selected {best_ollama_model}", 35)
-            if ollama_models:
+            if ollama_models and 'ollama' not in excluded:
                 for m in ollama_models:
                     candidates.append(('ollama', m["name"]))
-            if self.adapters['lm_studio'].is_available():
+            if self.adapters['lm_studio'].is_available() and 'lm_studio' not in excluded:
                 for m in self.adapters['lm_studio'].discover_models():
                     candidates.append(('lm_studio', m.model_id))
         elif mode == "manual" or (active_model and active_model != "auto"):
             emit("model_selected", f"Manual Mode: Selected {active_model}", 35)
             if "/" in active_model:
                 pid, mid = active_model.split("/", 1)
-                candidates.append((pid, mid))
+                if pid not in excluded:
+                    candidates.append((pid, mid))
             else:
-                candidates.append(('ollama', active_model))
-            # Still append fallback candidates if fallback enabled
+                if 'ollama' not in excluded:
+                    candidates.append(('ollama', active_model))
+            # Fallback candidates if enabled
             if settings.get("aiFallback", True):
-                if ollama_models and ('ollama', best_ollama_model) not in candidates:
+                if ollama_models and ('ollama', best_ollama_model) not in candidates and 'ollama' not in excluded:
                     candidates.append(('ollama', best_ollama_model))
         else:
-            # 'auto' mode: Claude Code -> Local Ollama (qwen3-vl:8b) -> LM Studio -> Cloud Fallbacks
-            emit("model_selected", "Auto Mode: Primary Claude Code CLI with Ollama Fallback", 35)
-            candidates.append(('claude_code', 'claude-3-5-haiku'))
-            if ollama_models:
+            # 'auto' mode: Claude Code (if not excluded) -> Local Ollama (qwen3-vl:8b / qwen3:8b) -> LM Studio -> Cloud
+            if 'claude_code' not in excluded:
+                candidates.append(('claude_code', 'claude-3-5-haiku'))
+            if ollama_models and 'ollama' not in excluded:
                 for m in ollama_models:
                     candidates.append(('ollama', m["name"]))
-            if self.adapters['lm_studio'].is_available():
+            if self.adapters['lm_studio'].is_available() and 'lm_studio' not in excluded:
                 for m in self.adapters['lm_studio'].discover_models():
                     candidates.append(('lm_studio', m.model_id))
             # Cloud fallbacks if configured
             for c_id in ['gemini', 'openai', 'deepseek', 'groq']:
-                if get_secret(f"ai_key_{c_id}"):
+                if c_id not in excluded and get_secret(f"ai_key_{c_id}"):
                     p_def = next((p for p in provider_mgr.BUILTIN_PROVIDERS if p["id"] == c_id), None)
                     if p_def and p_def.get("default_models"):
                         candidates.append((c_id, p_def["default_models"][0]))
 
+        # Enforce strict finite fallback cap (max 3 candidate attempts per user request)
+        MAX_FALLBACK_ATTEMPTS = 3
+        candidates = candidates[:MAX_FALLBACK_ATTEMPTS]
+
         if not candidates:
-            if ollama_models:
+            if ollama_models and 'ollama' not in excluded:
                 candidates = [('ollama', best_ollama_model)]
             else:
-                emit("error", "No eligible AI provider is currently reachable.", 100)
+                msg = "No eligible AI provider is currently reachable. Please start Ollama or configure a provider in Settings."
+                emit("error", msg, 100)
                 return {
                     'success': False,
                     'error': 'No available AI models detected.',
-                    'reply': 'No eligible AI provider is currently reachable. Please start Ollama or configure a provider.'
+                    'reply': msg
                 }
 
         fallback_notes = []
+        attempted_providers = set()
+
         for idx, (pid, mid) in enumerate(candidates):
+            if pid in attempted_providers:
+                continue
+            attempted_providers.add(pid)
+
             if idx > 0:
                 prev_pid = candidates[idx - 1][0]
                 emit("fallback", f"Switching from {prev_pid} to {pid} ({mid})", 50)
 
             emit("executing", f"Executing with {pid} ({mid})...", 60)
 
-            # Get adapter
             adapter = self.adapters.get(pid)
             if not adapter:
                 adapter = self._get_cloud_adapter(pid)
             if not adapter:
+                fallback_notes.append(f"{pid}: not configured")
                 continue
 
             # Attempt generation
-            res = adapter.generate(mid, prompt)
+            res = adapter.generate(mid, clean_prompt)
 
             if res.get('success'):
                 reply = res.get('reply', '')
@@ -198,7 +238,7 @@ class ModelRouter:
                 notice = ""
                 if fallback_occurred:
                     prev_pid = candidates[idx - 1][0]
-                    notice = f"Notice: Switched from {prev_pid} to {pid} ({mid}) due to quota/rate limit."
+                    notice = f"Notice: Completed via {pid} ({mid}) following {prev_pid} failover."
 
                 emit("verifying", "Verifying task outcome...", 85)
                 emit("completed", f"Task complete ({pid} - {mid})", 100)
@@ -216,13 +256,14 @@ class ModelRouter:
                 err_type = res.get('error_type', 'generic')
                 fallback_notes.append(f"{pid} ({mid}): {err_type}")
 
-        # All candidates failed
+        # All candidates in the finite chain failed
         journal.finish_task(task_id, "; ".join(fallback_notes), status='failed')
-        emit("error", f"All providers exhausted: {'; '.join(fallback_notes)}", 100)
+        err_detail = "; ".join(fallback_notes)
+        emit("error", f"All fallback providers exhausted: {err_detail}", 100)
         return {
             'success': False,
-            'error': f"All providers exhausted: {'; '.join(fallback_notes)}",
-            'reply': f"Unable to complete task. Providers attempted: {'; '.join(fallback_notes)}"
+            'error': f"All providers exhausted: {err_detail}",
+            'reply': f"Unable to complete task. Providers attempted: {err_detail}. Please start Ollama or configure an API key in Settings."
         }
 
 router = ModelRouter()

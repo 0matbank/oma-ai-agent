@@ -1,19 +1,17 @@
 """
 Multi-AI Architecture: Claude Code Adapter
-Maintains existing Claude CLI subscription flow (claude -p) with quota detection.
+Directly integrates with the Claude Code CLI (claude.exe -p) with strict timeout and recursion protection.
+Never invokes atticus.py recursively.
 """
 import os
+import shutil
 import subprocess
 from typing import Dict, Any, List
 from multi_ai.models import ModelInfo
 
-INSTALLED_PYTHON = r"C:\Users\USERAS\AppData\Local\Atticus\venv\Scripts\python.exe"
-INSTALLED_SCRIPT = r"C:\Users\USERAS\.atticus\atticus.py"
-
 class ClaudeCodeAdapter:
-    def __init__(self, python_path: str = INSTALLED_PYTHON, script_path: str = INSTALLED_SCRIPT):
-        self.python_path = python_path if os.path.exists(python_path) else "python"
-        self.script_path = script_path
+    def __init__(self, claude_path: str = None):
+        self.claude_path = claude_path or shutil.which("claude") or os.path.expanduser(r"~/.local/bin/claude.exe")
 
     def discover_models(self) -> List[ModelInfo]:
         return [
@@ -38,35 +36,48 @@ class ClaudeCodeAdapter:
         ]
 
     def is_available(self) -> bool:
-        if not os.path.exists(self.script_path):
+        if not self.claude_path:
             return False
-        try:
-            res = subprocess.run(
-                [self.python_path, self.script_path, "--check"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            return "ok" in res.stdout.lower()
-        except Exception:
-            return False
+        return os.path.exists(self.claude_path)
 
     def generate(self, model_id: str, prompt: str) -> Dict[str, Any]:
-        """Runs the query through the installed Atticus Claude Code flow."""
+        """Runs the query directly through the installed Claude CLI (claude.exe -p)."""
+        # 1. Hard recursion guard: Never invoke Claude Code if already inside Atticus or in a fallback chain
+        if os.environ.get("OMA_IN_ATTICUS") == "1" or os.environ.get("OMA_ROUTER_FALLBACK") == "1":
+            return {
+                'success': False,
+                'error_type': 'recursion_blocked',
+                'error': 'Direct Claude Code invocation blocked inside Atticus fallback context',
+                'model': model_id,
+                'provider': 'claude_code'
+            }
+
+        if not self.claude_path or not os.path.exists(self.claude_path):
+            return {
+                'success': False,
+                'error_type': 'not_installed',
+                'error': 'Claude CLI (claude.exe) not found on system',
+                'model': model_id,
+                'provider': 'claude_code'
+            }
+
         try:
+            # Run claude -p directly with stdin=subprocess.DEVNULL to avoid stdin blocking
+            cmd = [self.claude_path, '-p', prompt, '--output-format', 'text']
             res = subprocess.run(
-                [self.python_path, self.script_path, prompt],
+                cmd,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
-                errors='ignore',
-                timeout=30
+                errors='replace',
+                timeout=20
             )
             out = res.stdout.strip()
             err = res.stderr.strip()
             combined = (out + "\n" + err).strip()
 
-            if "weekly limit" in combined.lower() or "rate limit" in combined.lower():
+            if any(q in combined.lower() for q in ('weekly limit', 'rate limit', 'hit your limit', 'quota exceeded', 'too many requests', 'usage limit')):
                 return {
                     'success': False,
                     'error_type': 'quota_exhausted',
@@ -75,17 +86,18 @@ class ClaudeCodeAdapter:
                     'provider': 'claude_code'
                 }
 
-            if combined:
+            if res.returncode == 0 and out:
                 return {
                     'success': True,
-                    'reply': combined,
+                    'reply': out,
                     'model': model_id,
                     'provider': 'claude_code'
                 }
 
             return {
                 'success': False,
-                'error': 'Empty response from Claude Code worker',
+                'error_type': 'exit_code_' + str(res.returncode),
+                'error': combined or f'Claude CLI exited with code {res.returncode}',
                 'model': model_id,
                 'provider': 'claude_code'
             }
@@ -93,13 +105,14 @@ class ClaudeCodeAdapter:
             return {
                 'success': False,
                 'error_type': 'timeout',
-                'error': 'Claude Code process timed out',
+                'error': 'Claude CLI timed out after 20s',
                 'model': model_id,
                 'provider': 'claude_code'
             }
         except Exception as e:
             return {
                 'success': False,
+                'error_type': 'exception',
                 'error': str(e),
                 'model': model_id,
                 'provider': 'claude_code'

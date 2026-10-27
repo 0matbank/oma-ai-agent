@@ -31,6 +31,18 @@ except ImportError:   # tests and syntax checks on other systems
 import integrations
 
 os.environ.setdefault('PYTHONUTF8', '1')   # helpers and hooks started from here read and write UTF-8
+
+# Emergency Hard Recursion Safeguard
+_oma_depth = int(os.environ.get('OMA_EXECUTION_DEPTH', '0'))
+_is_task_prompt = (len(sys.argv) > 1 and not sys.argv[1].startswith('--'))
+if _is_task_prompt and (os.environ.get('OMA_IN_ATTICUS') == '1' or _oma_depth >= 1):
+    sys.stderr.write(f"[OMA RECURSION GUARD] Blocked recursive prompt execution (depth={_oma_depth}).\n")
+    print("Error: Recursive agent execution was blocked.", flush=True)
+    sys.exit(1)
+
+os.environ['OMA_IN_ATTICUS'] = '1'
+os.environ['OMA_EXECUTION_DEPTH'] = str(_oma_depth + 1)
+
 if sys.platform == 'win32':
     for stream in (sys.stdout, sys.stderr):
         try:
@@ -1376,11 +1388,13 @@ def run(task, p=None, shots=()):
     p.wait()
     run.ran = cmds   # the exact commands, for the ask log
     # Multi-AI Automatic Fallback
-    if (not reply or not completed or (p and p.returncode)) and pref('aiFallback', True):
+    if (not reply or not completed or (p and p.returncode)) and pref('aiFallback', True) and not getattr(run, 'fallback_attempted', False):
+        run.fallback_attempted = True
         try:
+            from multi_ai.router import clean_user_prompt, router
+            clean_task = clean_user_prompt(task)
             say('—,', 'Claude quota limit reached. Falling back to local Ollama (qwen3-vl:8b)...')
-            from multi_ai.router import router
-            fallback_res = router.execute(task)
+            fallback_res = router.execute(clean_task, exclude_providers=['claude_code'])
             if fallback_res.get('success'):
                 run.ok = True
                 run.ran = ['<multi_ai_fallback>']
@@ -1388,6 +1402,8 @@ def run(task, p=None, shots=()):
                 reply = fallback_res.get('reply', '')
                 steps.append("Completed via " + str(fallback_res.get('provider_used')) + " (" + str(fallback_res.get('model_used')) + ")")
                 return reply, 0, steps
+            elif fallback_res.get('reply'):
+                reply = fallback_res.get('reply')
         except Exception:
             pass
     if not reply and p.returncode:
@@ -1395,7 +1411,8 @@ def run(task, p=None, shots=()):
         if not c['ok']:
             say('!', 'setup')
         p.errors.seek(0)
-        reply = c['text'] + ' Atticus setup is open to fix it.' if not c['ok'] else f'Claude failed: {p.errors.read(200)}'
+        err_msg = p.errors.read(200).strip()
+        reply = c['text'] + ' Atticus setup is open to fix it.' if not c['ok'] else f'Claude failed: {err_msg}'
     # a step that failed and was then done another way is dropped, so the way that worked can still be learned
     run.cmds = [] if last_failed or result_error or p.returncode or not completed or not reply else [c for i, c in enumerate(cmds) if i not in bad]
     run.ok = bool(completed and reply and not result_error and not p.returncode and not last_failed)
@@ -1748,8 +1765,8 @@ def main():
         from multi_ai.providers import provider_mgr
         return print(json.dumps(provider_mgr.remove_custom_provider(args[1])))
     if args[:1] == ['--oma-ask'] and len(args) > 1:
-        from multi_ai.router import router
-        prompt = ' '.join(args[1:])
+        from multi_ai.router import clean_user_prompt, router
+        prompt = clean_user_prompt(' '.join(args[1:]))
         def on_event(ev):
             print("§EVENT§" + json.dumps(ev), flush=True)
         res = router.execute(prompt, event_callback=on_event)
@@ -1837,24 +1854,28 @@ def main():
     if images == []:
         ctx += ' Screen capture unavailable. Do not guess screen contents; explain how to enable Screen Recording for Atticus.'
     helping.join(4)
+    from multi_ai.router import clean_user_prompt
+    clean_task = clean_user_prompt(task)
     prompt = (f'Context: {ctx}\n' + (f'Earlier:\n{earlier}' if earlier else '') + (f'Memory:\n{mem}\n' if mem else '') +
               (f'Integrations:\n{int_hints}\n' if int_hints else '') + ''.join(helps) +
-              (f'Saved workflow (historical guidance):\n{procedure}\n' if procedure else '') + f'Request: {task}')
+              (f'Saved workflow (historical guidance):\n{procedure}\n' if procedure else '') + f'Request: {clean_task}')
     reply, cost, steps = run(prompt, warm, images or ())
     if not wait_commit():
         return
     if not run.ok:   # Try again (same model) or Try Sonnet, from a card in the box
-        model = pref('model', 'haiku')
-        sonnet = pref('escalate', True) and model == 'haiku'
-        answer = 'y' if sonnet and pref('escalateAuto', False) else retry_offer(sonnet)
-        if answer in ('r', 'y'):
-            next_model = model if answer == 'r' else 'sonnet'
-            say('▸', 'Trying again with ' + next_model.capitalize())
-            previous = run.ran[:]
-            context = '\nPrior attempted actions (check their effects before repeating):\n' + '\n'.join(previous)[-1800:] if previous else ''
-            again, more, extra = run(prompt + f'\nA previous try failed: {reply[:400]}' + context, start_claude(servers, next_model), images or ())
-            run.ran = previous + run.ran
-            reply, cost, steps = again or reply, cost + more, steps + extra
+        is_quota = any(q in (reply or '').lower() for q in ('weekly limit', 'rate limit', 'hit your limit', 'quota'))
+        if not getattr(run, 'fallback_attempted', False) and not is_quota:
+            model = pref('model', 'haiku')
+            sonnet = pref('escalate', True) and model == 'haiku'
+            answer = 'y' if sonnet and pref('escalateAuto', False) else retry_offer(sonnet)
+            if answer in ('r', 'y'):
+                next_model = model if answer == 'r' else 'sonnet'
+                say('▸', 'Trying again with ' + next_model.capitalize())
+                previous = run.ran[:]
+                context = '\nPrior attempted actions (check their effects before repeating):\n' + '\n'.join(previous)[-1800:] if previous else ''
+                again, more, extra = run(prompt + f'\nA previous try failed: {reply[:400]}' + context, start_claude(servers, next_model), images or ())
+                run.ran = previous + run.ran
+                reply, cost, steps = again or reply, cost + more, steps + extra
     reply = point(re.sub(r'\s*\n\s*Sources?:.*\Z', '', reply, flags=re.S | re.I))
     taught = re.search(r'\[tip ([^\]]+)\]', reply)
     reply = (reply[:taught.start()] + reply[taught.end():]).strip() if taught else reply

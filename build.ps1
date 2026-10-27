@@ -57,6 +57,15 @@ Copy-Item integrations\*.py "$dest\integrations" -Force
 Copy-Item ui\*.html, ui\*.js, ui\*.css, ui\AppIcon.ico, ui\AppIcon.png "$dest\ui" -Force
 New-Item -ItemType Directory -Force "$dest\multi_ai" | Out-Null
 Copy-Item multi_ai\* "$dest\multi_ai" -Recurse -Force
+
+# Keep ~/.atticus in sync if present
+$dotAtticus = Join-Path $HOME '.atticus'
+if (Test-Path $dotAtticus) {
+  Copy-Item atticus.py, winctl.py $dotAtticus -Force
+  New-Item -ItemType Directory -Force "$dotAtticus\multi_ai" | Out-Null
+  Copy-Item multi_ai\* "$dotAtticus\multi_ai" -Recurse -Force
+}
+
 $version = (git log -1 --format='%h - %cd' --date=format:'%b %d, %Y' 2>$null)
 @{ python = "$venv\Scripts\python.exe"; source = $PSScriptRoot; version = "$version" } | ConvertTo-Json | Set-Content "$dest\atticus.json" -Encoding utf8
 if ($Stage) { exit 0 }

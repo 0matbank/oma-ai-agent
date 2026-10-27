@@ -7,6 +7,7 @@ import re
 import subprocess
 import urllib.parse
 import urllib.request
+import time
 from typing import Dict, Any, List
 
 try:
@@ -28,10 +29,32 @@ def is_safe_command(cmd: str) -> bool:
             return False
     return True
 
+# Duplicate Windows Action Safeguard
+_ACTION_TIMESTAMPS: Dict[str, float] = {}
+_ACTION_COOLDOWN = 3.0  # seconds
+
+def is_duplicate_action(action_key: str, cooldown: float = _ACTION_COOLDOWN) -> bool:
+    """Checks if an identical action was executed within the cooldown window."""
+    now = time.time()
+    last_time = _ACTION_TIMESTAMPS.get(action_key, 0.0)
+    if now - last_time < cooldown:
+        return True
+    _ACTION_TIMESTAMPS[action_key] = now
+    # Periodic cleanup of old history
+    if len(_ACTION_TIMESTAMPS) > 100:
+        for k in list(_ACTION_TIMESTAMPS.keys()):
+            if now - _ACTION_TIMESTAMPS[k] > 60:
+                del _ACTION_TIMESTAMPS[k]
+    return False
+
 # Tool Implementations
 def tool_open_app(app_name: str) -> str:
     """Launches an application by name or common alias."""
     app_lower = app_name.lower().strip()
+    action_key = f"open_app:{app_lower}"
+    if is_duplicate_action(action_key, cooldown=4.0):
+        return f"✓ {app_name} is already opening (skipped duplicate action)."
+
     mapping = {
         'chrome': 'chrome',
         'google chrome': 'chrome',
@@ -195,6 +218,16 @@ def execute_tool_call(name: str, args: Dict[str, Any]) -> str:
     """Executes a registered tool securely through the action policy gate."""
     if name not in TOOL_REGISTRY:
         return f"Unknown tool: {name}"
+    
+    # Action deduplication check
+    try:
+        import json
+        call_key = f"{name}:{json.dumps(args, sort_keys=True)}"
+        if is_duplicate_action(call_key, cooldown=3.0):
+            return f"✓ Action {name} already performed (duplicate skipped)."
+    except Exception:
+        pass
+
     func = TOOL_REGISTRY[name]['func']
     try:
         return func(**args)
