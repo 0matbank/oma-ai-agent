@@ -29,3 +29,7 @@ win/Atticus/obj/
 win/Oma/bin/
 win/Oma/obj/
 screen_tmp.png
+backup_*/
+patch_*.py
+fix_*.py
+build_unified_ui.py

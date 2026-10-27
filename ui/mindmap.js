@@ -302,6 +302,7 @@ class OmaMindMap {
           });
         }
       }, 50);
+    }
   }
 
   closeDrawer() {

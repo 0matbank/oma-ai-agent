@@ -36,22 +36,28 @@ def tool_open_app(app_name: str) -> str:
         'chrome': 'chrome',
         'google chrome': 'chrome',
         'notepad': 'notepad',
-        'calculator': 'calc',
+        'calculator': 'calculator:',
+        'calc': 'calculator:',
         'terminal': 'wt',
         'powershell': 'powershell',
         'cmd': 'cmd',
         'explorer': 'explorer',
         'vs code': 'code',
         'code': 'code',
-        'spotify': 'spotify',
-        'edge': 'msedge'
+        'spotify': 'spotify:',
+        'edge': 'msedge',
+        'settings': 'ms-settings:'
     }
     target = mapping.get(app_lower, app_lower)
     try:
-        subprocess.Popen(f'start {target}', shell=True)
+        os.startfile(target)
         return f"✓ Opened {app_name}."
     except Exception as e:
-        return f"Error opening {app_name}: {str(e)}"
+        try:
+            subprocess.Popen(f'start "" "{target}"', shell=True)
+            return f"✓ Opened {app_name}."
+        except Exception as e2:
+            return f"Error opening {app_name}: {str(e2)}"
 
 def tool_place_window(app: str, position: str = "full", screen: str = "current") -> str:
     """Moves, resizes, or snaps a window (left, right, full, center)."""
