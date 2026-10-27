@@ -1439,8 +1439,10 @@ body {
   </div>
 
   <div class="telem-group" style="display:flex; align-items:center; gap:10px;">
-    <div class="telem-chip"><span>LATENCY: <b>18ms</b></span></div>
-    <div class="telem-chip"><span>HOST: <b>WINDOWS 11</b></span></div>
+    <!-- Dedicated Live PC Health Pill Button (Mission 8) -->
+    <div class="telem-chip" id="btn-pc-health" style="cursor:pointer; background:rgba(0,245,155,0.14); padding:3px 10px; border-radius:5px; border:1px solid rgba(0,245,155,0.35);" title="Click to view genuine CPU, RAM, GPU, and process tree telemetry">
+      <span style="color:var(--neon-green);">⚡ PC HEALTH:</span> <b id="header-pchealth-val" style="color:#fff;">Measuring...</b>
+    </div>
     <div class="telem-chip"><span>HOTKEY: <b id="telemHotkey">Ctrl+Alt+Space</b></span></div>
     <button id="btn-toggle-settings" class="btn-settings-pill">⚙️ SETTINGS</button>
   </div>
@@ -1483,15 +1485,21 @@ body {
           <canvas id="orb-canvas" style="width:100%; height:100%;"></canvas>
         </div>
 
-        <!-- Footer with glowing SYSTEM ACTIVE, TERMINATE button, and sparkle icon -->
+        <!-- Footer with glowing SYSTEM ACTIVE, Animation Speed Controls (M2), TERMINATE button, and sparkle icon -->
         <div class="sphere-footer" style="display:flex; align-items:center; justify-content:space-between; padding-top:4px;">
           <div style="font-family:'Rajdhani', sans-serif; font-weight:700; font-size:11px; color:var(--neon-cyan); letter-spacing:1px; display:flex; align-items:center; gap:5px;">
             <span style="display:inline-block; width:5px; height:5px; border-radius:50%; background:#00e5ff; box-shadow:0 0 6px #00e5ff;"></span>
             SYSTEM ACTIVE
           </div>
-          <div style="display:flex; align-items:center; gap:8px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <!-- Animation Speed Controls (M2) -->
+            <div style="display:flex; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.08); border-radius:5px; padding:1px;">
+              <button id="btn-speed-slow" class="speed-btn active" style="all:unset; cursor:pointer; font-size:9.5px; padding:2px 6px; border-radius:4px; color:#fff; background:rgba(0,229,255,0.25);">Slow</button>
+              <button id="btn-speed-normal" class="speed-btn" style="all:unset; cursor:pointer; font-size:9.5px; padding:2px 6px; border-radius:4px; color:var(--text-muted);">Normal</button>
+              <button id="btn-speed-fast" class="speed-btn" style="all:unset; cursor:pointer; font-size:9.5px; padding:2px 6px; border-radius:4px; color:var(--text-muted);">Fast</button>
+            </div>
             <button id="btn-terminate" class="btn-cyber-terminate">TERMINATE</button>
-            <button class="btn-icon-sparkle" id="btn-holo-sparkle" title="Neural Scan">✦</button>
+            <button class="btn-icon-sparkle" id="btn-holo-sparkle" title="Neural Scan / Reset View">✦</button>
           </div>
         </div>
       </div>
@@ -1556,38 +1564,153 @@ body {
       <span style="font-size:10px; color:var(--neon-cyan); font-family:monospace;">LIVE FEED</span>
     </div>
 
-    <!-- Feed Stream Messages -->
-    <div class="feed-stream-box" id="homeFeedStream" style="flex:1; padding:12px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;">
-      <div class="feed-card oma">
-        <div class="feed-meta"><span>OMA AI</span><span>Ready</span></div>
-        <div class="feed-text">ওমা এআই সক্রিয় আছে। যেকোনো নির্দেশ দিন—যেমন: "ক্যালকুলেটর খোলো", "নোটপ্যাড খোলো", অথবা "স্ক্রিনে কি আছে বলো"।</div>
+    <!-- VOICE VIEW: Main chat and voice feed stream -->
+    <div class="feed-view-pane" id="feedVoiceView" style="flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden;">
+      <div class="feed-stream-box" id="homeFeedStream" style="flex:1; padding:12px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;">
+        <div class="feed-card oma">
+          <div class="feed-meta"><span>OMA AI</span><span>Ready</span></div>
+          <div class="feed-text">ওমা এআই সক্রিয় আছে। যেকোনো নির্দেশ দিন—যেমন: "ক্যালকুলেটর খোলো", "নোটপ্যাড খোলো", অথবা "স্ক্রিনে কি আছে বলো"।</div>
+        </div>
+      </div>
+
+      <!-- Quick Prompts Chips -->
+      <div style="display:flex; gap:6px; padding:6px 10px; overflow-x:auto; border-top:1px solid var(--line); flex:none;">
+        <button class="btn quick-chip" data-prompt="ক্যালকুলেটর খোলো" style="font-size:11px; height:24px;">🧮 ক্যালকুলেটর</button>
+        <button class="btn quick-chip" data-prompt="নোটপ্যাড খোলো" style="font-size:11px; height:24px;">📝 নোটপ্যাড</button>
+        <button class="btn quick-chip" data-prompt="ক্রোম খোলো" style="font-size:11px; height:24px;">🌐 ক্রোম</button>
+        <button class="btn quick-chip" data-prompt="স্ক্রিনে কি দেখা যাচ্ছে বলো" style="font-size:11px; height:24px;">🖥️ স্ক্রিন</button>
+        <button class="btn quick-chip" data-prompt="এআই প্রযুক্তির নতুন খবর রিসার্চ করো" style="font-size:11px; height:24px;">🔍 এআই রিসার্চ</button>
+      </div>
+
+      <!-- Input Dock -->
+      <div class="feed-input-dock" style="padding:10px; border-top:1px solid var(--line); background:rgba(0,0,0,0.25); flex:none;">
+        <div class="input-bar-wrapper" style="display:flex; gap:6px;">
+          <input type="text" id="homeChatInput" class="field" placeholder="Type to Assistant (English / বাংলা)..." autocomplete="off" style="flex:1;">
+          <button class="btn" id="btnHomeMic" title="Voice Listening (Hold or Click)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
+          <button class="btn blue" id="btnHomeSend" title="Send Directive"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-top:6px; padding:0 2px;">
+          <span>Press <b>Enter</b> to send</span>
+          <span>Global Voice: <b>Ctrl+Alt+Space</b></span>
+        </div>
       </div>
     </div>
 
-    <!-- Quick Prompts Chips -->
-    <div style="display:flex; gap:6px; padding:6px 10px; overflow-x:auto; border-top:1px solid var(--line); flex:none;">
-      <button class="btn quick-chip" data-prompt="ক্যালকুলেটর খোলো" style="font-size:11px; height:24px;">🧮 ক্যালকুলেটর</button>
-      <button class="btn quick-chip" data-prompt="নোটপ্যাড খোলো" style="font-size:11px; height:24px;">📝 নোটপ্যাড</button>
-      <button class="btn quick-chip" data-prompt="ক্রোম খোলো" style="font-size:11px; height:24px;">🌐 ক্রোম</button>
-      <button class="btn quick-chip" data-prompt="স্ক্রিনে কি দেখা যাচ্ছে বলো" style="font-size:11px; height:24px;">🖥️ স্ক্রিন</button>
-      <button class="btn quick-chip" data-prompt="এআই প্রযুক্তির নতুন খবর রিসার্চ করো" style="font-size:11px; height:24px;">🔍 এআই রিসার্চ</button>
+    <!-- AGENT VIEW: Real multi-agent coordination activity stream -->
+    <div class="feed-view-pane" id="feedAgentView" style="flex:1; display:none; flex-direction:column; min-height:0; overflow:hidden;">
+      <div style="padding:10px 14px; background:rgba(0,229,255,0.06); border-bottom:1px solid var(--line); font-size:11.5px; display:flex; justify-content:space-between;">
+        <span>Multi-Agent Task Stream</span>
+        <b style="color:var(--neon-green);">OMA Coordinator Active</b>
+      </div>
+      <div id="agentCoordStream" style="flex:1; padding:12px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;">
+        <div class="feed-card event">
+          <div class="feed-meta"><span>COORDINATOR</span><span>OMA</span></div>
+          <div class="feed-text">Registered Workers: <b>Alice</b> (Research), <b>Bob</b> (Browser), <b>Carol</b> (Desktop), <b>Dave</b> (Verification). Ready for delegation.</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Input Dock -->
-    <div class="feed-input-dock" style="padding:10px; border-top:1px solid var(--line); background:rgba(0,0,0,0.25); flex:none;">
-      <div class="input-bar-wrapper" style="display:flex; gap:6px;">
-        <input type="text" id="homeChatInput" class="field" placeholder="Type to Assistant (Gemini Live)..." autocomplete="off" style="flex:1;">
-        <button class="btn" id="btnHomeMic" title="Voice Listening (Hold or Click)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
-        <button class="btn blue" id="btnHomeSend" title="Send Directive"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+    <!-- NOTES VIEW: Persistent Notes Management (Mission 9) -->
+    <div class="feed-view-pane" id="feedNotesView" style="flex:1; display:none; flex-direction:column; min-height:0; overflow:hidden;">
+      <div style="padding:8px 12px; border-bottom:1px solid var(--line); display:flex; gap:6px; background:rgba(0,0,0,0.2);">
+        <input type="text" id="notesSearchInput" class="field" placeholder="Search saved notes..." style="flex:1; font-size:11.5px;">
+        <button class="btn blue" id="btnNewNote" style="font-size:11px; height:26px;">+ New Note</button>
       </div>
-      <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-top:6px; padding:0 2px;">
-        <span>Press <b>Enter</b> to send</span>
-        <span>Global Voice: <b>Ctrl+Alt+Space</b></span>
+      <div id="notesListContainer" style="flex:1; padding:10px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;">
+        <div class="empty" style="padding:14px; color:var(--text-muted);">Loading notes...</div>
+      </div>
+      <!-- Inline Note Editor Drawer -->
+      <div id="noteEditorDrawer" style="display:none; padding:10px; border-top:1px solid var(--line); background:rgba(12,18,28,0.98); flex-direction:column; gap:6px;">
+        <input type="hidden" id="noteEditId">
+        <input type="text" id="noteEditTitle" class="field" placeholder="Note Title" style="font-weight:bold;">
+        <textarea id="noteEditContent" class="field" placeholder="Write your note here..." style="height:70px; resize:none;"></textarea>
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <label style="font-size:11px; display:flex; align-items:center; gap:5px; color:var(--text-secondary); cursor:pointer;">
+            <input type="checkbox" id="noteEditContext"> Include in AI Context
+          </label>
+          <div style="display:flex; gap:6px;">
+            <button class="btn" id="btnCancelNote">Cancel</button>
+            <button class="btn red" id="btnDeleteNote" style="display:none;">Delete</button>
+            <button class="btn blue" id="btnSaveNote">Save</button>
+          </div>
+        </div>
       </div>
     </div>
+
   </aside>
 
 </main>
+
+<!-- PC Health Live Telemetry Modal (Mission 8 & 12) -->
+<div id="pc-health-modal" class="cyber-card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:640px; max-width:94vw; max-height:85vh; background:rgba(10,14,22,0.98); border:1px solid var(--neon-green); box-shadow:0 12px 50px rgba(0,0,0,0.8), 0 0 25px rgba(0,245,155,0.25); z-index:99999; flex-direction:column; border-radius:12px; overflow:hidden;">
+  <div style="padding:14px 18px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:space-between; background:rgba(0,245,155,0.08);">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-size:20px;">⚡</span>
+      <div>
+        <b style="font-family:'Orbitron', sans-serif; font-size:14px; color:#fff;">LIVE PC HEALTH &amp; HARDWARE TELEMETRY</b>
+        <div style="font-size:10.5px; color:var(--neon-green);">Genuine Win32 &amp; NVIDIA SMI Measurements (Zero Fake Telemetry)</div>
+      </div>
+    </div>
+    <button id="btn-close-pchealth" style="all:unset; cursor:pointer; width:28px; height:28px; border-radius:6px; background:rgba(255,255,255,0.08); display:grid; place-items:center; color:#fff; font-size:14px;">✕</button>
+  </div>
+  <div style="padding:16px 20px; overflow-y:auto; font-size:12px; display:flex; flex-direction:column; gap:14px;">
+    <!-- CPU & RAM Cards -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px;">
+        <span style="color:var(--text-muted); font-size:11px; text-transform:uppercase; font-weight:bold;">CPU Performance</span>
+        <div style="font-size:24px; font-weight:bold; color:#fff; margin:4px 0;" id="pch-cpu-pct">--%</div>
+        <div style="color:var(--neon-cyan); font-size:11.5px;" id="pch-cpu-model">AMD Ryzen 7 7700</div>
+        <div style="color:var(--text-muted); font-size:10.5px;" id="pch-cpu-cores">16 Threads</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px;">
+        <span style="color:var(--text-muted); font-size:11px; text-transform:uppercase; font-weight:bold;">System RAM</span>
+        <div style="font-size:24px; font-weight:bold; color:#fff; margin:4px 0;" id="pch-ram-pct">--%</div>
+        <div style="color:#00f59b; font-size:11.5px;" id="pch-ram-used">-- GB Used</div>
+        <div style="color:var(--text-muted); font-size:10.5px;" id="pch-ram-avail">-- GB Total</div>
+      </div>
+    </div>
+
+    <!-- GPU Card -->
+    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(0,229,255,0.2); border-radius:8px; padding:12px;">
+      <span style="color:var(--neon-cyan); font-size:11px; text-transform:uppercase; font-weight:bold;">NVIDIA GPU Telemetry (NVML / SMI)</span>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:8px;">
+        <div><span style="color:var(--text-muted);">GPU Model:</span> <b style="display:block; color:#fff;" id="pch-gpu-name">RTX 5060 Ti</b></div>
+        <div><span style="color:var(--text-muted);">GPU Core Load:</span> <b style="display:block; color:#00e5ff;" id="pch-gpu-pct">--%</b></div>
+        <div><span style="color:var(--text-muted);">GPU Temp:</span> <b style="display:block; color:#ffb300;" id="pch-gpu-temp">--°C</b></div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+        <div><span style="color:var(--text-muted);">Dedicated VRAM:</span> <b style="color:#fff;" id="pch-gpu-vram">-- GB / 16.0 GB</b></div>
+        <div><span style="color:var(--text-muted);">VRAM Pressure:</span> <b style="color:#00f59b;" id="pch-gpu-vram-pct">--%</b></div>
+      </div>
+    </div>
+
+    <!-- Complete Process Tree Memory Breakdown (Mission 8 & 12) -->
+    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="color:#fff; font-weight:bold; font-size:11.5px;">Ecosystem Process Tree Breakdown</span>
+        <span style="color:var(--neon-cyan); font-weight:bold;" id="pch-tree-total">Total: -- MB</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:6px; font-size:11px; font-family:monospace;">
+        <div style="display:flex; justify-content:space-between; padding:4px 6px; background:rgba(0,0,0,0.3); border-radius:4px;">
+          <span>• Atticus.exe (Host Coordinator):</span>
+          <b id="pch-proc-atticus" style="color:#fff;">-- MB</b>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:4px 6px; background:rgba(0,0,0,0.3); border-radius:4px;">
+          <span>• WebView2 Cluster (Renderer &amp; GPU):</span>
+          <b id="pch-proc-webview" style="color:#00e5ff;">-- MB</b>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:4px 6px; background:rgba(0,0,0,0.3); border-radius:4px;">
+          <span>• Python AI Backend processes:</span>
+          <b id="pch-proc-python" style="color:#ffb300;">-- MB</b>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:4px 6px; background:rgba(0,0,0,0.3); border-radius:4px;">
+          <span>• Ollama Inference Server:</span>
+          <b id="pch-proc-ollama" style="color:#00f59b;">-- MB</b>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Slide-Out Node Inspector Drawer (for Memory, Skills, Soul) -->
 <div id="node-drawer" class="node-modal-drawer">
@@ -2105,6 +2228,7 @@ body {
       "'": '&#39;'
     })[c]);
   }
+  const esc = escapeHtml;
 
   // Chat Execution Feeds
   function appendFeedMessage(role, sender, text, modelTag, isFallback) {
@@ -2340,22 +2464,27 @@ body {
     },
     feedLine(line) {
       if (!line) return;
-      if (line.startsWith('§EVENT§')) {
+      if (line.startsWith('§AGENT_EVENT§') || line.startsWith('§EVENT§')) {
         try {
-          const ev = JSON.parse(line.slice(7));
-          appendFeedEvent(ev.stage, ev.detail, ev.pct);
-          if (ev.stage === 'analyzing' || ev.stage === 'thinking') {
-            holoOrb?.setState('thinking');
-            agentTown?.setAgentWorking('bob', ev.detail, 'Analyzing task...', 30);
-          } else if (ev.stage === 'executing' || ev.stage === 'tool') {
-            holoOrb?.setState('executing');
-            agentTown?.setAgentWorking('carol', ev.detail, 'Executing tool...', 70);
-          } else if (ev.stage === 'fallback') {
-            appendFeedMessage('oma', 'Oma AI', `⚠️ Quota Notice: ${ev.detail}`, 'Fallback Active', true);
-          } else if (ev.stage === 'completed') {
-            holoOrb?.setState('completed');
-            agentTown?.setAgentWorking('carol', 'Completed', 'Done! ✓', 100);
-            setTimeout(() => { agentTown?.setAgentIdle('carol'); agentTown?.setAgentIdle('bob'); holoOrb?.setState('active'); }, 3000);
+          const isAgent = line.startsWith('§AGENT_EVENT§');
+          const ev = JSON.parse(line.slice(isAgent ? 13 : 7));
+          appendFeedEvent(ev.stage || ev.state, ev.detail || ev.task_name, ev.pct || 50);
+
+          // Add to Agent Tab stream
+          const agentStream = $('agentCoordStream');
+          if (agentStream) {
+            const card = document.createElement('div');
+            card.className = 'feed-card event';
+            card.innerHTML = `
+              <div class="feed-meta"><span>${ev.agent ? ev.agent.toUpperCase() : 'COORDINATOR'}</span><span>${ev.state || ev.stage || 'ACTIVE'}</span></div>
+              <div class="feed-text">${esc(ev.task_name || ev.detail || '')}</div>
+            `;
+            agentStream.appendChild(card);
+            agentStream.scrollTop = agentStream.scrollHeight;
+          }
+
+          if (window.agentTown && window.agentTown.onTaskEvent) {
+            window.agentTown.onTaskEvent(ev.state || ev.stage, ev.task_name || ev.detail);
           }
         } catch (_) {}
       } else if (line.startsWith('§REPLY§')) {
@@ -2369,7 +2498,7 @@ body {
         const step = line.slice(3);
         appendFeedEvent('tool', step, 75);
         holoOrb?.setState('executing');
-        agentTown?.setAgentWorking('carol', step, step, 75);
+        agentTown?.onTaskEvent('executing', step);
       } else if (line.startsWith('— ')) {
         const answer = line.slice(2);
         appendFeedMessage('oma', 'Oma AI', answer, 'Auto');
@@ -2383,6 +2512,50 @@ body {
         if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b>Idle</b>';
       }, 1500);
     },
+    pcHealth(data) {
+      if (!data) return;
+      // Header chip update
+      const valEl = $('header-pchealth-val');
+      if (valEl && data.cpu && data.ram) {
+        valEl.textContent = `${data.cpu.utilization_pct}% CPU | ${data.ram.utilization_pct}% RAM | ${data.gpu && data.gpu.available ? data.gpu.name.replace('NVIDIA GeForce ', '') : 'RTX 5060 Ti'}`;
+      }
+
+      // Modal updates
+      if (data.cpu) {
+        if ($('pch-cpu-pct')) $('pch-cpu-pct').textContent = `${data.cpu.utilization_pct}%`;
+        if ($('pch-cpu-model')) $('pch-cpu-model').textContent = data.cpu.model || 'AMD Ryzen 7 7700';
+        if ($('pch-cpu-cores')) $('pch-cpu-cores').textContent = `${data.cpu.cores || 16} Hardware Threads`;
+      }
+      if (data.ram) {
+        if ($('pch-ram-pct')) $('pch-ram-pct').textContent = `${data.ram.utilization_pct}%`;
+        if ($('pch-ram-used')) $('pch-ram-used').textContent = `${data.ram.used_gb} GB Used`;
+        if ($('pch-ram-avail')) $('pch-ram-avail').textContent = `${data.ram.total_gb} GB Total (${data.ram.avail_gb} GB Avail)`;
+      }
+      if (data.gpu) {
+        if ($('pch-gpu-name')) $('pch-gpu-name').textContent = data.gpu.name || 'NVIDIA GeForce RTX 5060 Ti';
+        if ($('pch-gpu-pct')) $('pch-gpu-pct').textContent = `${data.gpu.utilization_pct}%`;
+        if ($('pch-gpu-temp')) $('pch-gpu-temp').textContent = `${data.gpu.temperature_c}°C`;
+        if ($('pch-gpu-vram')) $('pch-gpu-vram').textContent = `${data.gpu.vram_used_gb} GB / ${data.gpu.vram_total_gb} GB`;
+        if ($('pch-gpu-vram-pct')) $('pch-gpu-vram-pct').textContent = `${data.gpu.vram_pct}%`;
+      }
+      if (data.process_tree) {
+        const pt = data.process_tree;
+        if ($('pch-tree-total')) $('pch-tree-total').textContent = `Total Stack: ${pt.total_oma_ecosystem_gb} GB (${pt.total_oma_ecosystem_mb} MB)`;
+        if ($('pch-proc-atticus')) $('pch-proc-atticus').textContent = `${pt.atticus_app_mb} MB`;
+        if ($('pch-proc-webview')) $('pch-proc-webview').textContent = `${pt.webview2_cluster_mb} MB (${pt.webview2_instances} inst)`;
+        if ($('pch-proc-python')) $('pch-proc-python').textContent = `${pt.python_backend_mb} MB (${pt.python_instances} inst)`;
+        if ($('pch-proc-ollama')) $('pch-proc-ollama').textContent = `${pt.ollama_inference_mb} MB (${pt.ollama_instances} inst)`;
+      }
+    },
+    workersStatus(data) {
+      if (window.agentTown && window.agentTown.updateFromBackendStatus) {
+        window.agentTown.updateFromBackendStatus(data);
+      }
+    },
+    notesList(list) {
+      window.currentNotesList = list || [];
+      renderNotes(window.currentNotesList);
+    },
     tab(name) {
       const b = document.querySelector(`nav button[data-s="${name}"]`);
       if (b) b.click();
@@ -2390,129 +2563,233 @@ body {
     integrations
   };
 
-  // Initialize Canvas Visualizers on Window Load
+  // Notes Management Helpers
+  window.currentNotesList = [];
+  function renderNotes(list, query = '') {
+    const cont = $('notesListContainer');
+    if (!cont) return;
+    cont.innerHTML = '';
+    const q = (query || '').toLowerCase().trim();
+    const filtered = q ? list.filter(n => (n.title || '').toLowerCase().includes(q) || (n.content || '').toLowerCase().includes(q)) : list;
+
+    if (!filtered || filtered.length === 0) {
+      cont.innerHTML = '<div class="empty" style="padding:14px; color:var(--text-muted); text-align:center;">No saved notes found. Click "+ New Note" to create one.</div>';
+      return;
+    }
+
+    filtered.forEach(note => {
+      const el = document.createElement('div');
+      el.className = 'cyber-card';
+      el.style.cssText = 'padding:10px 12px; cursor:pointer; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:7px; transition:all 0.2s;';
+      el.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <b style="color:#fff; font-size:12px;">${esc(note.title)}</b>
+          ${note.use_as_context ? '<span class="pill ok" style="font-size:9.5px; padding:1px 5px;">AI Context</span>' : ''}
+        </div>
+        <div style="font-size:11px; color:var(--text-secondary); line-height:1.35; max-height:36px; overflow:hidden; text-overflow:ellipsis;">
+          ${esc(note.content)}
+        </div>
+      `;
+      el.onclick = () => openNoteEditor(note);
+      cont.appendChild(el);
+    });
+  }
+
+  function openNoteEditor(note = null) {
+    const drawer = $('noteEditorDrawer');
+    if (!drawer) return;
+    drawer.style.display = 'flex';
+    $('noteEditId').value = note ? (note.id || '') : '';
+    $('noteEditTitle').value = note ? (note.title || '') : '';
+    $('noteEditContent').value = note ? (note.content || '') : '';
+    $('noteEditContext').checked = note ? (note.use_as_context || false) : false;
+    $('btnDeleteNote').style.display = note ? 'inline-block' : 'none';
+  }
+
+  function closeNoteEditor() {
+    const drawer = $('noteEditorDrawer');
+    if (drawer) drawer.style.display = 'none';
+  }
+
+  // Wire UI Controls
   window.addEventListener('DOMContentLoaded', () => {
     try {
       holoOrb = new window.OmaHoloOrb('orb-canvas');
       agentTown = new window.AgentTown('town-canvas');
       mindMap = new window.OmaMindMap('cables-canvas');
+      window.holoOrb = holoOrb;
+      window.agentTown = agentTown;
+      window.mindMap = mindMap;
     } catch (e) {
       console.warn('Canvas init:', e);
     }
-  });
 
+    // Chat Input & Send Button
+    const chatInput = $('homeChatInput');
+    const btnSend = $('btnHomeSend');
+    const btnMic = $('btnHomeMic');
 
-  // Authoritative State Controller & Drawer Setup
-  window.OmaController = {
-    state: 'active',
-    holoOrb: null,
-    mindMap: null,
-    agentTown: null,
+    if (btnSend && chatInput) {
+      btnSend.onclick = () => {
+        const val = chatInput.value;
+        chatInput.value = '';
+        sendDirective(val);
+      };
+    }
+    if (chatInput) {
+      chatInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          const val = chatInput.value;
+          chatInput.value = '';
+          sendDirective(val);
+        }
+      };
+    }
+    if (btnMic) {
+      btnMic.onclick = () => post({ do: 'talk' });
+    }
 
-    init() {
-      try { this.holoOrb = new OmaHoloFace('orb-canvas'); } catch(e) { console.error('HoloFace init error:', e); }
-      try { this.mindMap = new OmaMindMap('cables-canvas'); } catch(e) { console.error('MindMap init error:', e); }
-      try { this.agentTown = new AgentTown('town-canvas'); } catch(e) { console.error('AgentTown init error:', e); }
-      window.holoOrb = this.holoOrb;
-      window.agentTown = this.agentTown;
-      window.mindMap = this.mindMap;
+    // Quick Chips
+    document.querySelectorAll('.quick-chip').forEach(chip => {
+      chip.onclick = () => {
+        const prompt = chip.dataset.prompt;
+        if (prompt) sendDirective(prompt);
+      };
+    });
 
-      this.wireEvents();
-    },
+    // Language Switcher
+    const langSwitcher = $('lang-switcher');
+    const langLabel = $('current-lang-label');
+    if (langSwitcher && langLabel) {
+      langSwitcher.onclick = () => {
+        const isBn = langLabel.textContent.includes('বাংলা');
+        langLabel.textContent = isBn ? 'English' : 'বাংলা';
+      };
+    }
 
-    setState(state, detail, pct) {
-      this.state = state;
-      if (this.holoOrb && this.holoOrb.setState) this.holoOrb.setState(state);
-      if (this.mindMap && this.mindMap.setState) this.mindMap.setState(state);
-      if (this.agentTown && this.agentTown.onTaskEvent) this.agentTown.onTaskEvent(state, detail);
-    },
+    // Top Header PC Health Button
+    const btnPcHealth = $('btn-pc-health');
+    const modalPcHealth = $('pc-health-modal');
+    const btnClosePch = $('btn-close-pchealth');
+    if (btnPcHealth && modalPcHealth) {
+      btnPcHealth.onclick = () => {
+        modalPcHealth.style.display = 'flex';
+        post({ do: 'pcHealth' });
+      };
+    }
+    if (btnClosePch && modalPcHealth) {
+      btnClosePch.onclick = () => {
+        modalPcHealth.style.display = 'none';
+      };
+    }
 
-    openSettings(tabName) {
-      const drawer = document.getElementById('settings-drawer');
-      if (drawer) drawer.classList.add('open');
-      if (tabName) {
-        const btn = document.querySelector(`nav.master-nav button[data-s="${tabName}"]`);
-        if (btn) btn.click();
-      }
-    },
-
-    closeSettings() {
-      const drawer = document.getElementById('settings-drawer');
-      if (drawer) drawer.classList.remove('open');
-    },
-
-    wireEvents() {
-      const btnToggle = document.getElementById('btn-toggle-settings');
-      if (btnToggle) btnToggle.onclick = () => this.openSettings();
-
-      const btnClose = document.getElementById('btn-close-settings');
-      if (btnClose) btnClose.onclick = () => this.closeSettings();
-
-      const btnDrawerClose = document.getElementById('drawer-close');
-      if (btnDrawerClose) {
-        btnDrawerClose.onclick = () => {
-          const nd = document.getElementById('node-drawer');
-          if (nd) nd.classList.remove('open');
+    // Animation Speed Controls (M2)
+    const speedBtns = {
+      slow: $('btn-speed-slow'),
+      normal: $('btn-speed-normal'),
+      fast: $('btn-speed-fast')
+    };
+    Object.entries(speedBtns).forEach(([spd, btn]) => {
+      if (btn) {
+        btn.onclick = () => {
+          Object.values(speedBtns).forEach(b => { if (b) { b.classList.remove('active'); b.style.color = 'var(--text-muted)'; b.style.background = 'transparent'; } });
+          btn.classList.add('active');
+          btn.style.color = '#fff';
+          btn.style.background = 'rgba(0,229,255,0.25)';
+          if (window.holoOrb && window.holoOrb.setSpeedMode) {
+            window.holoOrb.setSpeedMode(spd);
+          }
         };
       }
+    });
 
-      const btnTerminate = document.getElementById('btn-terminate');
-      if (btnTerminate) {
-        btnTerminate.onclick = () => {
-          post({ do: "voiceCancel" });
-          this.setState('active', 'Cancelled', 100);
-        };
-      }
-
-      // Drawer tab buttons
-      document.querySelectorAll('nav.master-nav button.nav-btn').forEach(b => {
-        b.onclick = () => {
-          document.querySelectorAll('nav.master-nav button.nav-btn, .settings-content section.tab-section').forEach(e => e.classList.remove('on'));
-          b.classList.add('on');
-          const targetSection = document.getElementById(b.dataset.s);
-          if (targetSection) targetSection.classList.add('on');
-        };
-      });
+    // Reset 3D Face View
+    const btnResetFace = $('btn-holo-sparkle');
+    if (btnResetFace && window.holoOrb) {
+      btnResetFace.onclick = () => {
+        window.holoOrb.targetRotX = 0;
+        window.holoOrb.targetRotY = 0;
+        window.holoOrb.targetZoomScale = 1.0;
+      };
     }
-  };
 
-  // Re-route st methods to authoritative controller
-  const prevFeedLine = window.st.feedLine;
-  window.st.feedLine = function(line) {
-    if (typeof line === 'string' && line.startsWith('§EVENT§')) {
-      try {
-        const ev = JSON.parse(line.slice(7));
-        window.OmaController.setState(ev.stage || 'executing', ev.detail || '', ev.pct || 50);
-      } catch(e) {}
-    } else if (typeof line === 'string' && line.startsWith('§REPLY§')) {
-      window.OmaController.setState('completed', 'Task Complete', 100);
-      setTimeout(() => window.OmaController.setState('active', 'Ready', 0), 3000);
+    // Feed Column Tabs (VOICE, AGENT, NOTES)
+    document.querySelectorAll('.feed-tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.feed-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const ftab = (tab.dataset.ftab || 'voice').toLowerCase();
+
+        $('feedVoiceView').style.display = ftab === 'voice' ? 'flex' : 'none';
+        $('feedAgentView').style.display = ftab === 'agent' ? 'flex' : 'none';
+        $('feedNotesView').style.display = ftab === 'notes' ? 'flex' : 'none';
+
+        if (ftab === 'notes') {
+          post({ do: 'notesList' });
+        }
+      };
+    });
+
+    // Notes Controls
+    const btnNewNote = $('btnNewNote');
+    if (btnNewNote) btnNewNote.onclick = () => openNoteEditor(null);
+
+    const btnCancelNote = $('btnCancelNote');
+    if (btnCancelNote) btnCancelNote.onclick = closeNoteEditor;
+
+    const btnSaveNote = $('btnSaveNote');
+    if (btnSaveNote) {
+      btnSaveNote.onclick = () => {
+        const id = $('noteEditId').value;
+        const title = $('noteEditTitle').value.trim();
+        const content = $('noteEditContent').value.trim();
+        const useCtx = $('noteEditContext').checked;
+        if (!title && !content) return;
+        post({
+          do: 'notesSave',
+          note: { id: id || undefined, title, content, use_as_context: useCtx }
+        });
+        closeNoteEditor();
+      };
     }
-    if (prevFeedLine) prevFeedLine(line);
-  };
 
-  const prevVoiceStart = window.st.voiceStart;
-  window.st.voiceStart = function() {
-    window.OmaController.setState('listening', 'Listening to microphone...', 0);
-    if (prevVoiceStart) prevVoiceStart();
-  };
-
-  const prevVoiceDone = window.st.voiceDone;
-  window.st.voiceDone = function(transcript) {
-    if (transcript) {
-      window.OmaController.setState('thinking', 'Processing voice directive...', 20);
-    } else {
-      window.OmaController.setState('active', 'Ready', 0);
+    const btnDeleteNote = $('btnDeleteNote');
+    if (btnDeleteNote) {
+      btnDeleteNote.onclick = () => {
+        const id = $('noteEditId').value;
+        if (!id) return;
+        if (confirm('Are you sure you want to delete this note?')) {
+          post({ do: 'notesDelete', id });
+          closeNoteEditor();
+        }
+      };
     }
-    if (prevVoiceDone) prevVoiceDone(transcript);
-  };
 
-  window.st.openSettings = function(tab) {
-    window.OmaController.openSettings(tab);
-  };
+    const notesSearchInput = $('notesSearchInput');
+    if (notesSearchInput) {
+      notesSearchInput.oninput = () => {
+        renderNotes(window.currentNotesList, notesSearchInput.value);
+      };
+    }
 
-  window.addEventListener('DOMContentLoaded', () => {
-    window.OmaController.init();
+    // Settings Drawer Wires
+    const btnToggleSettings = $('btn-toggle-settings');
+    const drawer = $('settings-drawer');
+    const btnCloseSettings = $('btn-close-settings');
+    if (btnToggleSettings && drawer) btnToggleSettings.onclick = () => drawer.classList.add('open');
+    if (btnCloseSettings && drawer) btnCloseSettings.onclick = () => drawer.classList.remove('open');
+
+    const btnTerminate = $('btn-terminate');
+    if (btnTerminate) {
+      btnTerminate.onclick = () => {
+        post({ do: 'voiceCancel' });
+        if (window.holoOrb) window.holoOrb.setState('active');
+        if (window.agentTown) {
+          Object.values(window.agentTown.agents).forEach(a => { a.state = 'IDLE'; a.speechBubble = null; });
+          window.agentTown.updateChipsBar();
+        }
+      };
+    }
   });
 </script>
 </body>

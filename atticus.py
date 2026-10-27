@@ -1845,9 +1845,32 @@ def main():
     if args[:1] == ['--provider-remove'] and len(args) > 1:
         from multi_ai.providers import provider_mgr
         return print(json.dumps(provider_mgr.remove_custom_provider(args[1])))
+    if args[:1] == ['--workers-status']:
+        from multi_ai.orchestrator import orchestrator
+        return print(json.dumps(orchestrator.get_all_workers_status()))
+    if args[:1] == ['--pc-health']:
+        from multi_ai.telemetry import get_complete_pc_health
+        return print(json.dumps(get_complete_pc_health()))
+    if args[:1] == ['--notes-list']:
+        from multi_ai.orchestrator import get_all_notes
+        return print(json.dumps(get_all_notes()))
+    if args[:1] == ['--notes-save']:
+        from multi_ai.orchestrator import save_note
+        raw = sys.stdin.read().strip()
+        data = json.loads(raw) if raw.startswith('{') else {}
+        return print(json.dumps(save_note(
+            title=data.get('title', ''),
+            content=data.get('content', ''),
+            note_id=data.get('id'),
+            use_as_context=data.get('use_as_context', False)
+        )))
+    if args[:1] == ['--notes-delete'] and len(args) > 1:
+        from multi_ai.orchestrator import delete_note
+        return print(json.dumps(delete_note(args[1])))
     if args[:1] == ['--oma-ask'] and len(args) > 1:
         t_start = time.time()
-        from multi_ai.router import clean_user_prompt, router
+        from multi_ai.router import clean_user_prompt
+        from multi_ai.orchestrator import orchestrator, get_all_notes
         user_task = ' '.join(args[1:])
         prompt = clean_user_prompt(user_task)
 
@@ -1870,13 +1893,23 @@ def main():
             except Exception as e:
                 sys.stderr.write(f"[Fast Engine Notice] {e}\n")
         
-        # Build Atticus memory, workflow, and recent turns context (F12)
+        # Build Atticus memory, workflow, notes, and recent turns context (F12)
         mem = relevant_rules(prompt) if 'relevant_rules' in dir() or callable(globals().get('relevant_rules')) else ''
         procedure = workflows(prompt) if pref('learn', True) else ''
         turns = recent()
         turns = [r for r in turns if time.time() - r.get('t', 0) < 600][-3:]
         earlier = earlier_chat(turns)
         
+        # Add authorized context notes
+        notes_ctx = []
+        try:
+            for n in get_all_notes():
+                if n.get('use_as_context'):
+                    notes_ctx.append(f"• {n.get('title')}: {n.get('content')}")
+        except Exception:
+            pass
+        notes_str = "\n".join(notes_ctx)
+
         sys_context_parts = [
             "You are Oma AI (PC 2070 Agent), a personal desktop AI assistant. When the user asks to open an app or execute a desktop action, be polite, helpful, and concise. To perform an action, you may emit [ACTION: open_app(\"app_name\")]."
         ]
@@ -1884,6 +1917,8 @@ def main():
             sys_context_parts.append(f"Memory / User Rules:\n{mem}")
         if procedure:
             sys_context_parts.append(f"Saved Procedure:\n{procedure}")
+        if notes_str:
+            sys_context_parts.append(f"User Notes Context:\n{notes_str}")
         if earlier:
             sys_context_parts.append(f"Recent Conversation:\n{earlier}")
         
@@ -1892,22 +1927,10 @@ def main():
         def on_event(ev):
             print("§EVENT§" + json.dumps(ev), flush=True)
             
-        res = router.execute(prompt, system_prompt=system_context, event_callback=on_event)
+        res = orchestrator.execute_directive(prompt, system_context=system_context, event_callback=on_event)
         
         if res.get('success'):
             reply_text = res.get('reply', '')
-            action_match = re.search(r'\[ACTION:\s*open_app\([\'"]([^\'"]+)[\'"]\)\s*\]', reply_text)
-            if not action_match:
-                action_match = re.search(r'(?:খোলো|খুলুন|চালু করো|চালু করুন|ওপেন করো|অন করো|open|launch|start)\s+([a-zA-Z0-9_\-\u0980-\u09FF\s]+)', prompt, re.I)
-            if action_match:
-                target_app = action_match.group(1).strip()
-                try:
-                    from multi_ai.tools import tool_open_app
-                    t_res = tool_open_app(target_app)
-                    if t_res and not t_res.startswith('Error'):
-                        on_event({"stage": "completed", "detail": f"Verified Windows Action: {t_res}", "pct": 100})
-                except Exception as ex:
-                    sys.stderr.write(f"[Action Tool Error] {ex}\n")
             remember_turn(prompt, reply_text)
             log_turn(prompt, reply_text, t_start)
             

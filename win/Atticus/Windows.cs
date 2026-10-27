@@ -258,14 +258,46 @@ sealed class SettingsWindow : PageWindow
         Refresh2(); if (t != "") { Js($"st.tab('{t}')"); tab = ""; }
         perms ??= new System.Windows.Forms.Timer { Interval = 1500 };
         perms.Tick -= Perms; perms.Tick += Perms; perms.Start();
+        StartTelemetryTimer();
     }
     void Perms(object s, EventArgs e) { if (Visible) Send("st.perms", OnboardingWindow.Perms()); }
+
+    System.Windows.Forms.Timer telemTimer;
+    void StartTelemetryTimer()
+    {
+        telemTimer ??= new System.Windows.Forms.Timer { Interval = 3500 };
+        telemTimer.Tick -= TelemetryTick;
+        telemTimer.Tick += TelemetryTick;
+        telemTimer.Start();
+        Task.Run(TelemetryTickCore);
+    }
+    void TelemetryTick(object s, EventArgs e)
+    {
+        if (!Visible) return;
+        Task.Run(TelemetryTickCore);
+    }
+    void TelemetryTickCore()
+    {
+        try {
+            var h = Py.Run(new[] { "--pc-health" });
+            if (h.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.pcHealth({h})"));
+            var w = Py.Run(new[] { "--workers-status" });
+            if (w.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.workersStatus({w})"));
+        } catch { }
+    }
 
     protected override void Loaded() {
         Program.Err("SettingsWindow.Loaded() entered");
         Visible = true;
         BringToFront();
         Push(); Refresh2(); Send("st.perms", OnboardingWindow.Perms()); if (tab != "") { Js($"st.tab('{tab}')"); tab = ""; }
+        StartTelemetryTimer();
+        Task.Run(() => {
+            try {
+                var notes = Py.Run(new[] { "--notes-list" });
+                if (notes.TrimStart().StartsWith("[")) Program.Post(() => Js($"st.notesList({notes})"));
+            } catch { }
+        });
     }
 
     static readonly SemaphoreSlim askLock = new(1, 1);
@@ -435,6 +467,43 @@ sealed class SettingsWindow : PageWindow
                 break;
             case "voiceCancel":
                 Program.Post(CancelListening);
+                break;
+            case "workersStatus":
+                Task.Run(() => {
+                    var j = Py.Run(new[] { "--workers-status" });
+                    if (j.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.workersStatus({j})"));
+                });
+                break;
+            case "pcHealth":
+                Task.Run(() => {
+                    var j = Py.Run(new[] { "--pc-health" });
+                    if (j.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.pcHealth({j})"));
+                });
+                break;
+            case "notesList":
+                Task.Run(() => {
+                    var j = Py.Run(new[] { "--notes-list" });
+                    if (j.TrimStart().StartsWith("[")) Program.Post(() => Js($"st.notesList({j})"));
+                });
+                break;
+            case "notesSave":
+                if (b.TryGetProperty("note", out var nEl)) {
+                    var nJson = nEl.GetRawText();
+                    Task.Run(() => {
+                        Py.RunWithInput(new[] { "--notes-save" }, nJson + "\n", 15);
+                        var j = Py.Run(new[] { "--notes-list" });
+                        if (j.TrimStart().StartsWith("[")) Program.Post(() => Js($"st.notesList({j})"));
+                    });
+                }
+                break;
+            case "notesDelete":
+                if (S("id") is { } ndId) {
+                    Task.Run(() => {
+                        Py.Run(new[] { "--notes-delete", ndId });
+                        var j = Py.Run(new[] { "--notes-list" });
+                        if (j.TrimStart().StartsWith("[")) Program.Post(() => Js($"st.notesList({j})"));
+                    });
+                }
                 break;
             case "openOverlay":
                 Program.Post(() => Open());
