@@ -591,10 +591,10 @@ def proc_of(app):
 
 
 def plain(text):
-    """Spoken request -> its core words: "Hey Atticus, can you open Spotify please?" -> "open spotify"."""
+    """Spoken request -> its core words: "Hey Oma, can you open Spotify please?" -> "open spotify"."""
     t = re.sub(r'[,;!?]|:(?!//)|(?<!\w)\.|\.(?!\w)', '', text.lower().strip(' .!?')).strip()   # keep domain dots; normalize punctuation before spoken prefixes
-    t = re.sub(r"^(hey |ok |okay )?(atticus,? )?(please |can you |could you |would you )?", '', t)
-    t = re.sub(r'^(also |and |now |then )+', '', re.sub(r'\s+please$', '', t))
+    t = re.sub(r"^(hey |ok |okay )?(atticus|oma),?\s*(please |can you |could you |would you )?", '', t)
+    t = re.sub(r'^(also |and |now |then )+', '', re.sub(r'\s+(please|for me|now)$', '', t))
     return t
 
 
@@ -922,10 +922,26 @@ def fast(text):
             return f'Opened {target.title()}.'
         app = app_named(target)
         if not app:
+            try:
+                from multi_ai.tools import tool_open_app
+                t_res = tool_open_app(target)
+                if t_res and not t_res.startswith('Error'):
+                    fast.cmds = [f'{SHOW} {shlex.quote(target)}']
+                    return f'Opened {target}.'
+            except Exception:
+                pass
             return None
         if pref('openOn', 'here') == 'other':
             show(app)   # Settings: open on the other screen and keep focus (slower, ~1-3 s)
         elif not open_app(app):   # plain open, ~0.1 s: here and in front
+            try:
+                from multi_ai.tools import tool_open_app
+                t_res = tool_open_app(app)
+                if t_res and not t_res.startswith('Error'):
+                    fast.cmds = [f'{SHOW} {shlex.quote(app)}']
+                    return f'Opened {app}.'
+            except Exception:
+                pass
             return None
         fast.cmds = [f'{SHOW} {shlex.quote(app)}']
         open(LAST, 'w', encoding='utf-8').write(app)
@@ -1861,7 +1877,9 @@ def main():
         turns = [r for r in turns if time.time() - r.get('t', 0) < 600][-3:]
         earlier = earlier_chat(turns)
         
-        sys_context_parts = []
+        sys_context_parts = [
+            "You are Oma AI (PC 2070 Agent), a personal desktop AI assistant. When the user asks to open an app or execute a desktop action, be polite, helpful, and concise. To perform an action, you may emit [ACTION: open_app(\"app_name\")]."
+        ]
         if mem:
             sys_context_parts.append(f"Memory / User Rules:\n{mem}")
         if procedure:
@@ -1878,6 +1896,18 @@ def main():
         
         if res.get('success'):
             reply_text = res.get('reply', '')
+            action_match = re.search(r'\[ACTION:\s*open_app\([\'"]([^\'"]+)[\'"]\)\s*\]', reply_text)
+            if not action_match:
+                action_match = re.search(r'(?:খোলো|খুলুন|চালু করো|চালু করুন|ওপেন করো|অন করো|open|launch|start)\s+([a-zA-Z0-9_\-\u0980-\u09FF\s]+)', prompt, re.I)
+            if action_match:
+                target_app = action_match.group(1).strip()
+                try:
+                    from multi_ai.tools import tool_open_app
+                    t_res = tool_open_app(target_app)
+                    if t_res and not t_res.startswith('Error'):
+                        on_event({"stage": "completed", "detail": f"Verified Windows Action: {t_res}", "pct": 100})
+                except Exception as ex:
+                    sys.stderr.write(f"[Action Tool Error] {ex}\n")
             remember_turn(prompt, reply_text)
             log_turn(prompt, reply_text, t_start)
             

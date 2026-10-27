@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Oma AI</title>
+<title>Oma AI - Futuristic Cybernetic Command Center</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap');
@@ -1066,7 +1066,7 @@ body {
   body {
     font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: var(--bg); color: var(--fg); height: 100vh; width: 100vw;
-    display: flex; flex-direction: row !important; overflow: hidden; user-select: none;
+    display: flex; flex-direction: column !important; overflow: hidden; user-select: none;
   }
   
   /* Left Master Sidebar */
@@ -1218,264 +1218,451 @@ body {
   /* Model badge */
   .model-tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: rgba(0,229,255,0.15); color: #00e5ff; font-weight: 600; }
   .model-tag.fallback { background: rgba(255,179,0,0.15); color: #ffb300; }
+
+  /* Reference Video Specific Matching Styles */
+  .btn-settings-pill {
+    background: rgba(0, 229, 255, 0.12);
+    border: 1px solid rgba(0, 229, 255, 0.35);
+    color: var(--neon-cyan);
+    font-family: var(--font-tech);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.8px;
+    padding: 3px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-settings-pill:hover {
+    background: rgba(0, 229, 255, 0.25);
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+  }
+
+  .btn-cyber-terminate {
+    background: rgba(255, 42, 95, 0.15);
+    border: 1px solid #ff2a5f;
+    color: #ff2a5f;
+    font-family: var(--font-tech);
+    font-weight: 800;
+    font-size: 11.5px;
+    letter-spacing: 1.5px;
+    padding: 5px 22px;
+    border-radius: 20px;
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(255, 42, 95, 0.25);
+    transition: all 0.2s;
+  }
+  .btn-cyber-terminate:hover {
+    background: #ff2a5f;
+    color: #fff;
+    box-shadow: 0 0 18px rgba(255, 42, 95, 0.6);
+  }
+
+  .btn-icon-sparkle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(0, 229, 255, 0.1);
+    border: 1px solid rgba(0, 229, 255, 0.3);
+    color: var(--neon-cyan);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-icon-sparkle:hover {
+    background: rgba(0, 229, 255, 0.25);
+    box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+  }
+
+  /* Settings Slide-Over Drawer */
+  #settings-drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(7, 9, 14, 0.94);
+    backdrop-filter: blur(24px);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #settings-drawer.open {
+    transform: translateX(0);
+  }
+  .drawer-header-bar {
+    height: 48px;
+    background: rgba(12, 16, 23, 0.95);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    flex: none;
+  }
+  .drawer-body-split {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+  .btn-close-drawer {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    transition: all 0.2s;
+  }
+  .btn-close-drawer:hover {
+    background: rgba(255, 42, 95, 0.3);
+    border-color: #ff2a5f;
+  }
+
+  /* Node items in nodes-panel */
+  .system-node {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+  }
+  .system-node:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: var(--node-color, var(--neon-cyan));
+    box-shadow: 0 0 10px var(--node-glow, rgba(0, 229, 255, 0.3));
+  }
+  .node-icon-box {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex: none;
+  }
+  .node-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .node-title {
+    display: block;
+    font-family: var(--font-tech);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    color: #fff;
+  }
+  .node-subtitle {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .node-anchor {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex: none;
+  }
+
+  /* Master Layout Fixes (Full 100% viewport width) */
+  body {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+    width: 100vw !important;
+    overflow: hidden !important;
+  }
+  #top-header {
+    width: 100% !important;
+    flex: none !important;
+    height: 48px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+  #dashboard-viewport {
+    width: 100% !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 12px !important;
+    padding: 12px !important;
+    overflow: hidden !important;
+    min-height: 0 !important;
+  }
 </style>
+
 </head>
 <body>
 
-<!-- Left Master Navigation Sidebar -->
-<nav class="master-nav">
-  <div class="brand-box">
-    <div class="brand-logo">
-      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+<!-- Top System Telemetry Bar (Across full width) -->
+<header id="top-header" class="telemetry-bar">
+  <div class="brand-section" style="display:flex; align-items:center; gap:8px;">
+    <div class="brand-logo" style="width:26px; height:26px; background:linear-gradient(135deg, #00e5ff, #0077ff); border-radius:6px; display:flex; align-items:center; justify-content:center;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </div>
-    <div class="brand-text">
-      <b>OMA AI</b>
-      <span>PC 2070 AGENT</span>
+    <div>
+      <b style="font-family:'Orbitron', sans-serif; font-size:13px; letter-spacing:0.8px; color:#fff;">OMA AI</b>
+      <span style="font-size:9.5px; color:var(--neon-cyan); letter-spacing:0.5px; margin-left:4px;">PC 2070</span>
     </div>
   </div>
 
-  <div class="nav-group-title">Command Center</div>
-  <button class="nav-btn on" data-s="home">
-    <i class="ni" style="background:#00e5ff"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></i>
-    Dashboard
-  </button>
-  <button class="nav-btn" data-s="feed">
-    <i class="ni" style="background:#00f59b"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></i>
-    Chat &amp; Feed
-  </button>
-  <button class="nav-btn" data-s="tasks">
-    <i class="ni" style="background:#b388ff"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></i>
-    Task Execution
-  </button>
+  <div class="telem-group" style="display:flex; align-items:center; gap:10px;">
+    <div class="telem-chip" id="lang-switcher" style="cursor:pointer; background:rgba(0,229,255,0.12); padding:3px 10px; border-radius:5px; border:1px solid rgba(0,229,255,0.3);" title="ক্লিক করে ভাষা পরিবর্তন করুন (বাংলা / English)">
+      <span style="color:var(--neon-cyan);">🌐 ভয়েস:</span> <b id="current-lang-label" style="color:#fff;">বাংলা</b>
+    </div>
+    <div class="telem-chip">
+      <div class="status-pulse"></div>
+      <span>CORE: <b style="color:var(--neon-cyan);">ONLINE</b></span>
+    </div>
+    <div class="telem-chip">
+      <span>MODEL: <b id="telemActiveModel" class="model-tag">Google: Gemini 2.0 Flash</b></span>
+    </div>
+  </div>
 
-  <div class="nav-group-title">Multi-AI Intelligence</div>
-  <button class="nav-btn" data-s="providers">
-    <i class="ni" style="background:#10a37f"><svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM4 12a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2 2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm12 0a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2zm-6 8a2 2 0 0 1 2-2v-2a2 2 0 0 1 2-2 2 2 0 0 1-2 2v2a2 2 0 0 1-2 2zM9 9h6v6H9z"/></svg></i>
-    AI Providers
-  </button>
-  <button class="nav-btn" data-s="brain">
-    <i class="ni" style="background:#d97757"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/></svg></i>
-    Intelligence
-  </button>
+  <div class="telem-group" style="display:flex; align-items:center; gap:10px;">
+    <div class="telem-chip"><span>LATENCY: <b>18ms</b></span></div>
+    <div class="telem-chip"><span>HOST: <b>WINDOWS 11</b></span></div>
+    <div class="telem-chip"><span>HOTKEY: <b id="telemHotkey">Ctrl+Alt+Space</b></span></div>
+    <button id="btn-toggle-settings" class="btn-settings-pill">⚙️ SETTINGS</button>
+  </div>
+</header>
 
-  <div class="nav-group-title">System Settings</div>
-  <button class="nav-btn" data-s="general">
-    <i class="ni" style="background:#8e8e93"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></i>
-    General
-  </button>
-  <button class="nav-btn" data-s="sound">
-    <i class="ni" style="background:#ff375f"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg></i>
-    Sound
-  </button>
-  <button class="nav-btn" data-s="screen">
-    <i class="ni" style="background:#bf5af2"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16.5V20"/></svg></i>
-    Screen &amp; Windows
-  </button>
-  <button class="nav-btn" data-s="memory">
-    <i class="ni" style="background:#ff9f0a"><svg viewBox="0 0 24 24"><path d="M6 4h12v16l-6-4-6 4z"/></svg></i>
-    Memory
-  </button>
-  <button class="nav-btn" data-s="integrations">
-    <i class="ni" style="background:#bf5af2"><svg viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z"/></svg></i>
-    Integrations
-  </button>
-  <button class="nav-btn" data-s="usage">
-    <i class="ni" style="background:#30d158"><svg viewBox="0 0 24 24"><path d="M5 19V11M12 19V5M19 19v-6"/></svg></i>
-    Usage
-  </button>
-  <button class="nav-btn" data-s="account">
-    <i class="ni" style="background:#0a84ff"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></i>
-    Account &amp; Access
-  </button>
-  <button class="nav-btn" data-s="lab">
-    <i class="ni" style="background:#64d2ff"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3M7.5 15h9"/></svg></i>
-    Experimental
-  </button>
-  <button class="nav-btn" data-s="about">
-    <i class="ni" style="background:#5e5ce6"><svg viewBox="0 0 24 24"><path d="M12 4v10M8 10l4 4 4-4M5 19h14"/></svg></i>
-    About &amp; Updates
-  </button>
+<!-- Master Dashboard Viewport (100% width) -->
+<main id="dashboard-viewport" style="flex:1; display:flex; gap:12px; padding:12px; overflow:hidden; min-height:0;">
 
-  <div class="spacer"></div>
-  <div class="ver" id="ver">Oma AI • PC 2070</div>
-</nav>
+  <!-- Left Workspace Column (~65% width) -->
+  <section id="workspace-column" style="flex:1.8; display:flex; flex-direction:column; gap:12px; min-width:0; min-height:0;">
 
-<!-- Main Interactive Viewport -->
-<main class="main-viewport">
+    <!-- Upper Deck: Neural Nodes + Cables + Central Holographic Face Card -->
+    <div id="upper-deck" style="display:flex; gap:0px; height:280px; flex:none;">
 
-  <!-- ==================== TAB: HOME / DASHBOARD ==================== -->
-  <section id="home" class="tab-section on">
-    <!-- Telemetry Header -->
-    <div class="telemetry-bar">
-      <div class="telem-group">
-        <div class="telem-chip" id="lang-switcher" style="cursor:pointer; background:rgba(0,229,255,0.12); padding:3px 10px; border-radius:5px; border:1px solid rgba(0,229,255,0.3);">
-          <span style="color:var(--neon-cyan);">🌐 ভয়েস:</span> <b id="current-lang-label" style="color:#fff;">বাংলা</b>
+      <!-- Left Nodes Card (Memory, Skills, Soul, Setting) -->
+      <div id="nodes-panel" class="cyber-card" style="width:180px; padding:10px; display:flex; flex-direction:column; justify-content:space-between; flex:none; border-top-right-radius:0; border-bottom-right-radius:0; border-right:none;">
+        <div id="nodes-group" style="display:flex; flex-direction:column; gap:8px;">
+          <!-- Populated by mindmap.js -->
         </div>
-        <div class="telem-chip">
-          <div class="status-pulse"></div>
-          <span>CORE: <b style="color:var(--neon-cyan);">ONLINE</b></span>
+        <div style="font-size:9.5px; color:var(--text-muted); font-family:monospace; padding-left:4px;">NEURAL BUS // ACTIVE</div>
+      </div>
+
+      <!-- Connector Cables Canvas Area -->
+      <div id="cables-panel" style="width:85px; position:relative; flex:none;">
+        <canvas id="cables-canvas" style="width:100%; height:100%; display:block;"></canvas>
+      </div>
+
+      <!-- Central Holographic Human Face Card -->
+      <div id="sphere-panel" class="cyber-card" style="flex:1; padding:12px; display:flex; flex-direction:column; position:relative; overflow:hidden; border-top-left-radius:0; border-bottom-left-radius:0;">
+        <div class="sphere-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:2px;">
+          <div id="sphere-status-badge" class="status-badge active" style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--neon-cyan);">
+            <span class="status-pulse"></span>
+            <span id="sphere-status-text">SYSTEM ACTIVE</span>
+          </div>
+          <span style="font-size:10px; color:var(--text-muted); font-family:monospace; letter-spacing:1px;">AUTONOMOUS AI FACE</span>
         </div>
-        <div class="telem-chip">
-          <span>MODEL: <b id="telemActiveModel" class="model-tag">Auto Fallback</b></span>
+
+        <!-- 3D Particle Face Canvas -->
+        <div class="sphere-viewport" style="flex:1; position:relative; display:grid; place-items:center; min-height:0;">
+          <canvas id="orb-canvas" style="width:100%; height:100%;"></canvas>
+        </div>
+
+        <!-- Footer with glowing SYSTEM ACTIVE, TERMINATE button, and sparkle icon -->
+        <div class="sphere-footer" style="display:flex; align-items:center; justify-content:space-between; padding-top:4px;">
+          <div style="font-family:'Rajdhani', sans-serif; font-weight:700; font-size:11px; color:var(--neon-cyan); letter-spacing:1px; display:flex; align-items:center; gap:5px;">
+            <span style="display:inline-block; width:5px; height:5px; border-radius:50%; background:#00e5ff; box-shadow:0 0 6px #00e5ff;"></span>
+            SYSTEM ACTIVE
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button id="btn-terminate" class="btn-cyber-terminate">TERMINATE</button>
+            <button class="btn-icon-sparkle" id="btn-holo-sparkle" title="Neural Scan">✦</button>
+          </div>
         </div>
       </div>
-      <div class="telem-group">
-        <div class="telem-chip"><span>LATENCY: <b>18ms</b></span></div>
-        <div class="telem-chip"><span>HOST: <b>WINDOWS 11</b></span></div>
-        <div class="telem-chip"><span>HOTKEY: <b id="telemHotkey">Ctrl+Alt+Space</b></span></div>
+
+    </div>
+
+    <!-- Lower Deck: Detailed Agent Town Virtual Office -->
+    <div id="agent-town-panel" class="cyber-card" style="flex:1; display:flex; flex-direction:column; padding:10px; min-height:0;">
+      <!-- Town Header -->
+      <div class="town-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex:none;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-weight:700; color:#fff; font-family:'Orbitron', monospace; font-size:12px; letter-spacing:0.5px;">🏢 AGENT TOWN</span>
+          <span class="town-badge">READY</span>
+        </div>
+
+        <div class="town-tabs">
+          <button class="town-tab active" data-tab="agents">agents</button>
+          <button class="town-tab" data-tab="visual hub">visual hub</button>
+          <button class="town-tab" data-tab="gesture">gesture</button>
+        </div>
+
+        <div style="font-size:11px; color:var(--text-muted); display:flex; gap:10px;">
+          <span>Units: <b>Alice, Bob, Carol, Dave</b></span>
+          <span id="agentTownActivity">Status: <b>Idle</b></span>
+        </div>
+      </div>
+
+      <!-- Agent Status Chips Sub-Bar -->
+      <div id="agent-chips-container" class="agent-chips-bar" style="margin-bottom:6px;">
+        <!-- Populated by agent_town.js -->
+      </div>
+
+      <!-- Virtual Office Canvas Viewport -->
+      <div class="town-viewport" style="flex:1; border-radius:8px; border:1px solid rgba(255,255,255,0.06); position:relative; overflow:hidden;">
+        <canvas id="town-canvas"></canvas>
+      </div>
+
+      <!-- Town Footer Telemetry -->
+      <div class="town-footer" style="margin-top:6px; border-radius:6px; border:1px solid var(--border-subtle);">
+        <div class="town-stats">
+          <span>CTX: <b>42%</b></span>
+          <span>SEATS: <b>4/7</b></span>
+          <span id="town-busy-stat"><b>0/4 busy</b></span>
+        </div>
+        <div style="font-size:10.5px; color:var(--text-muted);">
+          Oma Virtual Workplace Simulation // Active
+        </div>
       </div>
     </div>
 
-    <!-- Master Layout Grid inside Home -->
-    <div style="flex:1; display:flex; gap:12px; padding:12px; overflow:hidden; min-height:0;">
-      <!-- Left Column: Holographic Orb + Agent Town -->
-      <div style="flex:1; display:flex; flex-direction:column; gap:12px; min-width:0; min-height:0;">
-        
-        <!-- Upper Deck: Mindmap Cables + Holographic Neural Sphere -->
-        <div style="display:flex; gap:12px; height:260px;">
-          <!-- Node Inspector Card -->
-          <div class="cyber-card" style="width:220px; padding:12px; display:flex; flex-direction:column; justify-content:space-between; position:relative;">
-            <canvas id="cables-canvas" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;"></canvas>
-            <div id="nodes-group" style="display:flex; flex-direction:column; gap:8px; z-index:2;">
-              <!-- Populated by mindmap.js -->
-            </div>
-            <div style="font-size:10px; color:var(--fg3); font-family:monospace; z-index:2;">NEURAL BUS // ACTIVE</div>
-          </div>
-
-          <!-- Central Holographic 3D Orb -->
-          <div class="cyber-card" style="flex:1; padding:12px; display:flex; flex-direction:column; position:relative; overflow:hidden;">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-              <div id="sphere-status-badge" class="status-badge active" style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:var(--neon-cyan);">
-                <span class="status-pulse"></span>
-                <span id="sphere-status-text">SYSTEM ACTIVE</span>
-              </div>
-              <span style="font-size:11px; color:var(--fg3); font-family:monospace;">AUTONOMOUS AI FACE</span>
-            </div>
-            
-            <div style="flex:1; position:relative; display:grid; place-items:center;">
-              <canvas id="orb-canvas" style="width:100%; height:100%;"></canvas>
-            </div>
-
-            <div style="display:flex; align-items:center; justify-content:space-between; font-size:11px;">
-              <span style="color:var(--fg2);">Oma Particle Neural Matrix</span>
-              <button class="btn blue" id="btnOverlayTrigger" style="height:22px; font-size:11px;">Talk (Ctrl+Alt+Space)</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Lower Deck: 2D Pixel Art Agent Town -->
-        <div class="cyber-card" style="flex:1; display:flex; flex-direction:column; padding:10px; min-height:220px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-weight:700; color:#fff; font-family:'Orbitron', monospace; font-size:12px; letter-spacing:0.5px;">🏢 AGENT TOWN</span>
-              <span class="pill ok" style="font-size:10px;">MULTI-AGENT WORKPLACE</span>
-            </div>
-            <div style="font-size:11px; color:var(--fg2); display:flex; gap:10px;">
-              <span>Units: <b>Alice, Bob, Carol, Dave</b></span>
-              <span id="agentTownActivity">Status: <b>Idle</b></span>
-            </div>
-          </div>
-
-          <!-- Agent Chips Bar -->
-          <div id="agent-chips-container" style="display:flex; gap:6px; margin-bottom:6px;">
-            <!-- Populated by agent_town.js -->
-          </div>
-
-          <!-- Virtual Office Viewport -->
-          <div style="flex:1; background:#04060a; border-radius:8px; border:1px solid rgba(255,255,255,0.06); position:relative; overflow:hidden;">
-            <canvas id="town-canvas" style="width:100%; height:100%; display:block;"></canvas>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Right Column: Live Chat & Directive Stream -->
-      <div class="cyber-card" style="width:340px; display:flex; flex-direction:column; overflow:hidden; flex:none;">
-        <div style="padding:10px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;">
-          <b style="font-size:12px; color:#fff; letter-spacing:0.5px;">DIRECTIVE FEED</b>
-          <span style="font-size:10px; color:var(--neon-cyan); font-family:monospace;">REAL-TIME</span>
-        </div>
-
-        <!-- Chat Stream -->
-        <div class="feed-stream-box" id="homeFeedStream">
-          <div class="feed-card oma">
-            <div class="feed-meta"><span>OMA AI</span><span>Ready</span></div>
-            <div class="feed-text">ওমা এআই সক্রিয় আছে। যেকোনো নির্দেশ দিন—যেমন: "ক্যালকুলেটর খোলো", "ইউটিউবে গান চালাও", অথবা "স্ক্রিনে কি আছে বলো"।</div>
-          </div>
-        </div>
-
-        <!-- Quick Prompts Chips -->
-        <div style="display:flex; gap:6px; padding:6px 10px; overflow-x:auto; border-top:1px solid var(--line); flex:none;">
-          <button class="btn quick-chip" data-prompt="ক্যালকুলেটর খোলো" style="font-size:11px; height:22px;">🧮 ক্যালকুলেটর</button>
-          <button class="btn quick-chip" data-prompt="নোটপ্যাড খোলো" style="font-size:11px; height:22px;">📝 নোটপ্যাড</button>
-          <button class="btn quick-chip" data-prompt="ক্রোম খোলো" style="font-size:11px; height:22px;">🌐 ক্রোম</button>
-          <button class="btn quick-chip" data-prompt="স্ক্রিনে কি দেখা যাচ্ছে বলো" style="font-size:11px; height:22px;">🖥️ স্ক্রিন</button>
-        </div>
-
-        <!-- Input Bar -->
-        <div style="padding:10px; border-top:1px solid var(--line); display:flex; gap:6px; background:rgba(0,0,0,0.2);">
-          <input type="text" id="homeChatInput" class="field" placeholder="Type directive to Oma..." autocomplete="off">
-          <button class="btn" id="btnHomeMic" title="Voice"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
-          <button class="btn blue" id="btnHomeSend" title="Send"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
-        </div>
-      </div>
-    </div>
   </section>
 
-  <!-- ==================== TAB: FULL CHAT & STREAM ==================== -->
-  <section id="feed" class="tab-section">
-    <div style="flex:1; display:flex; flex-direction:column; max-width:820px; width:100%; margin:0 auto; padding:20px; height:100%;">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--line);">
-        <div>
-          <h1>Chat &amp; Live Stream</h1>
-          <p class="lede" style="margin:0;">Interactive communication stream with active AI model inspection and real-time execution logs.</p>
-        </div>
-        <button class="btn" id="btnClearChat">Clear History</button>
+  <!-- Right Directive Feed Column (~35% width) -->
+  <aside id="feed-column" class="cyber-card" style="flex:1.0; display:flex; flex-direction:column; overflow:hidden; min-width:320px; max-width:440px;">
+    <!-- Feed Header Tabs -->
+    <div class="feed-header" style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid var(--line); flex:none;">
+      <div class="feed-tabs" style="display:flex; gap:4px;">
+        <button class="feed-tab active" data-ftab="voice">VOICE</button>
+        <button class="feed-tab" data-ftab="agent">AGENT</button>
+        <button class="feed-tab" data-ftab="notes">NOTES</button>
       </div>
+      <span style="font-size:10px; color:var(--neon-cyan); font-family:monospace;">LIVE FEED</span>
+    </div>
 
-      <div class="feed-stream-box" id="fullFeedStream" style="border:1px solid var(--line); border-radius:10px; background:var(--card); margin-bottom:12px;">
-        <div class="feed-card oma">
-          <div class="feed-meta"><span>OMA AI</span><span class="model-tag">Auto Multi-AI</span></div>
-          <div class="feed-text">Hello! I am Oma AI. Type any command, ask questions, or press Ctrl+Alt+Space to control your Windows PC.</div>
-        </div>
-      </div>
-
-      <div style="display:flex; gap:8px;">
-        <input type="text" id="fullChatInput" class="field" style="font-size:13.5px; padding:10px 14px;" placeholder="Message Oma AI..." autocomplete="off">
-        <button class="btn blue" id="btnFullSend" style="padding:0 20px; font-size:13px;">Send</button>
+    <!-- Feed Stream Messages -->
+    <div class="feed-stream-box" id="homeFeedStream" style="flex:1; padding:12px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;">
+      <div class="feed-card oma">
+        <div class="feed-meta"><span>OMA AI</span><span>Ready</span></div>
+        <div class="feed-text">ওমা এআই সক্রিয় আছে। যেকোনো নির্দেশ দিন—যেমন: "ক্যালকুলেটর খোলো", "নোটপ্যাড খোলো", অথবা "স্ক্রিনে কি আছে বলো"।</div>
       </div>
     </div>
-  </section>
 
-  <!-- ==================== TAB: TASK EXECUTION / MINDMAP ==================== -->
-  <section id="tasks" class="tab-section">
-    <div class="settings-container" style="max-width:880px;">
-      <h1>Task Execution Pipeline</h1>
-      <p class="lede">Real-time visualization of tool invocations, model switching, and runtime checkpoints.</p>
+    <!-- Quick Prompts Chips -->
+    <div style="display:flex; gap:6px; padding:6px 10px; overflow-x:auto; border-top:1px solid var(--line); flex:none;">
+      <button class="btn quick-chip" data-prompt="ক্যালকুলেটর খোলো" style="font-size:11px; height:24px;">🧮 ক্যালকুলেটর</button>
+      <button class="btn quick-chip" data-prompt="নোটপ্যাড খোলো" style="font-size:11px; height:24px;">📝 নোটপ্যাড</button>
+      <button class="btn quick-chip" data-prompt="ক্রোম খোলো" style="font-size:11px; height:24px;">🌐 ক্রোম</button>
+      <button class="btn quick-chip" data-prompt="স্ক্রিনে কি দেখা যাচ্ছে বলো" style="font-size:11px; height:24px;">🖥️ স্ক্রিন</button>
+      <button class="btn quick-chip" data-prompt="এআই প্রযুক্তির নতুন খবর রিসার্চ করো" style="font-size:11px; height:24px;">🔍 এআই রিসার্চ</button>
+    </div>
 
-      <h3>Active Task Pipeline</h3>
-      <div class="group" style="padding:16px;">
-        <div id="pipelineStatus" style="font-size:13px; font-weight:600; color:#fff; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
-          <span class="status-pulse"></span>
-          <span>Pipeline State: <b style="color:var(--neon-cyan);">Idle / Ready for Directives</b></span>
-        </div>
-        <div id="pipelineStages" style="display:grid; grid-template-columns:repeat(5, 1fr); gap:8px; text-align:center;">
-          <div class="stat"><small>1. Voice / Input</small><b id="pStage1" style="font-size:13px; color:var(--neon-green);">✓ Ready</b></div>
-          <div class="stat"><small>2. Speech-to-Text</small><b id="pStage2" style="font-size:13px; color:var(--fg2);">Whisper.net</b></div>
-          <div class="stat"><small>3. Model Router</small><b id="pStage3" style="font-size:13px; color:var(--neon-cyan);">Multi-AI</b></div>
-          <div class="stat"><small>4. Tool Execution</small><b id="pStage4" style="font-size:13px; color:var(--fg2);">winctl.py</b></div>
-          <div class="stat"><small>5. Verification</small><b id="pStage5" style="font-size:13px; color:var(--fg2);">Completed</b></div>
-        </div>
+    <!-- Input Dock -->
+    <div class="feed-input-dock" style="padding:10px; border-top:1px solid var(--line); background:rgba(0,0,0,0.25); flex:none;">
+      <div class="input-bar-wrapper" style="display:flex; gap:6px;">
+        <input type="text" id="homeChatInput" class="field" placeholder="Type to Assistant (Gemini Live)..." autocomplete="off" style="flex:1;">
+        <button class="btn" id="btnHomeMic" title="Voice Listening (Hold or Click)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
+        <button class="btn blue" id="btnHomeSend" title="Send Directive"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
       </div>
-
-      <h3>Live Execution Event Logs</h3>
-      <div class="group" id="pipelineLogs" style="max-height:300px; overflow-y:auto; padding:12px; font-family:monospace; font-size:11.5px; line-height:1.6;">
-        <div style="color:var(--fg3);">No active execution in progress. Hold Ctrl+Alt+Space or type a command to dispatch.</div>
+      <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-top:6px; padding:0 2px;">
+        <span>Press <b>Enter</b> to send</span>
+        <span>Global Voice: <b>Ctrl+Alt+Space</b></span>
       </div>
     </div>
-  </section>
+  </aside>
 
-  <!-- ==================== TAB: AI PROVIDERS & MODELS ==================== -->
+</main>
+
+<!-- Slide-Out Node Inspector Drawer (for Memory, Skills, Soul) -->
+<div id="node-drawer" class="node-modal-drawer">
+  <div class="drawer-header">
+    <span id="drawer-title" class="drawer-title">CAPABILITY INSPECTOR</span>
+    <button id="drawer-close" class="drawer-close">✕</button>
+  </div>
+  <div id="drawer-content" class="drawer-body"></div>
+</div>
+
+<!-- ==================== SLIDE-OVER SETTINGS DRAWER ==================== -->
+<div id="settings-drawer" class="settings-drawer">
+  <div class="drawer-header-bar">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-family:'Orbitron', sans-serif; font-size:13px; font-weight:700; color:#fff; letter-spacing:1px;">OMA AI // SYSTEM CONFIGURATION</span>
+      <span class="pill ok" style="font-size:10px;">All Settings &amp; Multi-AI</span>
+    </div>
+    <button id="btn-close-settings" class="btn-close-drawer">✕</button>
+  </div>
+
+  <div class="drawer-body-split">
+    <!-- Left Navigation Sidebar for Settings -->
+    <nav class="master-nav" style="width:230px; flex:none; border-right:1px solid var(--border-subtle); overflow-y:auto;">
+      <div class="nav-group-title">Multi-AI Intelligence</div>
+      <button class="nav-btn on" data-s="providers">
+        <i class="ni" style="background:#10a37f"><svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM4 12a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2 2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm12 0a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2zm-6 8a2 2 0 0 1 2-2v-2a2 2 0 0 1 2-2 2 2 0 0 1-2 2v2a2 2 0 0 1-2 2zM9 9h6v6H9z"/></svg></i>
+        AI Providers
+      </button>
+      <button class="nav-btn" data-s="brain">
+        <i class="ni" style="background:#d97757"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/></svg></i>
+        Intelligence
+      </button>
+
+      <div class="nav-group-title">System Settings</div>
+      <button class="nav-btn" data-s="general">
+        <i class="ni" style="background:#8e8e93"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></i>
+        General
+      </button>
+      <button class="nav-btn" data-s="sound">
+        <i class="ni" style="background:#ff375f"><svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg></i>
+        Sound
+      </button>
+      <button class="nav-btn" data-s="screen">
+        <i class="ni" style="background:#bf5af2"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16.5V20"/></svg></i>
+        Screen &amp; Windows
+      </button>
+      <button class="nav-btn" data-s="memory">
+        <i class="ni" style="background:#ff9f0a"><svg viewBox="0 0 24 24"><path d="M6 4h12v16l-6-4-6 4z"/></svg></i>
+        Memory
+      </button>
+      <button class="nav-btn" data-s="integrations">
+        <i class="ni" style="background:#bf5af2"><svg viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z"/></svg></i>
+        Integrations
+      </button>
+      <button class="nav-btn" data-s="usage">
+        <i class="ni" style="background:#30d158"><svg viewBox="0 0 24 24"><path d="M5 19V11M12 19V5M19 19v-6"/></svg></i>
+        Usage
+      </button>
+      <button class="nav-btn" data-s="account">
+        <i class="ni" style="background:#0a84ff"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></i>
+        Account &amp; Access
+      </button>
+      <button class="nav-btn" data-s="lab">
+        <i class="ni" style="background:#64d2ff"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3M7.5 15h9"/></svg></i>
+        Experimental
+      </button>
+      <button class="nav-btn" data-s="about">
+        <i class="ni" style="background:#5e5ce6"><svg viewBox="0 0 24 24"><path d="M12 4v10M8 10l4 4 4-4M5 19h14"/></svg></i>
+        About &amp; Updates
+      </button>
+    </nav>
+
+    <!-- Right Settings Sections Display -->
+    <div class="settings-content" style="flex:1; overflow-y:auto; padding:20px 28px;">
+      <!-- ==================== TAB: AI PROVIDERS & MODELS ==================== -->
   <section id="providers" class="tab-section">
     <div class="settings-container" style="max-width:760px;">
       <h1>AI Providers &amp; Models</h1>
@@ -1714,1330 +1901,19 @@ body {
     </div>
   </section>
 
-</main>
 
-<!-- Inlined Visual Subsystems Scripts -->
+    </div>
+  </div>
+</div>
+
+<!-- Injected Subsystems Scripts (always up to date via Web.cs) -->
+<script>/*ORB_JS*/</script>
+<script>/*MINDMAP_JS*/</script>
+<script>/*AGENT_TOWN_JS*/</script>
+
+<!-- Master Controller with Single Authoritative Task-State Coordinator -->
 <script>
-/**
- * Oma AI Agent - 3D Holographic Particle Sphere & Orbital Gyroscope
- * Recreates the exact futuristic neural sphere seen in the PC in 2070 video.
- */
-class OmaHoloOrb {
-  constructor(canvasId) {
-    this.canvas = document.getElementById(canvasId);
-    if (!this.canvas) return;
-    this.ctx = this.canvas.getContext('2d');
-    this.particles = [];
-    this.particleCount = 520;
-    this.radius = 68;
-    this.rotX = 0;
-    this.rotY = 0;
-    this.rotZ = 0;
-    this.state = 'active'; // 'active', 'thinking', 'listening', 'executing', 'idle'
-    this.audioLevel = 0;
-    this.time = 0;
 
-    // Rings
-    this.rings = [
-      { radius: 88, tiltX: 0.8, tiltZ: 0.3, speed: 0.015, angle: 0, color: 'rgba(0, 229, 255, 0.45)' },
-      { radius: 96, tiltX: -0.6, tiltZ: 0.9, speed: -0.012, angle: 0, color: 'rgba(255, 179, 0, 0.45)' },
-      { radius: 80, tiltX: 0.2, tiltZ: -0.7, speed: 0.02, angle: 0, color: 'rgba(0, 245, 155, 0.35)' }
-    ];
-
-    this.initParticles();
-    this.resize();
-    window.addEventListener('resize', () => this.resize());
-    this.animate();
-  }
-
-  resize() {
-    const rect = this.canvas.parentElement.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    this.width = Math.max(rect.width || 0, 100);
-    this.height = Math.max(rect.height || 0, 100);
-    this.canvas.width = this.width * dpr;
-    this.canvas.height = this.height * dpr;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.centerX = this.width / 2;
-    this.centerY = this.height / 2;
-    this.radius = Math.max(Math.min(this.width, this.height) * 0.26, 20);
-    this.rings[0].radius = this.radius * 1.35;
-    this.rings[1].radius = this.radius * 1.48;
-    this.rings[2].radius = this.radius * 1.25;
-  }
-
-  initParticles() {
-    this.particles = [];
-    const phi = Math.PI * (3 - Math.sqrt(5)); // Golden ratio angle
-    for (let i = 0; i < this.particleCount; i++) {
-      const y = 1 - (i / (this.particleCount - 1)) * 2; // y goes from 1 to -1
-      const radiusAtY = Math.sqrt(1 - y * y);
-      const theta = phi * i;
-      const x = Math.cos(theta) * radiusAtY;
-      const z = Math.sin(theta) * radiusAtY;
-
-      // Color palette from video: cyan, emerald green, warm gold
-      const pType = Math.random();
-      let color = 'rgba(0, 229, 255, ';
-      if (pType > 0.7) color = 'rgba(255, 179, 0, ';
-      else if (pType > 0.45) color = 'rgba(0, 245, 155, ';
-
-      this.particles.push({
-        baseX: x,
-        baseY: y,
-        baseZ: z,
-        color: color,
-        size: 1.2 + Math.random() * 1.6,
-        pulseOffset: Math.random() * Math.PI * 2,
-        noiseSpeed: 0.8 + Math.random() * 1.2
-      });
-    }
-  }
-
-  setState(newState) {
-    this.state = newState;
-    const badge = document.getElementById('sphere-status-badge');
-    const badgeText = document.getElementById('sphere-status-text');
-    if (!badge || !badgeText) return;
-
-    badge.className = 'status-badge ' + newState;
-    if (newState === 'thinking') {
-      badgeText.textContent = 'THINKING ...';
-    } else if (newState === 'listening') {
-      badgeText.textContent = 'LISTENING ...';
-    } else if (newState === 'executing') {
-      badgeText.textContent = 'EXECUTING ...';
-    } else {
-      badgeText.textContent = 'SYSTEM ACTIVE';
-    }
-  }
-
-  setAudioLevel(level) {
-    this.audioLevel = Math.min(Math.max(level, 0), 1);
-  }
-
-  animate() {
-    requestAnimationFrame(() => this.animate());
-    this.time += 0.02;
-
-    this.ctx.clearRect(0, 0, this.width, this.height);
-
-    // Dynamic rotation speeds based on state
-    let speedMult = 1.0;
-    if (this.state === 'thinking') speedMult = 2.4;
-    else if (this.state === 'executing') speedMult = 1.8;
-    else if (this.state === 'listening') speedMult = 1.2;
-
-    this.rotY += 0.008 * speedMult;
-    this.rotX += 0.004 * speedMult;
-    this.rotZ += 0.002 * speedMult;
-
-    // Draw central glowing aura
-    const rOuter = Math.max(this.radius * 1.4, 10);
-    const gradient = this.ctx.createRadialGradient(
-      this.centerX, this.centerY, 5,
-      this.centerX, this.centerY, rOuter
-    );
-    if (this.state === 'thinking') {
-      gradient.addColorStop(0, 'rgba(255, 179, 0, 0.22)');
-      gradient.addColorStop(0.5, 'rgba(255, 179, 0, 0.06)');
-      gradient.addColorStop(1, 'transparent');
-    } else {
-      gradient.addColorStop(0, 'rgba(0, 229, 255, 0.2)');
-      gradient.addColorStop(0.5, 'rgba(0, 229, 255, 0.05)');
-      gradient.addColorStop(1, 'transparent');
-    }
-    this.ctx.fillStyle = gradient;
-    this.ctx.beginPath();
-    this.ctx.arc(this.centerX, this.centerY, this.radius * 1.4, 0, Math.PI * 2);
-    this.ctx.fill();
-
-    // Render Orbital Gyroscope Rings
-    this.renderRings();
-
-    // Transform and project particles
-    const cosY = Math.cos(this.rotY), sinY = Math.sin(this.rotY);
-    const cosX = Math.cos(this.rotX), sinX = Math.sin(this.rotX);
-    const cosZ = Math.cos(this.rotZ), sinZ = Math.sin(this.rotZ);
-
-    const projectedParticles = [];
-
-    const pulse = Math.sin(this.time * 2) * 0.05;
-    const audioExpansion = this.audioLevel * 0.35;
-    const currentRadius = this.radius * (1 + pulse + audioExpansion);
-
-    for (let i = 0; i < this.particles.length; i++) {
-      const p = this.particles[i];
-
-      // Add dynamic noise vibration
-      let nx = p.baseX;
-      let ny = p.baseY;
-      let nz = p.baseZ;
-
-      if (this.state === 'thinking' || this.audioLevel > 0.05) {
-        const vibration = Math.sin(this.time * p.noiseSpeed * 4 + p.pulseOffset) * (0.04 + this.audioLevel * 0.1);
-        nx += nx * vibration;
-        ny += ny * vibration;
-        nz += nz * vibration;
-      }
-
-      // Rotate Y
-      let x1 = nx * cosY + nz * sinY;
-      let y1 = ny;
-      let z1 = -nx * sinY + nz * cosY;
-
-      // Rotate X
-      let x2 = x1;
-      let y2 = y1 * cosX - z1 * sinX;
-      let z2 = y1 * sinX + z1 * cosX;
-
-      // Rotate Z
-      let x3 = x2 * cosZ - y2 * sinZ;
-      let y3 = x2 * sinZ + y2 * cosZ;
-      let z3 = z2;
-
-      // Perspective projection
-      const cameraDist = 280;
-      const fov = cameraDist / (cameraDist + z3 * currentRadius);
-      const projX = this.centerX + x3 * currentRadius * fov;
-      const projY = this.centerY + y3 * currentRadius * fov;
-
-      // Depth alpha
-      const alpha = Math.max(0.12, Math.min(1, (z3 + 1.2) / 2.2));
-      const size = Math.max(0.8, p.size * fov);
-
-      projectedParticles.push({
-        x: projX,
-        y: projY,
-        z: z3,
-        size: size,
-        alpha: alpha,
-        color: p.color
-      });
-    }
-
-    // Sort by depth (back to front)
-    projectedParticles.sort((a, b) => a.z - b.z);
-
-    // Draw connecting neural filament web between close particles
-    if (this.state === 'thinking' || this.state === 'executing') {
-      this.ctx.lineWidth = 0.5;
-      for (let i = 0; i < projectedParticles.length; i += 3) {
-        const p1 = projectedParticles[i];
-        if (p1.z < 0) continue; // Only front particles
-        for (let j = i + 1; j < Math.min(i + 8, projectedParticles.length); j++) {
-          const p2 = projectedParticles[j];
-          const dx = p1.x - p2.x;
-          const dy = p1.y - p2.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 28) {
-            const filamentAlpha = (1 - dist / 28) * 0.25 * p1.alpha;
-            this.ctx.strokeStyle = `rgba(0, 229, 255, ${filamentAlpha})`;
-            this.ctx.beginPath();
-            this.ctx.moveTo(p1.x, p1.y);
-            this.ctx.lineTo(p2.x, p2.y);
-            this.ctx.stroke();
-          }
-        }
-      }
-    }
-
-    // Render particles
-    for (let i = 0; i < projectedParticles.length; i++) {
-      const p = projectedParticles[i];
-      this.ctx.fillStyle = p.color + p.alpha + ')';
-      this.ctx.beginPath();
-      this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      this.ctx.fill();
-
-      // Shimmer halo on bright front particles
-      if (p.z > 0.6 && Math.random() > 0.8) {
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        this.ctx.beginPath();
-        this.ctx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2);
-        this.ctx.fill();
-      }
-    }
-  }
-
-  renderRings() {
-    for (let r = 0; r < this.rings.length; r++) {
-      const ring = this.rings[r];
-      ring.angle += ring.speed;
-
-      this.ctx.save();
-      this.ctx.translate(this.centerX, this.centerY);
-
-      // Rotate ring plane
-      this.ctx.rotate(ring.tiltZ);
-      this.ctx.scale(1, Math.cos(ring.tiltX));
-      this.ctx.rotate(ring.angle);
-
-      // Draw dashed futuristic orbit ring
-      this.ctx.strokeStyle = ring.color;
-      this.ctx.lineWidth = 1.2;
-      this.ctx.setLineDash([4, 12, 16, 8]);
-      this.ctx.lineDashOffset = -this.time * 20;
-
-      this.ctx.beginPath();
-      this.ctx.arc(0, 0, ring.radius, 0, Math.PI * 2);
-      this.ctx.stroke();
-
-      // Draw orbiting satellites/beacons along the ring
-      const beaconAngle = ring.angle * 2;
-      const bx = Math.cos(beaconAngle) * ring.radius;
-      const by = Math.sin(beaconAngle) * ring.radius;
-
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.beginPath();
-      this.ctx.arc(bx, by, 2.2, 0, Math.PI * 2);
-      this.ctx.fill();
-
-      this.ctx.restore();
-    }
-  }
-}
-
-window.OmaHoloOrb = OmaHoloOrb;
-
-</script>
-
-<script>
-/**
- * Oma AI Agent - Agent Town (2D Pixel Art Virtual Office Simulator)
- * Recreates the exact multi-agent pixel office environment shown in the PC in 2070 video.
- */
-class AgentTown {
-  constructor(canvasId) {
-    this.canvas = document.getElementById(canvasId);
-    if (!this.canvas) return;
-    this.ctx = this.canvas.getContext('2d');
-    this.time = 0;
-    this.scale = 2; // Pixel art scaling
-
-    // Office dimensions in tile units (tile size = 16px)
-    this.tileSize = 16;
-    this.mapWidth = 38;
-    this.mapHeight = 24;
-
-    // Desks layout: { x, y, agentId, chairDir }
-    this.desks = [
-      { id: 'desk_alice', x: 8, y: 7, agentId: 'alice', active: false, label: 'Research 01' },
-      { id: 'desk_bob', x: 14, y: 7, agentId: 'bob', active: false, label: 'Dev 02' },
-      { id: 'desk_carol', x: 20, y: 7, agentId: 'carol', active: false, label: 'Automation 03' },
-      { id: 'desk_dave', x: 26, y: 7, agentId: 'dave', active: false, label: 'Content 04' },
-      { id: 'desk_extra1', x: 8, y: 13, agentId: null, active: false, label: 'Open 05' },
-      { id: 'desk_extra2', x: 14, y: 13, agentId: null, active: false, label: 'Open 06' }
-    ];
-
-    // Agents
-    this.agents = {
-      alice: {
-        id: 'alice',
-        name: 'Alice',
-        role: 'Senior Researcher',
-        color: '#ff5722',
-        hairColor: '#ff6e40',
-        shirtColor: '#00e5ff',
-        pantsColor: '#263238',
-        x: 8 * 16,
-        y: 8 * 16,
-        targetX: 8 * 16,
-        targetY: 8 * 16,
-        deskId: 'desk_alice',
-        state: 'working', // 'idle', 'walking', 'working'
-        direction: 'up', // 'up', 'down', 'left', 'right'
-        walkFrame: 0,
-        task: 'Researching latest AI advancements & Stonic/Oma tech...',
-        taskBubble: 'Provide a detailed research report on the latest advancements and current public perception of...',
-        bubbleProgress: 65,
-        bubbleTimer: 9999,
-        actionBubble: '💡',
-        actionBubbleTimer: 180
-      },
-      bob: {
-        id: 'bob',
-        name: 'Bob',
-        role: 'System Architect',
-        color: '#ffb300',
-        hairColor: '#37474f',
-        shirtColor: '#90a4ae',
-        pantsColor: '#1a237e',
-        x: 14 * 16,
-        y: 8 * 16,
-        targetX: 14 * 16,
-        targetY: 8 * 16,
-        deskId: 'desk_bob',
-        state: 'idle',
-        direction: 'up',
-        walkFrame: 0,
-        task: '',
-        taskBubble: null,
-        bubbleProgress: 0,
-        bubbleTimer: 0,
-        actionBubble: null,
-        actionBubbleTimer: 0
-      },
-      carol: {
-        id: 'carol',
-        name: 'Carol',
-        role: 'Automation & Tools',
-        color: '#b388ff',
-        hairColor: '#795548',
-        shirtColor: '#b388ff',
-        pantsColor: '#37474f',
-        x: 20 * 16,
-        y: 8 * 16,
-        targetX: 20 * 16,
-        targetY: 8 * 16,
-        deskId: 'desk_carol',
-        state: 'idle',
-        direction: 'up',
-        walkFrame: 0,
-        task: '',
-        taskBubble: null,
-        bubbleProgress: 0,
-        bubbleTimer: 0,
-        actionBubble: null,
-        actionBubbleTimer: 0
-      },
-      dave: {
-        id: 'dave',
-        name: 'Dave',
-        role: 'Creative & Comm',
-        color: '#00f59b',
-        hairColor: '#4e342e',
-        shirtColor: '#00f59b',
-        pantsColor: '#212121',
-        x: 26 * 16,
-        y: 8 * 16,
-        targetX: 26 * 16,
-        targetY: 8 * 16,
-        deskId: 'desk_dave',
-        state: 'idle',
-        direction: 'up',
-        walkFrame: 0,
-        task: '',
-        taskBubble: null,
-        bubbleProgress: 0,
-        bubbleTimer: 0,
-        actionBubble: null,
-        actionBubbleTimer: 0
-      }
-    };
-
-    // Supervisor Drone / Oma Orb
-    this.omaDrone = {
-      x: 17 * 16,
-      y: 11 * 16,
-      targetX: 17 * 16,
-      targetY: 11 * 16,
-      bobOffset: 0
-    };
-
-    this.initDOM();
-    this.resize();
-    window.addEventListener('resize', () => this.resize());
-    this.animate();
-
-    // Occasional idle wanderer movement
-    setInterval(() => this.idleWander(), 8000);
-  }
-
-  resize() {
-    const rect = this.canvas.parentElement.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    this.width = Math.max(rect.width || 0, 100);
-    this.height = Math.max(rect.height || 0, 100);
-    this.canvas.width = this.width * dpr;
-    this.canvas.height = this.height * dpr;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    // Calculate ideal pixel scale to fit map
-    const scaleX = this.width / (this.mapWidth * this.tileSize);
-    const scaleY = this.height / (this.mapHeight * this.tileSize);
-    this.scale = Math.max(1.2, Math.min(scaleX, scaleY));
-    this.offsetX = Math.max(0, (this.width - this.mapWidth * this.tileSize * this.scale) / 2);
-    this.offsetY = Math.max(0, (this.height - this.mapHeight * this.tileSize * this.scale) / 2);
-  }
-
-  initDOM() {
-    this.updateChipsBar();
-  }
-
-  updateChipsBar() {
-    const container = document.getElementById('agent-chips-container');
-    if (!container) return;
-    container.innerHTML = '';
-
-    Object.values(this.agents).forEach(agent => {
-      const chip = document.createElement('div');
-      chip.className = `agent-chip ${agent.state === 'working' ? 'working' : ''}`;
-      chip.id = `chip-${agent.id}`;
-      chip.style.setProperty('--chip-color', agent.color);
-
-      chip.innerHTML = `
-        <div class="chip-status-square"></div>
-        <div>
-          <div class="chip-name">${agent.name}</div>
-          <div class="chip-role">${agent.state === 'working' ? 'Working' : 'Idle'}</div>
-        </div>
-      `;
-
-      chip.addEventListener('click', () => {
-        this.focusAgent(agent.id);
-      });
-
-      container.appendChild(chip);
-    });
-
-    this.updateMetrics();
-  }
-
-  updateMetrics() {
-    const busyCount = Object.values(this.agents).filter(a => a.state === 'working').length;
-    const totalCount = Object.keys(this.agents).length;
-    const el = document.getElementById('town-busy-stat');
-    if (el) el.textContent = `${busyCount}/${totalCount} busy`;
-  }
-
-  focusAgent(agentId) {
-    const agent = this.agents[agentId];
-    if (!agent) return;
-    agent.actionBubble = '👋';
-    agent.actionBubbleTimer = 90;
-  }
-
-  idleWander() {
-    // Random idle movement for agents that are not working
-    const idles = Object.values(this.agents).filter(a => a.state === 'idle');
-    if (idles.length === 0) return;
-    const lucky = idles[Math.floor(Math.random() * idles.length)];
-
-    if (Math.random() > 0.5) {
-      // Go get coffee / break room
-      lucky.targetX = (31 + Math.random() * 4) * 16;
-      lucky.targetY = (16 + Math.random() * 4) * 16;
-      lucky.state = 'walking';
-      lucky.actionBubble = '☕';
-      lucky.actionBubbleTimer = 120;
-    } else {
-      // Return to desk
-      const desk = this.desks.find(d => d.id === lucky.deskId);
-      if (desk) {
-        lucky.targetX = desk.x * 16;
-        lucky.targetY = (desk.y + 1) * 16;
-        lucky.state = 'walking';
-      }
-    }
-  }
-
-  /**
-   * Dispatches a real task to an agent (exact replica of video workflow)
-   */
-  assignTask(agentId, taskText, onComplete) {
-    const agent = this.agents[agentId] || this.agents.alice;
-    const desk = this.desks.find(d => d.id === agent.deskId);
-
-    // 1. Initial reaction: Thought bubble with '!'
-    agent.actionBubble = '❗';
-    agent.actionBubbleTimer = 140;
-
-    // 2. Set task text
-    agent.task = taskText;
-    agent.taskBubble = 'Returning to desk...';
-    agent.bubbleProgress = 0;
-    agent.bubbleTimer = 9999;
-    agent.state = 'walking';
-
-    // 3. Walk to desk
-    if (desk) {
-      agent.targetX = desk.x * 16;
-      agent.targetY = (desk.y + 1) * 16;
-    }
-
-    this.updateChipsBar();
-
-    // Fly Oma drone to agent to supervise
-    this.omaDrone.targetX = agent.targetX + 24;
-    this.omaDrone.targetY = agent.targetY - 16;
-
-    // When reached desk, start working
-    const checkArrival = setInterval(() => {
-      const dist = Math.hypot(agent.x - agent.targetX, agent.y - agent.targetY);
-      if (dist < 4) {
-        clearInterval(checkArrival);
-        agent.state = 'working';
-        agent.direction = 'up';
-        agent.actionBubble = '💻';
-        agent.actionBubbleTimer = 120;
-        agent.taskBubble = taskText;
-
-        // Progressively fill task progress
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-          progress += 5;
-          agent.bubbleProgress = progress;
-          if (progress >= 100) {
-            clearInterval(progressInterval);
-            agent.actionBubble = '✅';
-            agent.actionBubbleTimer = 160;
-            agent.taskBubble = '✓ Task Completed!';
-            setTimeout(() => {
-              agent.state = 'idle';
-              agent.taskBubble = null;
-              this.updateChipsBar();
-              if (onComplete) onComplete();
-            }, 3000);
-          }
-        }, 180);
-      }
-    }, 200);
-  }
-
-  animate() {
-    requestAnimationFrame(() => this.animate());
-    this.time += 0.03;
-
-    this.ctx.clearRect(0, 0, this.width, this.height);
-
-    this.ctx.save();
-    this.ctx.translate(this.offsetX, this.offsetY);
-    this.ctx.scale(this.scale, this.scale);
-
-    // 1. Draw Office Floors & Walls
-    this.drawOfficeLayout();
-
-    // 2. Draw Furniture (Desks, Chairs, Monitors, Plants, Servers)
-    this.drawFurniture();
-
-    // 3. Update & Draw Agents
-    this.updateAndDrawAgents();
-
-    // 4. Draw Supervisor Drone
-    this.drawDrone();
-
-    this.ctx.restore();
-  }
-
-  drawOfficeLayout() {
-    const W = this.mapWidth * this.tileSize;
-    const H = this.mapHeight * this.tileSize;
-
-    // Floor Base (Sleek slate dark office tiles)
-    this.ctx.fillStyle = '#111722';
-    this.ctx.fillRect(0, 0, W, H);
-
-    // Grid Floor lines
-    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
-    this.ctx.lineWidth = 1;
-    for (let x = 0; x <= this.mapWidth; x++) {
-      this.ctx.beginPath();
-      this.ctx.moveTo(x * this.tileSize, 0);
-      this.ctx.lineTo(x * this.tileSize, H);
-      this.ctx.stroke();
-    }
-    for (let y = 0; y <= this.mapHeight; y++) {
-      this.ctx.beginPath();
-      this.ctx.moveTo(0, y * this.tileSize);
-      this.ctx.lineTo(W, y * this.tileSize);
-      this.ctx.stroke();
-    }
-
-    // Modern Wood Carpet for Main Dev Bay
-    this.ctx.fillStyle = '#161f2e';
-    this.ctx.fillRect(5 * 16, 5 * 16, 26 * 16, 12 * 16);
-    this.ctx.strokeStyle = 'rgba(0, 229, 255, 0.15)';
-    this.ctx.strokeRect(5 * 16, 5 * 16, 26 * 16, 12 * 16);
-
-    // Break Room Area (Bottom Right)
-    this.ctx.fillStyle = '#1c2432';
-    this.ctx.fillRect(29 * 16, 15 * 16, 8 * 16, 8 * 16);
-    this.ctx.strokeStyle = 'rgba(255, 179, 0, 0.2)';
-    this.ctx.strokeRect(29 * 16, 15 * 16, 8 * 16, 8 * 16);
-
-    // Meeting Room (Top Left)
-    this.ctx.fillStyle = '#131b26';
-    this.ctx.fillRect(1 * 16, 1 * 16, 12 * 16, 4 * 16);
-    this.ctx.strokeStyle = 'rgba(0, 245, 155, 0.2)';
-    this.ctx.strokeRect(1 * 16, 1 * 16, 12 * 16, 4 * 16);
-
-    // Server Room (Top Right)
-    this.ctx.fillStyle = '#0d131d';
-    this.ctx.fillRect(29 * 16, 1 * 16, 8 * 16, 4 * 16);
-    this.ctx.strokeStyle = 'rgba(179, 136, 255, 0.2)';
-    this.ctx.strokeRect(29 * 16, 1 * 16, 8 * 16, 4 * 16);
-
-    // Outer Walls
-    this.ctx.fillStyle = '#080c12';
-    this.ctx.fillRect(0, 0, W, 8); // Top wall
-    this.ctx.fillRect(0, H - 8, W, 8); // Bottom wall
-    this.ctx.fillRect(0, 0, 8, H); // Left wall
-    this.ctx.fillRect(W - 8, 0, 8, H); // Right wall
-
-    // Room Labels in pixel font
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    this.ctx.font = '8px monospace';
-    this.ctx.fillText('CONFERENCE ROOM', 2 * 16, 2 * 16);
-    this.ctx.fillText('SERVER RACKS', 30 * 16, 2 * 16);
-    this.ctx.fillText('BREAK LOUNGE', 30 * 16, 16 * 16);
-    this.ctx.fillText('MAIN WORKSTATION BAY', 6 * 16, 6 * 16);
-  }
-
-  drawFurniture() {
-    // 1. Draw Desks with dual monitors
-    this.desks.forEach(desk => {
-      const dx = desk.x * 16;
-      const dy = desk.y * 16;
-
-      // Desk Surface
-      this.ctx.fillStyle = '#222d3d';
-      this.ctx.fillRect(dx - 12, dy - 8, 40, 20);
-      this.ctx.fillStyle = '#2c3b4e';
-      this.ctx.fillRect(dx - 12, dy - 8, 40, 4);
-
-      // Keyboard & mousepad
-      this.ctx.fillStyle = '#0e141c';
-      this.ctx.fillRect(dx - 4, dy + 2, 18, 7);
-      this.ctx.fillStyle = '#4a5d78';
-      this.ctx.fillRect(dx - 2, dy + 4, 14, 3);
-
-      // Dual Monitors
-      const isWorking = desk.active || (this.agents[desk.agentId] && this.agents[desk.agentId].state === 'working');
-
-      // Left Monitor
-      this.ctx.fillStyle = '#1a222e';
-      this.ctx.fillRect(dx - 10, dy - 12, 14, 10);
-      this.ctx.fillStyle = isWorking ? '#00e5ff' : '#223247';
-      this.ctx.fillRect(dx - 9, dy - 11, 12, 8);
-      if (isWorking) {
-        // Animated scrolling code lines
-        this.ctx.fillStyle = '#ffffff';
-        const lineOffset = Math.floor(this.time * 8) % 6;
-        this.ctx.fillRect(dx - 8, dy - 10 + (lineOffset % 5), 8, 1);
-        this.ctx.fillRect(dx - 8, dy - 8 + (lineOffset % 4), 6, 1);
-      }
-
-      // Right Monitor
-      this.ctx.fillStyle = '#1a222e';
-      this.ctx.fillRect(dx + 6, dy - 12, 14, 10);
-      this.ctx.fillStyle = isWorking ? '#00f59b' : '#223247';
-      this.ctx.fillRect(dx + 7, dy - 11, 12, 8);
-      if (isWorking) {
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.fillRect(dx + 8, dy - 9, 8, 1);
-        this.ctx.fillRect(dx + 8, dy - 6, 6, 1);
-      }
-
-      // Coffee Cup
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.fillRect(dx + 22, dy + 2, 4, 5);
-
-      // Ergonomic Chair behind desk
-      this.ctx.fillStyle = '#1a222e';
-      this.ctx.fillRect(dx + 1, dy + 14, 12, 10);
-      this.ctx.fillStyle = '#2d3b4e';
-      this.ctx.fillRect(dx + 2, dy + 15, 10, 8);
-    });
-
-    // 2. Server Racks (Top Right)
-    for (let i = 0; i < 4; i++) {
-      const sx = (30 + i * 1.8) * 16;
-      const sy = 2.4 * 16;
-      this.ctx.fillStyle = '#111722';
-      this.ctx.fillRect(sx, sy, 22, 28);
-      this.ctx.strokeStyle = '#233145';
-      this.ctx.strokeRect(sx, sy, 22, 28);
-
-      // Blinking status LEDs
-      for (let r = 0; r < 5; r++) {
-        const ledOn = Math.sin(this.time * 6 + i * 2 + r) > 0;
-        this.ctx.fillStyle = ledOn ? (r % 2 === 0 ? '#00f59b' : '#00e5ff') : '#1e293b';
-        this.ctx.fillRect(sx + 3, sy + 3 + r * 5, 3, 2);
-        this.ctx.fillRect(sx + 8, sy + 3 + r * 5, 8, 2);
-      }
-    }
-
-    // 3. Coffee Machine & Water Cooler (Break Room)
-    const bx = 30 * 16;
-    const by = 17 * 16;
-    // Counter
-    this.ctx.fillStyle = '#263445';
-    this.ctx.fillRect(bx, by, 64, 16);
-    // Coffee Maker
-    this.ctx.fillStyle = '#ff2a5f';
-    this.ctx.fillRect(bx + 6, by - 10, 12, 10);
-    // Steam animation
-    const steamY = Math.sin(this.time * 4) * 3;
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-    this.ctx.fillRect(bx + 10, by - 14 + steamY, 2, 3);
-
-    // Water Cooler
-    this.ctx.fillStyle = '#00e5ff';
-    this.ctx.fillRect(bx + 44, by - 12, 10, 12);
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.fillRect(bx + 42, by, 14, 16);
-
-    // Potted Office Plant
-    this.drawPlant(15 * 16, 2 * 16);
-    this.drawPlant(27 * 16, 2 * 16);
-    this.drawPlant(6 * 16, 18 * 16);
-  }
-
-  drawPlant(x, y) {
-    // Pot
-    this.ctx.fillStyle = '#795548';
-    this.ctx.fillRect(x - 5, y + 2, 10, 8);
-    // Green leaves
-    this.ctx.fillStyle = '#00c853';
-    this.ctx.fillRect(x - 8, y - 4, 16, 6);
-    this.ctx.fillStyle = '#69f0ae';
-    this.ctx.fillRect(x - 5, y - 7, 10, 5);
-  }
-
-  updateAndDrawAgents() {
-    Object.values(this.agents).forEach(agent => {
-      // Pathfinding / movement towards target
-      const dx = agent.targetX - agent.x;
-      const dy = agent.targetY - agent.y;
-      const dist = Math.hypot(dx, dy);
-
-      if (dist > 1.5) {
-        agent.state = 'walking';
-        const speed = 1.6;
-        agent.x += (dx / dist) * speed;
-        agent.y += (dy / dist) * speed;
-        agent.walkFrame += 0.2;
-
-        if (Math.abs(dx) > Math.abs(dy)) {
-          agent.direction = dx > 0 ? 'right' : 'left';
-        } else {
-          agent.direction = dy > 0 ? 'down' : 'up';
-        }
-      } else {
-        if (agent.state === 'walking') {
-          agent.state = agent.task ? 'working' : 'idle';
-        }
-      }
-
-      // Render Pixel Character
-      this.drawPixelCharacter(agent);
-
-      // Render Action/Thought bubble if active
-      if (agent.actionBubble && agent.actionBubbleTimer > 0) {
-        agent.actionBubbleTimer--;
-        this.drawThoughtBubble(agent.x, agent.y - 18, agent.actionBubble);
-      }
-
-      // Render Task Dialogue Bubble (Matching video)
-      if (agent.taskBubble) {
-        this.drawTaskSpeechCard(agent);
-      }
-    });
-  }
-
-  drawPixelCharacter(agent) {
-    const x = Math.round(agent.x);
-    const y = Math.round(agent.y);
-
-    const isWalking = agent.state === 'walking';
-    const legOffset = isWalking ? Math.sin(agent.walkFrame * 4) * 2 : 0;
-    const isTyping = agent.state === 'working';
-    const armOffset = isTyping ? (Math.floor(this.time * 8) % 2) * 2 : 0;
-
-    // Shadow
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-    this.ctx.beginPath();
-    this.ctx.ellipse(x + 6, y + 14, 7, 3, 0, 0, Math.PI * 2);
-    this.ctx.fill();
-
-    // Legs / Pants
-    this.ctx.fillStyle = agent.pantsColor;
-    this.ctx.fillRect(x + 2, y + 8, 3, 6 + legOffset);
-    this.ctx.fillRect(x + 7, y + 8, 3, 6 - legOffset);
-
-    // Torso / Shirt
-    this.ctx.fillStyle = agent.shirtColor;
-    this.ctx.fillRect(x + 1, y + 2, 10, 7);
-
-    // Arms (animated if typing)
-    this.ctx.fillStyle = agent.shirtColor;
-    if (isTyping) {
-      this.ctx.fillRect(x - 2, y + 3 - armOffset, 3, 5);
-      this.ctx.fillRect(x + 11, y + 3 + armOffset, 3, 5);
-    } else {
-      this.ctx.fillRect(x - 1, y + 3, 2, 5);
-      this.ctx.fillRect(x + 11, y + 3, 2, 5);
-    }
-
-    // Head / Face
-    this.ctx.fillStyle = '#ffd1a4'; // Skin tone
-    this.ctx.fillRect(x + 2, y - 5, 8, 7);
-
-    // Eyes
-    this.ctx.fillStyle = '#1a222e';
-    if (agent.direction === 'up') {
-      // Facing up / away
-    } else if (agent.direction === 'left') {
-      this.ctx.fillRect(x + 3, y - 3, 2, 2);
-    } else if (agent.direction === 'right') {
-      this.ctx.fillRect(x + 7, y - 3, 2, 2);
-    } else {
-      this.ctx.fillRect(x + 3, y - 3, 2, 2);
-      this.ctx.fillRect(x + 7, y - 3, 2, 2);
-    }
-
-    // Hair
-    this.ctx.fillStyle = agent.hairColor;
-    this.ctx.fillRect(x + 1, y - 8, 10, 4);
-    if (agent.id === 'alice') {
-      // Red hair sides
-      this.ctx.fillRect(x, y - 6, 2, 7);
-      this.ctx.fillRect(x + 10, y - 6, 2, 7);
-    }
-
-    // Name label
-    this.ctx.fillStyle = '#cbd5e1';
-    this.ctx.font = '7px sans-serif';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText(agent.name, x + 6, y + 21);
-    this.ctx.textAlign = 'start';
-  }
-
-  drawThoughtBubble(x, y, icon) {
-    this.ctx.save();
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.beginPath();
-    this.ctx.arc(x + 6, y, 7, 0, Math.PI * 2);
-    this.ctx.fill();
-
-    // Little dots
-    this.ctx.beginPath();
-    this.ctx.arc(x + 4, y + 9, 2, 0, Math.PI * 2);
-    this.ctx.fill();
-
-    this.ctx.font = '8px sans-serif';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText(icon, x + 6, y + 3);
-    this.ctx.restore();
-  }
-
-  drawTaskSpeechCard(agent) {
-    const x = Math.round(agent.x);
-    const y = Math.round(agent.y);
-
-    const bubbleW = 140;
-    const bubbleH = 38;
-    const bubbleX = Math.min(this.mapWidth * 16 - bubbleW - 10, Math.max(10, x - 20));
-    const bubbleY = y - 48;
-
-    this.ctx.save();
-    // Card Background
-    this.ctx.fillStyle = 'rgba(14, 20, 32, 0.95)';
-    this.ctx.fillRect(bubbleX, bubbleY, bubbleW, bubbleH);
-    this.ctx.strokeStyle = '#00e5ff';
-    this.ctx.lineWidth = 1;
-    this.ctx.strokeRect(bubbleX, bubbleY, bubbleW, bubbleH);
-
-    // Little pointer triangle
-    this.ctx.fillStyle = '#00e5ff';
-    this.ctx.beginPath();
-    this.ctx.moveTo(x + 6, bubbleY + bubbleH);
-    this.ctx.lineTo(x + 10, bubbleY + bubbleH + 4);
-    this.ctx.lineTo(x + 14, bubbleY + bubbleH);
-    this.ctx.fill();
-
-    // Document icon
-    this.ctx.font = '8px monospace';
-    this.ctx.fillStyle = '#ffb300';
-    this.ctx.fillText('📄', bubbleX + 6, bubbleY + 12);
-
-    // Task text (clipped to two lines)
-    this.ctx.fillStyle = '#f8fafc';
-    this.ctx.font = '7.5px sans-serif';
-    const text = agent.taskBubble;
-    const line1 = text.substring(0, 26);
-    const line2 = text.length > 26 ? text.substring(26, 52) + (text.length > 52 ? '...' : '') : '';
-    this.ctx.fillText(line1, bubbleX + 20, bubbleY + 12);
-    if (line2) this.ctx.fillText(line2, bubbleX + 20, bubbleY + 22);
-
-    // Progress bar at bottom of bubble
-    if (agent.bubbleProgress > 0) {
-      const p = Math.min(100, agent.bubbleProgress);
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-      this.ctx.fillRect(bubbleX + 6, bubbleY + 28, bubbleW - 12, 4);
-      this.ctx.fillStyle = p === 100 ? '#00f59b' : '#00e5ff';
-      this.ctx.fillRect(bubbleX + 6, bubbleY + 28, (bubbleW - 12) * (p / 100), 4);
-    }
-
-    this.ctx.restore();
-  }
-
-  drawDrone() {
-    // Smooth follow
-    this.omaDrone.x += (this.omaDrone.targetX - this.omaDrone.x) * 0.05;
-    this.omaDrone.y += (this.omaDrone.targetY - this.omaDrone.y) * 0.05;
-
-    const bob = Math.sin(this.time * 5) * 3;
-    const x = Math.round(this.omaDrone.x);
-    const y = Math.round(this.omaDrone.y + bob);
-
-    this.ctx.save();
-    // Drone shadow
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-    this.ctx.beginPath();
-    this.ctx.ellipse(x + 5, y + 14 - bob, 5, 2, 0, 0, Math.PI * 2);
-    this.ctx.fill();
-
-    // Drone Body
-    this.ctx.fillStyle = '#1e293b';
-    this.ctx.beginPath();
-    this.ctx.arc(x + 5, y + 4, 6, 0, Math.PI * 2);
-    this.ctx.fill();
-
-    // Glowing Eye
-    this.ctx.fillStyle = '#00e5ff';
-    this.ctx.beginPath();
-    this.ctx.arc(x + 5, y + 4, 2.5, 0, Math.PI * 2);
-    this.ctx.fill();
-
-    // Rotor rings
-    this.ctx.strokeStyle = 'rgba(0, 229, 255, 0.5)';
-    this.ctx.lineWidth = 1;
-    this.ctx.beginPath();
-    this.ctx.ellipse(x + 5, y - 2, 8, 2, 0, 0, Math.PI * 2);
-    this.ctx.stroke();
-
-    this.ctx.restore();
-  }
-}
-
-window.AgentTown = AgentTown;
-
-</script>
-
-<script>
-/**
- * Oma AI Agent - Neural Mind Map & Animated Connector Cables
- * Connects Memory, Skills, Soul, Setting to the Central Neural Core.
- */
-class OmaMindMap {
-  constructor(canvasId) {
-    this.canvas = document.getElementById(canvasId);
-    if (!this.canvas) return;
-    this.ctx = this.canvas.getContext('2d');
-    this.nodes = [
-      { id: 'memory', name: 'Memory', subtitle: 'Facts & Context', color: '#00e5ff', glow: 'rgba(0, 229, 255, 0.4)', icon: '🧠' },
-      { id: 'skills', name: 'Skills', subtitle: 'Tools & Functions', color: '#b388ff', glow: 'rgba(179, 136, 255, 0.4)', icon: '⚡' },
-      { id: 'soul', name: 'Soul', subtitle: 'Persona & Logic', color: '#00f59b', glow: 'rgba(0, 245, 155, 0.4)', icon: '✨' },
-      { id: 'setting', name: 'Setting', subtitle: 'System Config', color: '#ffb300', glow: 'rgba(255, 179, 0, 0.4)', icon: '⚙️' }
-    ];
-    this.pulses = [];
-    this.time = 0;
-
-    this.initDOM();
-    this.resize();
-    window.addEventListener('resize', () => this.resize());
-    this.animate();
-  }
-
-  initDOM() {
-    const container = document.getElementById('nodes-group');
-    if (!container) return;
-    container.innerHTML = '';
-
-    this.nodes.forEach(node => {
-      const el = document.createElement('div');
-      el.className = 'system-node';
-      el.id = `node-${node.id}`;
-      el.style.setProperty('--node-color', node.color);
-      el.style.setProperty('--node-glow', node.glow);
-
-      el.innerHTML = `
-        <div class="node-icon-box">${node.icon}</div>
-        <div class="node-info">
-          <span class="node-title">${node.name}</span>
-          <span class="node-subtitle">${node.subtitle}</span>
-        </div>
-      `;
-
-      el.addEventListener('click', () => {
-        this.openDrawer(node.id);
-      });
-
-      container.appendChild(el);
-    });
-
-    // Spawn animated pulse packets
-    setInterval(() => {
-      const randomNode = Math.floor(Math.random() * this.nodes.length);
-      this.pulses.push({
-        nodeIndex: randomNode,
-        progress: 0,
-        speed: 0.015 + Math.random() * 0.01,
-        color: this.nodes[randomNode].color
-      });
-    }, 450);
-  }
-
-  resize() {
-    const rect = this.canvas.parentElement.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    this.width = Math.max(rect.width || 0, 100);
-    this.height = Math.max(rect.height || 0, 100);
-    this.canvas.width = this.width * dpr;
-    this.canvas.height = this.height * dpr;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-
-  animate() {
-    requestAnimationFrame(() => this.animate());
-    this.time += 0.02;
-    this.ctx.clearRect(0, 0, this.width, this.height);
-
-    const targetX = this.width + 10;
-    const targetY = this.height / 2;
-
-    // Draw connecting cables
-    this.nodes.forEach((node, idx) => {
-      const el = document.getElementById(`node-${node.id}`);
-      if (!el) return;
-
-      const rect = el.getBoundingClientRect();
-      const parentRect = this.canvas.getBoundingClientRect();
-
-      const startX = rect.right - parentRect.left;
-      const startY = rect.top - parentRect.top + rect.height / 2;
-
-      // Draw glowing cyber cable
-      this.ctx.save();
-      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      this.ctx.lineWidth = 1.5;
-
-      const cp1X = startX + (targetX - startX) * 0.45;
-      const cp1Y = startY;
-      const cp2X = startX + (targetX - startX) * 0.65;
-      const cp2Y = targetY;
-
-      this.ctx.beginPath();
-      this.ctx.moveTo(startX, startY);
-      this.ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, targetX, targetY);
-      this.ctx.stroke();
-
-      // Ambient neon tint
-      this.ctx.strokeStyle = node.color.replace(')', ', 0.25)').replace('rgb', 'rgba');
-      this.ctx.lineWidth = 1;
-      this.ctx.stroke();
-      this.ctx.restore();
-    });
-
-    // Update & draw pulses
-    for (let i = this.pulses.length - 1; i >= 0; i--) {
-      const p = this.pulses[i];
-      p.progress += p.speed;
-
-      if (p.progress >= 1) {
-        this.pulses.splice(i, 1);
-        continue;
-      }
-
-      const node = this.nodes[p.nodeIndex];
-      const el = document.getElementById(`node-${node.id}`);
-      if (!el) continue;
-
-      const rect = el.getBoundingClientRect();
-      const parentRect = this.canvas.getBoundingClientRect();
-
-      const startX = rect.right - parentRect.left;
-      const startY = rect.top - parentRect.top + rect.height / 2;
-
-      const cp1X = startX + (targetX - startX) * 0.45;
-      const cp1Y = startY;
-      const cp2X = startX + (targetX - startX) * 0.65;
-      const cp2Y = targetY;
-
-      const t = p.progress;
-      // Cubic bezier formula: B(t) = (1-t)^3*P0 + 3(1-t)^2*t*P1 + 3(1-t)*t^2*P2 + t^3*P3
-      const u = 1 - t;
-      const tt = t * t;
-      const uu = u * u;
-      const uuu = uu * u;
-      const ttt = tt * t;
-
-      const px = uuu * startX + 3 * uu * t * cp1X + 3 * u * tt * cp2X + ttt * targetX;
-      const py = uuu * startY + 3 * uu * t * cp1Y + 3 * u * tt * cp2Y + ttt * targetY;
-
-      // Draw glowing particle pulse
-      this.ctx.save();
-      this.ctx.fillStyle = p.color;
-      this.ctx.shadowColor = p.color;
-      this.ctx.shadowBlur = 8;
-      this.ctx.beginPath();
-      this.ctx.arc(px, py, 2.5, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.restore();
-    }
-  }
-
-  openDrawer(type) {
-    const drawer = document.getElementById('node-drawer');
-    const title = document.getElementById('drawer-title');
-    const body = document.getElementById('drawer-content');
-    if (!drawer || !title || !body) return;
-
-    drawer.classList.add('open');
-
-    if (type === 'memory') {
-      title.textContent = 'MEMORY & CONTEXT';
-      title.style.color = '#00e5ff';
-      body.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:12px;">
-          <p>Oma remembers persistent facts about you, your workflows, and habits.</p>
-          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
-            <b style="color:#00e5ff;">User Profile:</b>
-            <div style="margin-top:4px; font-family:monospace; font-size:11.5px; color:#cbd5e1;">Name: Usman<br>Apps: Chrome, VS Code, Terminal<br>Preferred Language: Urdu / English / Bengali</div>
-          </div>
-          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
-            <b style="color:#00e5ff;">Active Directives:</b>
-            <ul style="margin-left:16px; margin-top:6px; font-size:12px;">
-              <li>Always execute multi-step research through Alice.</li>
-              <li>Arrange windows across active displays automatically.</li>
-              <li>Summarize web articles in concise bullet points.</li>
-            </ul>
-          </div>
-        </div>
-      `;
-    } else if (type === 'skills') {
-      title.textContent = 'INSTALLED SKILLS & TOOLS';
-      title.style.color = '#b388ff';
-      body.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:10px;">
-          <div class="module-pill bash" style="width:fit-content;">✓ Window Control (winctl)</div>
-          <p style="font-size:12px;">Move, resize, split, and focus any app across multiple monitors with zero latency.</p>
-
-          <div class="module-pill research" style="width:fit-content;">✓ Deep Web Research</div>
-          <p style="font-size:12px;">DuckDuckGo search, real-time page reading, live web synthesis.</p>
-
-          <div class="module-pill" style="width:fit-content;">✓ Vision & OCR Screen Inspection</div>
-          <p style="font-size:12px;">Analyze active window contents, UI automation buttons, and text fields.</p>
-
-          <div class="module-pill bash" style="width:fit-content;">✓ Background Bash & PowerShell</div>
-          <p style="font-size:12px;">Execute safe system commands, file navigation, and dev server launches.</p>
-        </div>
-      `;
-    } else if (type === 'soul') {
-      title.textContent = 'SOUL & PERSONALITY';
-      title.style.color = '#00f59b';
-      body.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:12px;">
-          <p>Oma AI operates as a collaborative, proactive futuristic companion inspired by next-gen virtual operating systems.</p>
-          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
-            <b style="color:#00f59b;">Core Persona:</b>
-            <div style="margin-top:6px; font-size:12px;">Direct, confident, respectful, hyper-efficient. Speaks naturally in conversational Urdu / Hindi / English, with instant agent dispatching.</div>
-          </div>
-          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
-            <b style="color:#00f59b;">Audio Synthesis:</b>
-            <div style="margin-top:6px; font-size:12px;">Active TTS voice pipeline: Natural conversational cadence, confirmation callbacks, and status reporting.</div>
-          </div>
-        </div>
-      `;
-    } else if (type === 'setting') {
-      title.textContent = 'MULTI-AI PROVIDERS & SYSTEM CONFIG';
-      title.style.color = '#ffb300';
-      body.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:14px;">
-          <!-- Smart Routing Mode -->
-          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:8px; border:1px solid rgba(255,179,0,0.3);">
-            <b style="color:#ffb300; font-size:12px;">⚡ SMART ROUTING MODE:</b>
-            <div style="margin-top:8px; display:flex; gap:6px;">
-              <button id="btn-mode-auto" style="flex:1; padding:6px; border-radius:4px; font-size:11px; background:#ffb300; color:#000; font-weight:bold; border:none; cursor:pointer;">Auto Fallback</button>
-              <button id="btn-mode-local" style="flex:1; padding:6px; border-radius:4px; font-size:11px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(255,255,255,0.1); cursor:pointer;">Local Only</button>
-            </div>
-            <p style="margin-top:6px; font-size:10.5px; color:#94a3b8;">
-              Auto Mode: Claude Code ➔ Local Ollama (Qwen) ➔ Cloud. Auto-switches on rate limits.
-            </p>
-          </div>
-
-          <!-- Connected Providers -->
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            <b style="font-size:12px; color:#fff;">CONNECTED AI PROVIDERS:</b>
-            
-            <!-- Ollama -->
-            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,245,155,0.08); padding:8px 10px; border-radius:6px; border:1px solid rgba(0,245,155,0.3);">
-              <div>
-                <b style="color:#00f59b; font-size:12px;">● Local Ollama (11434)</b>
-                <div style="font-size:10.5px; color:#94a3b8;">Detected: qwen3-vl:8b, qwen3:8b (RTX 5060 Ti)</div>
-              </div>
-              <span style="font-size:10px; background:#00f59b; color:#000; padding:2px 6px; border-radius:4px; font-weight:bold;">READY</span>
-            </div>
-
-            <!-- Claude Code -->
-            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,179,0,0.08); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,179,0,0.3);">
-              <div>
-                <b style="color:#ffb300; font-size:12px;">▲ Claude Code CLI</b>
-                <div style="font-size:10.5px; color:#94a3b8;">Subscription: Claude Team (Weekly Limit resets 2am)</div>
-              </div>
-              <span style="font-size:10px; background:rgba(255,179,0,0.2); color:#ffb300; padding:2px 6px; border-radius:4px; font-weight:bold;">AUTO-FALLBACK</span>
-            </div>
-
-            <!-- LM Studio -->
-            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
-              <div>
-                <b style="color:#cbd5e1; font-size:12px;">○ LM Studio (1234)</b>
-                <div style="font-size:10.5px; color:#64748b;">Localhost endpoint (Connect when server running)</div>
-              </div>
-              <span style="font-size:10px; background:rgba(255,255,255,0.1); color:#94a3b8; padding:2px 6px; border-radius:4px;">STANDBY</span>
-            </div>
-          </div>
-
-          <!-- Shortcuts & Hardware -->
-          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
-            <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11.5px;">
-              <span style="color:#94a3b8;">Global Voice:</span>
-              <kbd style="background:#222; padding:2px 6px; border-radius:4px; color:#00e5ff; font-family:monospace;">Ctrl + Alt + Space</kbd>
-            </div>
-            <div style="display:flex; justify-content:space-between; font-size:11.5px;">
-              <span style="color:#94a3b8;">Inference Device:</span>
-              <b style="color:#fff;">NVIDIA RTX 5060 Ti 16GB</b>
-            </div>
-          </div>
-        </div>
-      `;
-
-      // Event listeners for routing buttons
-      setTimeout(() => {
-        const btnAuto = document.getElementById('btn-mode-auto');
-        const btnLocal = document.getElementById('btn-mode-local');
-        if (btnAuto && btnLocal) {
-          btnAuto.addEventListener('click', () => {
-            if (typeof set === 'function') set('aiMode', 'auto');
-            else post({ do: 'set', k: 'aiMode', v: 'auto' });
-            btnAuto.style.background = '#ffb300'; btnAuto.style.color = '#000';
-            btnLocal.style.background = 'rgba(255,255,255,0.06)'; btnLocal.style.color = '#fff';
-          });
-          btnLocal.addEventListener('click', () => {
-            if (typeof set === 'function') set('aiMode', 'local_only');
-            else post({ do: 'set', k: 'aiMode', v: 'local_only' });
-            btnLocal.style.background = '#00f59b'; btnLocal.style.color = '#000';
-            btnAuto.style.background = 'rgba(255,255,255,0.06)'; btnAuto.style.color = '#fff';
-          });
-        }
-      }, 50);
-    }
-  }
-
-  closeDrawer() {
-    const drawer = document.getElementById('node-drawer');
-    if (drawer) drawer.classList.remove('open');
-  }
-}
-
-window.OmaMindMap = OmaMindMap;
-
-</script>
-
-<!-- Master Application Controller -->
-<script>
   const $ = id => document.getElementById(id);
   const post = m => window.webkit?.messageHandlers?.st?.postMessage(m);
   let P = {};
@@ -3283,20 +2159,20 @@ window.OmaMindMap = OmaMindMap;
     // Animate visual subsystems
     holoOrb?.setState('thinking');
     agentTown?.setAgentWorking('bob', text.trim(), 'Analyzing directive & routing models...', 20);
-    $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Processing Directive</b>';
+    if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Processing Directive</b>';
 
     post({ do: 'ask', text: text.trim() });
   }
 
   $('btnHomeSend').onclick = () => { const inp = $('homeChatInput'); sendDirective(inp.value); inp.value = ''; };
   $('homeChatInput').onkeydown = e => { if (e.key === 'Enter') { sendDirective($('homeChatInput').value); $('homeChatInput').value = ''; } };
-  $('btnFullSend').onclick = () => { const inp = $('fullChatInput'); sendDirective(inp.value); inp.value = ''; };
-  $('fullChatInput').onkeydown = e => { if (e.key === 'Enter') { sendDirective($('fullChatInput').value); $('fullChatInput').value = ''; } };
-  $('btnClearChat').onclick = () => { $('homeFeedStream').innerHTML = $('fullFeedStream').innerHTML = ''; };
+  if ($('btnFullSend')) $('btnFullSend').onclick = () => { const inp = $('fullChatInput'); sendDirective(inp.value); inp.value = ''; };
+  if ($('fullChatInput')) $('fullChatInput').onkeydown = e => { if (e.key === 'Enter') { sendDirective($('fullChatInput').value); $('fullChatInput').value = ''; } };
+  if ($('btnClearChat')) $('btnClearChat').onclick = () => { $('homeFeedStream').innerHTML = $('fullFeedStream').innerHTML = ''; };
 
   // Mic Button Trigger (Voice toggle directly in Oma UI)
   $('btnHomeMic').onclick = () => post({ do: 'micToggle' });
-  $('btnOverlayTrigger').onclick = () => post({ do: 'micToggle' });
+  if ($('btnOverlayTrigger')) $('btnOverlayTrigger').onclick = () => post({ do: 'micToggle' });
 
   // Quick Chips
   document.querySelectorAll('.quick-chip').forEach(c => c.onclick = () => sendDirective(c.dataset.prompt));
@@ -3360,7 +2236,7 @@ window.OmaMindMap = OmaMindMap;
   window.st = {
     load(d) {
       P = { talkMode: 'hold', ...d.prefs };
-      if (d.version) $('ver').textContent = $('aboutver').textContent = 'Oma AI • Version ' + d.version;
+      if (d.version) if ($('aboutver')) $('aboutver').textContent = 'Oma AI • Version ' + d.version; if ($('ver')) $('ver').textContent = 'Oma AI • Version ' + d.version;
       paint();
       if (d.state) state(d.state);
       post({ do: 'providers' });
@@ -3393,7 +2269,7 @@ window.OmaMindMap = OmaMindMap;
         badge.className = 'status-badge listening';
         badgeText.textContent = 'LISTENING ...';
       }
-      $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Listening (Mic Active)...</b>';
+      if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Listening (Mic Active)...</b>';
       const statusBox = $('pipelineStatus');
       if (statusBox) {
         statusBox.innerHTML = '<span class="status-pulse"></span><span>Pipeline Stage: <b style="color:var(--neon-cyan);">LISTENING</b> — Voice recording active</span>';
@@ -3456,10 +2332,10 @@ window.OmaMindMap = OmaMindMap;
         appendFeedMessage('user', 'You', finalText.trim());
         holoOrb?.setState('thinking');
         agentTown?.setAgentWorking('bob', finalText.trim(), 'Analyzing directive & routing models...', 25);
-        $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Processing Directive</b>';
+        if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Processing Directive</b>';
       } else {
         holoOrb?.setState('active');
-        $('agentTownActivity').innerHTML = 'Status: <b>Idle</b>';
+        if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b>Idle</b>';
       }
     },
     feedLine(line) {
@@ -3504,7 +2380,7 @@ window.OmaMindMap = OmaMindMap;
     feedDone() {
       setTimeout(() => {
         holoOrb?.setState('active');
-        $('agentTownActivity').innerHTML = 'Status: <b>Idle</b>';
+        if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b>Idle</b>';
       }, 1500);
     },
     tab(name) {
@@ -3523,6 +2399,120 @@ window.OmaMindMap = OmaMindMap;
     } catch (e) {
       console.warn('Canvas init:', e);
     }
+  });
+
+
+  // Authoritative State Controller & Drawer Setup
+  window.OmaController = {
+    state: 'active',
+    holoOrb: null,
+    mindMap: null,
+    agentTown: null,
+
+    init() {
+      try { this.holoOrb = new OmaHoloFace('orb-canvas'); } catch(e) { console.error('HoloFace init error:', e); }
+      try { this.mindMap = new OmaMindMap('cables-canvas'); } catch(e) { console.error('MindMap init error:', e); }
+      try { this.agentTown = new AgentTown('town-canvas'); } catch(e) { console.error('AgentTown init error:', e); }
+      window.holoOrb = this.holoOrb;
+      window.agentTown = this.agentTown;
+      window.mindMap = this.mindMap;
+
+      this.wireEvents();
+    },
+
+    setState(state, detail, pct) {
+      this.state = state;
+      if (this.holoOrb && this.holoOrb.setState) this.holoOrb.setState(state);
+      if (this.mindMap && this.mindMap.setState) this.mindMap.setState(state);
+      if (this.agentTown && this.agentTown.onTaskEvent) this.agentTown.onTaskEvent(state, detail);
+    },
+
+    openSettings(tabName) {
+      const drawer = document.getElementById('settings-drawer');
+      if (drawer) drawer.classList.add('open');
+      if (tabName) {
+        const btn = document.querySelector(`nav.master-nav button[data-s="${tabName}"]`);
+        if (btn) btn.click();
+      }
+    },
+
+    closeSettings() {
+      const drawer = document.getElementById('settings-drawer');
+      if (drawer) drawer.classList.remove('open');
+    },
+
+    wireEvents() {
+      const btnToggle = document.getElementById('btn-toggle-settings');
+      if (btnToggle) btnToggle.onclick = () => this.openSettings();
+
+      const btnClose = document.getElementById('btn-close-settings');
+      if (btnClose) btnClose.onclick = () => this.closeSettings();
+
+      const btnDrawerClose = document.getElementById('drawer-close');
+      if (btnDrawerClose) {
+        btnDrawerClose.onclick = () => {
+          const nd = document.getElementById('node-drawer');
+          if (nd) nd.classList.remove('open');
+        };
+      }
+
+      const btnTerminate = document.getElementById('btn-terminate');
+      if (btnTerminate) {
+        btnTerminate.onclick = () => {
+          post({ do: "voiceCancel" });
+          this.setState('active', 'Cancelled', 100);
+        };
+      }
+
+      // Drawer tab buttons
+      document.querySelectorAll('nav.master-nav button.nav-btn').forEach(b => {
+        b.onclick = () => {
+          document.querySelectorAll('nav.master-nav button.nav-btn, .settings-content section.tab-section').forEach(e => e.classList.remove('on'));
+          b.classList.add('on');
+          const targetSection = document.getElementById(b.dataset.s);
+          if (targetSection) targetSection.classList.add('on');
+        };
+      });
+    }
+  };
+
+  // Re-route st methods to authoritative controller
+  const prevFeedLine = window.st.feedLine;
+  window.st.feedLine = function(line) {
+    if (typeof line === 'string' && line.startsWith('§EVENT§')) {
+      try {
+        const ev = JSON.parse(line.slice(7));
+        window.OmaController.setState(ev.stage || 'executing', ev.detail || '', ev.pct || 50);
+      } catch(e) {}
+    } else if (typeof line === 'string' && line.startsWith('§REPLY§')) {
+      window.OmaController.setState('completed', 'Task Complete', 100);
+      setTimeout(() => window.OmaController.setState('active', 'Ready', 0), 3000);
+    }
+    if (prevFeedLine) prevFeedLine(line);
+  };
+
+  const prevVoiceStart = window.st.voiceStart;
+  window.st.voiceStart = function() {
+    window.OmaController.setState('listening', 'Listening to microphone...', 0);
+    if (prevVoiceStart) prevVoiceStart();
+  };
+
+  const prevVoiceDone = window.st.voiceDone;
+  window.st.voiceDone = function(transcript) {
+    if (transcript) {
+      window.OmaController.setState('thinking', 'Processing voice directive...', 20);
+    } else {
+      window.OmaController.setState('active', 'Ready', 0);
+    }
+    if (prevVoiceDone) prevVoiceDone(transcript);
+  };
+
+  window.st.openSettings = function(tab) {
+    window.OmaController.openSettings(tab);
+  };
+
+  window.addEventListener('DOMContentLoaded', () => {
+    window.OmaController.init();
   });
 </script>
 </body>

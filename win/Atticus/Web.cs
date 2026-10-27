@@ -43,6 +43,9 @@ static class Web
         string html;
         try { html = File.ReadAllText(Paths.Ui(page)); } catch { html = $"missing {page}"; }
         if (html.Contains("/*ORBS*/")) html = html.Replace("/*ORBS*/", File.Exists(Paths.Ui("orbs.js")) ? File.ReadAllText(Paths.Ui("orbs.js")) : "");
+        if (html.Contains("/*ORB_JS*/")) html = html.Replace("/*ORB_JS*/", File.Exists(Paths.Ui("orb.js")) ? File.ReadAllText(Paths.Ui("orb.js")) : "");
+        if (html.Contains("/*MINDMAP_JS*/")) html = html.Replace("/*MINDMAP_JS*/", File.Exists(Paths.Ui("mindmap.js")) ? File.ReadAllText(Paths.Ui("mindmap.js")) : "");
+        if (html.Contains("/*AGENT_TOWN_JS*/")) html = html.Replace("/*AGENT_TOWN_JS*/", File.Exists(Paths.Ui("agent_town.js")) ? File.ReadAllText(Paths.Ui("agent_town.js")) : "");
         v.CoreWebView2.NavigateToString(html);
         return v;
     }

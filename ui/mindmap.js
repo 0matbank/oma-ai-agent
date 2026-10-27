@@ -1,25 +1,39 @@
 /**
- * Oma AI Agent - Neural Mind Map & Animated Connector Cables
- * Connects Memory, Skills, Soul, Setting to the Central Neural Core.
+ * Oma AI Agent - Neural Mind Map & Glowing Connector Cables
+ * Connects Memory, Skills, Soul, Setting to the Central Holographic AI Face.
+ * Recreates the exact multi-colored curved bezier cables and bus junction from the reference video.
  */
+
 class OmaMindMap {
   constructor(canvasId) {
     this.canvas = document.getElementById(canvasId);
     if (!this.canvas) return;
     this.ctx = this.canvas.getContext('2d');
     this.nodes = [
-      { id: 'memory', name: 'Memory', subtitle: 'Facts & Context', color: '#00e5ff', glow: 'rgba(0, 229, 255, 0.4)', icon: '🧠' },
-      { id: 'skills', name: 'Skills', subtitle: 'Tools & Functions', color: '#b388ff', glow: 'rgba(179, 136, 255, 0.4)', icon: '⚡' },
-      { id: 'soul', name: 'Soul', subtitle: 'Persona & Logic', color: '#00f59b', glow: 'rgba(0, 245, 155, 0.4)', icon: '✨' },
-      { id: 'setting', name: 'Setting', subtitle: 'System Config', color: '#ffb300', glow: 'rgba(255, 179, 0, 0.4)', icon: '⚙️' }
+      { id: 'memory', name: 'Memory', subtitle: 'Facts & Context', color: '#00e5ff', glow: 'rgba(0, 229, 255, 0.5)', icon: '🧠', tab: 'memory' },
+      { id: 'skills', name: 'Skills', subtitle: 'Tools & Functions', color: '#ff5722', glow: 'rgba(255, 87, 34, 0.5)', icon: '⚡', tab: 'tasks' },
+      { id: 'soul', name: 'Soul', subtitle: 'Persona & Logic', color: '#00e676', glow: 'rgba(0, 230, 118, 0.5)', icon: '✨', tab: 'brain' },
+      { id: 'setting', name: 'Setting', subtitle: 'System Config', color: '#e0e0ff', glow: 'rgba(224, 224, 255, 0.5)', icon: '⚙️', tab: 'settings' }
     ];
     this.pulses = [];
     this.time = 0;
+    this.state = 'active';
 
     this.initDOM();
     this.resize();
     window.addEventListener('resize', () => this.resize());
     this.animate();
+
+    // Pulse generator
+    setInterval(() => {
+      const idx = Math.floor(Math.random() * this.nodes.length);
+      this.pulses.push({
+        nodeIndex: idx,
+        progress: 0,
+        speed: 0.018 + Math.random() * 0.012,
+        color: this.nodes[idx].color
+      });
+    }, 400);
   }
 
   initDOM() {
@@ -35,283 +49,218 @@ class OmaMindMap {
       el.style.setProperty('--node-glow', node.glow);
 
       el.innerHTML = `
-        <div class="node-icon-box">${node.icon}</div>
+        <div class="node-icon-box" style="background:${node.color}18; border:1px solid ${node.color}40; color:${node.color};">
+          ${node.icon}
+        </div>
         <div class="node-info">
           <span class="node-title">${node.name}</span>
           <span class="node-subtitle">${node.subtitle}</span>
         </div>
+        <div class="node-anchor" style="background:${node.color}; box-shadow:0 0 8px ${node.color};"></div>
       `;
 
       el.addEventListener('click', () => {
-        this.openDrawer(node.id);
+        if (node.id === 'setting') {
+          if (window.OmaController && window.OmaController.openSettings) {
+            window.OmaController.openSettings();
+          } else if (window.st && window.st.openSettings) {
+            window.st.openSettings();
+          }
+        } else {
+          this.openDrawer(node.id, node.name, node.subtitle);
+        }
       });
 
       container.appendChild(el);
     });
-
-    // Spawn animated pulse packets
-    setInterval(() => {
-      const randomNode = Math.floor(Math.random() * this.nodes.length);
-      this.pulses.push({
-        nodeIndex: randomNode,
-        progress: 0,
-        speed: 0.015 + Math.random() * 0.01,
-        color: this.nodes[randomNode].color
-      });
-    }, 450);
   }
 
   resize() {
-    const rect = this.canvas.parentElement.getBoundingClientRect();
+    if (!this.canvas) return;
+    const rect = this.canvas.parentElement ? this.canvas.parentElement.getBoundingClientRect() : this.canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    this.width = rect.width;
-    this.height = rect.height;
+    this.width = rect.width || 120;
+    this.height = rect.height || 260;
     this.canvas.width = this.width * dpr;
     this.canvas.height = this.height * dpr;
     this.ctx.scale(dpr, dpr);
   }
 
+  setState(newState) {
+    this.state = newState;
+  }
+
   animate() {
     requestAnimationFrame(() => this.animate());
     this.time += 0.02;
+
+    if (!this.ctx || !this.width) return;
     this.ctx.clearRect(0, 0, this.width, this.height);
 
-    const targetX = this.width + 10;
-    const targetY = this.height / 2;
+    // The junction point where the 4 curves converge (near the right edge of this connector area)
+    const junctionX = this.width - 24;
+    const junctionY = this.height / 2;
+    const busEndX = this.width;
 
-    // Draw connecting cables
+    // Cable origins from the 4 DOM nodes
+    const nodeYPositions = [];
+    const container = document.getElementById('nodes-group');
+    const parentRect = this.canvas.getBoundingClientRect();
+
     this.nodes.forEach((node, idx) => {
       const el = document.getElementById(`node-${node.id}`);
-      if (!el) return;
+      let startY = 30 + idx * 60;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        startY = r.top - parentRect.top + r.height / 2;
+      }
+      nodeYPositions.push(startY);
+    });
 
-      const rect = el.getBoundingClientRect();
-      const parentRect = this.canvas.getBoundingClientRect();
+    // 1. Draw glowing background cables
+    this.nodes.forEach((node, idx) => {
+      const startX = 0;
+      const startY = nodeYPositions[idx];
 
-      const startX = rect.right - parentRect.left;
-      const startY = rect.top - parentRect.top + rect.height / 2;
-
-      // Draw glowing cyber cable
+      // Draw faint background cable
       this.ctx.save();
       this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
       this.ctx.lineWidth = 1.5;
-
-      const cp1X = startX + (targetX - startX) * 0.45;
-      const cp1Y = startY;
-      const cp2X = startX + (targetX - startX) * 0.65;
-      const cp2Y = targetY;
-
       this.ctx.beginPath();
       this.ctx.moveTo(startX, startY);
-      this.ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, targetX, targetY);
+      this.ctx.bezierCurveTo(startX + (junctionX - startX) * 0.45, startY, startX + (junctionX - startX) * 0.65, junctionY, junctionX, junctionY);
       this.ctx.stroke();
 
-      // Ambient neon tint
-      this.ctx.strokeStyle = node.color.replace(')', ', 0.25)').replace('rgb', 'rgba');
-      this.ctx.lineWidth = 1;
+      // Draw neon colored glowing cable
+      this.ctx.strokeStyle = node.color;
+      this.ctx.lineWidth = 2.0;
+      this.ctx.shadowColor = node.color;
+      this.ctx.shadowBlur = 10;
+      this.ctx.beginPath();
+      this.ctx.moveTo(startX, startY);
+      this.ctx.bezierCurveTo(startX + (junctionX - startX) * 0.45, startY, startX + (junctionX - startX) * 0.65, junctionY, junctionX, junctionY);
       this.ctx.stroke();
       this.ctx.restore();
     });
 
-    // Update & draw pulses
+    // 2. Draw Horizontal Main Bus Line from Junction into the AI Face Card
+    this.ctx.save();
+    this.ctx.strokeStyle = '#00e5ff';
+    this.ctx.lineWidth = 2.8;
+    this.ctx.shadowColor = '#00e5ff';
+    this.ctx.shadowBlur = 12;
+    this.ctx.beginPath();
+    this.ctx.moveTo(junctionX, junctionY);
+    this.ctx.lineTo(busEndX, junctionY);
+    this.ctx.stroke();
+
+    // 3. Draw Junction Node with Pulsing Concentric Rings
+    const pulseRing = Math.sin(this.time * 3) * 3;
+    this.ctx.fillStyle = '#00e5ff';
+    this.ctx.shadowColor = '#00e5ff';
+    this.ctx.shadowBlur = 14;
+    this.ctx.beginPath();
+    this.ctx.arc(junctionX, junctionY, 5, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+    this.ctx.lineWidth = 1.2;
+    this.ctx.beginPath();
+    this.ctx.arc(junctionX, junctionY, 9 + pulseRing, 0, Math.PI * 2);
+    this.ctx.stroke();
+    this.ctx.restore();
+
+    // 4. Update and Draw Moving Energy Pulses (Packets)
+    let speedMult = 1.0;
+    if (this.state === 'thinking' || this.state === 'planning') speedMult = 2.5;
+    else if (this.state === 'executing') speedMult = 2.0;
+
     for (let i = this.pulses.length - 1; i >= 0; i--) {
       const p = this.pulses[i];
-      p.progress += p.speed;
+      p.progress += p.speed * speedMult;
 
-      if (p.progress >= 1) {
+      if (p.progress >= 1.3) {
         this.pulses.splice(i, 1);
         continue;
       }
 
-      const node = this.nodes[p.nodeIndex];
-      const el = document.getElementById(`node-${node.id}`);
-      if (!el) continue;
+      let ptX = 0;
+      let ptY = 0;
 
-      const rect = el.getBoundingClientRect();
-      const parentRect = this.canvas.getBoundingClientRect();
+      if (p.progress <= 1.0) {
+        // Curve phase
+        const t = p.progress;
+        const startX = 0;
+        const startY = nodeYPositions[p.nodeIndex];
+        const cp1x = startX + (junctionX - startX) * 0.45;
+        const cp1y = startY;
+        const cp2x = startX + (junctionX - startX) * 0.65;
+        const cp2y = junctionY;
 
-      const startX = rect.right - parentRect.left;
-      const startY = rect.top - parentRect.top + rect.height / 2;
+        // Cubic bezier formula
+        const invT = 1 - t;
+        ptX = invT * invT * invT * startX + 3 * invT * invT * t * cp1x + 3 * invT * t * t * cp2x + t * t * t * junctionX;
+        ptY = invT * invT * invT * startY + 3 * invT * invT * t * cp1y + 3 * invT * t * t * cp2y + t * t * t * junctionY;
+      } else {
+        // Bus phase: from junction to busEnd
+        const t = (p.progress - 1.0) / 0.3;
+        ptX = junctionX + (busEndX - junctionX) * t;
+        ptY = junctionY;
+      }
 
-      const cp1X = startX + (targetX - startX) * 0.45;
-      const cp1Y = startY;
-      const cp2X = startX + (targetX - startX) * 0.65;
-      const cp2Y = targetY;
-
-      const t = p.progress;
-      // Cubic bezier formula: B(t) = (1-t)^3*P0 + 3(1-t)^2*t*P1 + 3(1-t)*t^2*P2 + t^3*P3
-      const u = 1 - t;
-      const tt = t * t;
-      const uu = u * u;
-      const uuu = uu * u;
-      const ttt = tt * t;
-
-      const px = uuu * startX + 3 * uu * t * cp1X + 3 * u * tt * cp2X + ttt * targetX;
-      const py = uuu * startY + 3 * uu * t * cp1Y + 3 * u * tt * cp2Y + ttt * targetY;
-
-      // Draw glowing particle pulse
       this.ctx.save();
-      this.ctx.fillStyle = p.color;
+      this.ctx.fillStyle = '#ffffff';
       this.ctx.shadowColor = p.color;
-      this.ctx.shadowBlur = 8;
+      this.ctx.shadowBlur = 12;
       this.ctx.beginPath();
-      this.ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+      this.ctx.arc(ptX, ptY, 3.2, 0, Math.PI * 2);
       this.ctx.fill();
       this.ctx.restore();
     }
   }
 
-  openDrawer(type) {
+  openDrawer(id, name, subtitle) {
     const drawer = document.getElementById('node-drawer');
     const title = document.getElementById('drawer-title');
-    const body = document.getElementById('drawer-content');
-    if (!drawer || !title || !body) return;
+    const content = document.getElementById('drawer-content');
+    if (!drawer || !title || !content) return;
+
+    title.textContent = `${name.toUpperCase()} INSPECTOR`;
+
+    if (id === 'memory') {
+      content.innerHTML = `
+        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Active Memory &amp; System Rules (from memory.md)</div>
+        <div id="memory-rules-list" style="display:flex; flex-direction:column; gap:8px;">
+          <div class="drawer-card" style="padding:10px; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid rgba(255,255,255,0.08); font-size:12px;">
+            <b style="color:var(--neon-cyan);">Context Anchor:</b> Windows 11 PC 2070 Cybernetic Environment.
+          </div>
+          <div class="drawer-card" style="padding:10px; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid rgba(255,255,255,0.08); font-size:12px;">
+            <b style="color:var(--neon-cyan);">Language Mode:</b> Bilingual (Bengali &amp; English) Natural Speech.
+          </div>
+        </div>
+      `;
+    } else if (id === 'skills') {
+      content.innerHTML = `
+        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Authorized Windows Tools &amp; Capabilities</div>
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:12px;">
+          <div style="padding:8px; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid rgba(255,255,255,0.08);">⚡ tool_open_app(app_name): Fast launch &amp; focus</div>
+          <div style="padding:8px; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid rgba(255,255,255,0.08);">⚡ tool_place_window(app, pos): Snap &amp; arrange</div>
+          <div style="padding:8px; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid rgba(255,255,255,0.08);">⚡ tool_search_web(query): DuckDuckGo &amp; Google</div>
+          <div style="padding:8px; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid rgba(255,255,255,0.08);">⚡ tool_screenshot(): Screen vision &amp; OCR</div>
+        </div>
+      `;
+    } else if (id === 'soul') {
+      content.innerHTML = `
+        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Autonomous Persona &amp; Core Logic</div>
+        <div style="padding:10px; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid rgba(255,255,255,0.08); font-size:12px; line-height:1.6;">
+          <b style="color:var(--neon-green);">Oma AI Core:</b> Polite, hyper-responsive personal assistant.
+          <br>Always verifies Windows actions before reporting completion.
+          <br>Multi-AI automatic failover: Claude Code ➔ Ollama Local ➔ Cloud fallback.
+        </div>
+      `;
+    }
 
     drawer.classList.add('open');
-
-    if (type === 'memory') {
-      title.textContent = 'MEMORY & CONTEXT';
-      title.style.color = '#00e5ff';
-      body.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:12px;">
-          <p>Oma remembers persistent facts about you, your workflows, and habits.</p>
-          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
-            <b style="color:#00e5ff;">User Profile:</b>
-            <div style="margin-top:4px; font-family:monospace; font-size:11.5px; color:#cbd5e1;">Name: Usman<br>Apps: Chrome, VS Code, Terminal<br>Preferred Language: Urdu / English / Bengali</div>
-          </div>
-          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
-            <b style="color:#00e5ff;">Active Directives:</b>
-            <ul style="margin-left:16px; margin-top:6px; font-size:12px;">
-              <li>Always execute multi-step research through Alice.</li>
-              <li>Arrange windows across active displays automatically.</li>
-              <li>Summarize web articles in concise bullet points.</li>
-            </ul>
-          </div>
-        </div>
-      `;
-    } else if (type === 'skills') {
-      title.textContent = 'INSTALLED SKILLS & TOOLS';
-      title.style.color = '#b388ff';
-      body.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:10px;">
-          <div class="module-pill bash" style="width:fit-content;">✓ Window Control (winctl)</div>
-          <p style="font-size:12px;">Move, resize, split, and focus any app across multiple monitors with zero latency.</p>
-
-          <div class="module-pill research" style="width:fit-content;">✓ Deep Web Research</div>
-          <p style="font-size:12px;">DuckDuckGo search, real-time page reading, live web synthesis.</p>
-
-          <div class="module-pill" style="width:fit-content;">✓ Vision & OCR Screen Inspection</div>
-          <p style="font-size:12px;">Analyze active window contents, UI automation buttons, and text fields.</p>
-
-          <div class="module-pill bash" style="width:fit-content;">✓ Background Bash & PowerShell</div>
-          <p style="font-size:12px;">Execute safe system commands, file navigation, and dev server launches.</p>
-        </div>
-      `;
-    } else if (type === 'soul') {
-      title.textContent = 'SOUL & PERSONALITY';
-      title.style.color = '#00f59b';
-      body.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:12px;">
-          <p>Oma AI operates as a collaborative, proactive futuristic companion inspired by next-gen virtual operating systems.</p>
-          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
-            <b style="color:#00f59b;">Core Persona:</b>
-            <div style="margin-top:6px; font-size:12px;">Direct, confident, respectful, hyper-efficient. Speaks naturally in conversational Urdu / Hindi / English, with instant agent dispatching.</div>
-          </div>
-          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
-            <b style="color:#00f59b;">Audio Synthesis:</b>
-            <div style="margin-top:6px; font-size:12px;">Active TTS voice pipeline: Natural conversational cadence, confirmation callbacks, and status reporting.</div>
-          </div>
-        </div>
-      `;
-    } else if (type === 'setting') {
-      title.textContent = 'MULTI-AI PROVIDERS & SYSTEM CONFIG';
-      title.style.color = '#ffb300';
-      body.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:14px;">
-          <!-- Smart Routing Mode -->
-          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:8px; border:1px solid rgba(255,179,0,0.3);">
-            <b style="color:#ffb300; font-size:12px;">⚡ SMART ROUTING MODE:</b>
-            <div style="margin-top:8px; display:flex; gap:6px;">
-              <button id="btn-mode-auto" style="flex:1; padding:6px; border-radius:4px; font-size:11px; background:#ffb300; color:#000; font-weight:bold; border:none; cursor:pointer;">Auto Fallback</button>
-              <button id="btn-mode-local" style="flex:1; padding:6px; border-radius:4px; font-size:11px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(255,255,255,0.1); cursor:pointer;">Local Only</button>
-            </div>
-            <p style="margin-top:6px; font-size:10.5px; color:#94a3b8;">
-              Auto Mode: Claude Code ➔ Local Ollama (Qwen) ➔ Cloud. Auto-switches on rate limits.
-            </p>
-          </div>
-
-          <!-- Connected Providers -->
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            <b style="font-size:12px; color:#fff;">CONNECTED AI PROVIDERS:</b>
-            
-            <!-- Ollama -->
-            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,245,155,0.08); padding:8px 10px; border-radius:6px; border:1px solid rgba(0,245,155,0.3);">
-              <div>
-                <b style="color:#00f59b; font-size:12px;">● Local Ollama (11434)</b>
-                <div style="font-size:10.5px; color:#94a3b8;">Detected: qwen3-vl:8b, qwen3:8b (RTX 5060 Ti)</div>
-              </div>
-              <span style="font-size:10px; background:#00f59b; color:#000; padding:2px 6px; border-radius:4px; font-weight:bold;">READY</span>
-            </div>
-
-            <!-- Claude Code -->
-            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,179,0,0.08); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,179,0,0.3);">
-              <div>
-                <b style="color:#ffb300; font-size:12px;">▲ Claude Code CLI</b>
-                <div style="font-size:10.5px; color:#94a3b8;">Subscription: Claude Team (Weekly Limit resets 2am)</div>
-              </div>
-              <span style="font-size:10px; background:rgba(255,179,0,0.2); color:#ffb300; padding:2px 6px; border-radius:4px; font-weight:bold;">AUTO-FALLBACK</span>
-            </div>
-
-            <!-- LM Studio -->
-            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
-              <div>
-                <b style="color:#cbd5e1; font-size:12px;">○ LM Studio (1234)</b>
-                <div style="font-size:10.5px; color:#64748b;">Localhost endpoint (Connect when server running)</div>
-              </div>
-              <span style="font-size:10px; background:rgba(255,255,255,0.1); color:#94a3b8; padding:2px 6px; border-radius:4px;">STANDBY</span>
-            </div>
-          </div>
-
-          <!-- Shortcuts & Hardware -->
-          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
-            <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11.5px;">
-              <span style="color:#94a3b8;">Global Voice:</span>
-              <kbd style="background:#222; padding:2px 6px; border-radius:4px; color:#00e5ff; font-family:monospace;">Ctrl + Alt + Space</kbd>
-            </div>
-            <div style="display:flex; justify-content:space-between; font-size:11.5px;">
-              <span style="color:#94a3b8;">Inference Device:</span>
-              <b style="color:#fff;">NVIDIA RTX 5060 Ti 16GB</b>
-            </div>
-          </div>
-        </div>
-      `;
-
-      // Event listeners for routing buttons
-      setTimeout(() => {
-        const btnAuto = document.getElementById('btn-mode-auto');
-        const btnLocal = document.getElementById('btn-mode-local');
-        if (btnAuto && btnLocal) {
-          btnAuto.addEventListener('click', () => {
-            if (window.setMode) { window.setMode('auto'); }
-            else if (window.webkit?.messageHandlers?.st) { window.webkit.messageHandlers.st.postMessage({ do: 'set', k: 'aiMode', v: 'auto' }); }
-            else { try { fetch('/api/models/mode', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ mode: 'auto' }) }); } catch(e){} }
-            btnAuto.style.background = '#ffb300'; btnAuto.style.color = '#000';
-            btnLocal.style.background = 'rgba(255,255,255,0.06)'; btnLocal.style.color = '#fff';
-          });
-          btnLocal.addEventListener('click', () => {
-            if (window.setMode) { window.setMode('local_only'); }
-            else if (window.webkit?.messageHandlers?.st) { window.webkit.messageHandlers.st.postMessage({ do: 'set', k: 'aiMode', v: 'local_only' }); }
-            else { try { fetch('/api/models/mode', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ mode: 'local_only' }) }); } catch(e){} }
-            btnLocal.style.background = '#00f59b'; btnLocal.style.color = '#000';
-            btnAuto.style.background = 'rgba(255,255,255,0.06)'; btnAuto.style.color = '#fff';
-          });
-        }
-      }, 50);
-    }
-  }
-
-  closeDrawer() {
-    const drawer = document.getElementById('node-drawer');
-    if (drawer) drawer.classList.remove('open');
   }
 }
 
