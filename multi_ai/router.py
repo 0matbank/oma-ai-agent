@@ -20,7 +20,7 @@ def clean_user_prompt(text: str) -> str:
     if not text:
         return ""
     text = re.split(r'\n(?:A )?[Pp]revious (?:try )?failed:', text)[0]
-    parts = re.split(r'\bRequest:\s*', text)
+    parts = re.split(r'(?:^|\n)Request:\s*', text)
     if len(parts) > 1:
         text = parts[-1].strip()
     while True:
@@ -77,12 +77,17 @@ class ModelRouter:
         )
 
     def _get_cloud_adapter(self, provider_id: str) -> Optional[OpenAICompatAdapter]:
-        """Dynamically instantiates OpenAICompatAdapter using secret from Credential Manager."""
+        """Dynamically instantiates OpenAICompatAdapter using secret from Credential Manager (F07)."""
         secret_key = get_secret(f"ai_key_{provider_id}")
         if not secret_key:
             return None
 
         p_def = next((p for p in provider_mgr.BUILTIN_PROVIDERS if p["id"] == provider_id), None)
+        if not p_def:
+            from multi_ai.providers import load_custom_providers
+            customs = load_custom_providers()
+            p_def = next((c for c in customs if c["id"] == provider_id), None)
+
         base_url = p_def.get("base_url") if p_def else ""
         name = p_def.get("name") if p_def else provider_id
 
@@ -106,7 +111,7 @@ class ModelRouter:
         """Returns live status of all providers using provider_mgr."""
         return provider_mgr.get_full_overview()
 
-    def execute(self, prompt: str, task_id: Optional[str] = None, event_callback=None, exclude_providers: Optional[List[str]] = None) -> Dict[str, Any]:
+    def execute(self, prompt: str, task_id: Optional[str] = None, event_callback=None, exclude_providers: Optional[List[str]] = None, system_prompt: str = "") -> Dict[str, Any]:
         """
         Executes a task through the intelligent multi-AI fallback chain.
         Guarantees:
@@ -148,8 +153,8 @@ class ModelRouter:
         ollama_models = provider_mgr.discover_local_ollama_models()
         best_ollama_model = ollama_models[0]["name"] if ollama_models else "qwen3-vl:8b"
 
-        # Check recursion context: if inside Atticus or fallback, exclude claude_code
-        if os.environ.get("OMA_IN_ATTICUS") == "1" or os.environ.get("OMA_ROUTER_FALLBACK") == "1":
+        # Check recursion context: only exclude claude_code if in active fallback context (F02)
+        if os.environ.get("OMA_ROUTER_FALLBACK") == "1":
             excluded.add("claude_code")
 
         if mode == "local_only" or active_model == "local_only":
@@ -164,6 +169,8 @@ class ModelRouter:
             emit("model_selected", f"Manual Mode: Selected {active_model}", 35)
             if "/" in active_model:
                 pid, mid = active_model.split("/", 1)
+                if pid == "claude":
+                    pid = "claude_code"
                 if pid not in excluded:
                     candidates.append((pid, mid))
             else:
@@ -174,25 +181,35 @@ class ModelRouter:
                 if ollama_models and ('ollama', best_ollama_model) not in candidates and 'ollama' not in excluded:
                     candidates.append(('ollama', best_ollama_model))
         else:
-            # 'auto' mode: Claude Code (if not excluded) -> Local Ollama (qwen3-vl:8b / qwen3:8b) -> LM Studio -> Cloud
+            # 'auto' mode: Claude Code (if not excluded) -> Local Ollama -> LM Studio -> Cloud
+            ai_fallback = settings.get("aiFallback", True)
             if 'claude_code' not in excluded:
                 candidates.append(('claude_code', 'claude-3-5-haiku'))
-            if ollama_models and 'ollama' not in excluded:
+            if (ai_fallback or not candidates) and ollama_models and 'ollama' not in excluded:
                 for m in ollama_models:
                     candidates.append(('ollama', m["name"]))
-            if self.adapters['lm_studio'].is_available() and 'lm_studio' not in excluded:
+            if ai_fallback and self.adapters['lm_studio'].is_available() and 'lm_studio' not in excluded:
                 for m in self.adapters['lm_studio'].discover_models():
                     candidates.append(('lm_studio', m.model_id))
-            # Cloud fallbacks if configured
-            for c_id in ['gemini', 'openai', 'deepseek', 'groq']:
-                if c_id not in excluded and get_secret(f"ai_key_{c_id}"):
-                    p_def = next((p for p in provider_mgr.BUILTIN_PROVIDERS if p["id"] == c_id), None)
-                    if p_def and p_def.get("default_models"):
-                        candidates.append((c_id, p_def["default_models"][0]))
+            # Cloud fallbacks if configured and fallback allowed (F05)
+            if ai_fallback:
+                for c_id in ['gemini', 'openai', 'deepseek', 'groq']:
+                    if c_id not in excluded and get_secret(f"ai_key_{c_id}"):
+                        p_def = next((p for p in provider_mgr.BUILTIN_PROVIDERS if p["id"] == c_id), None)
+                        if p_def and p_def.get("default_models"):
+                            candidates.append((c_id, p_def["default_models"][0]))
 
-        # Enforce strict finite fallback cap (max 3 candidate attempts per user request)
+        # Deduplicate candidates across providers BEFORE applying attempt budget (F04)
         MAX_FALLBACK_ATTEMPTS = 3
-        candidates = candidates[:MAX_FALLBACK_ATTEMPTS]
+        deduped_candidates = []
+        seen_pids = set()
+        for pid, mid in candidates:
+            if pid not in seen_pids:
+                seen_pids.add(pid)
+                deduped_candidates.append((pid, mid))
+                if len(deduped_candidates) >= MAX_FALLBACK_ATTEMPTS:
+                    break
+        candidates = deduped_candidates
 
         if not candidates:
             if ollama_models and 'ollama' not in excluded:
@@ -207,13 +224,8 @@ class ModelRouter:
                 }
 
         fallback_notes = []
-        attempted_providers = set()
 
         for idx, (pid, mid) in enumerate(candidates):
-            if pid in attempted_providers:
-                continue
-            attempted_providers.add(pid)
-
             if idx > 0:
                 prev_pid = candidates[idx - 1][0]
                 emit("fallback", f"Switching from {prev_pid} to {pid} ({mid})", 50)
@@ -221,17 +233,34 @@ class ModelRouter:
             emit("executing", f"Executing with {pid} ({mid})...", 60)
 
             adapter = self.adapters.get(pid)
+            if not adapter and pid in ('claude', 'claude_code'):
+                adapter = self.adapters.get('claude_code')
             if not adapter:
                 adapter = self._get_cloud_adapter(pid)
             if not adapter:
                 fallback_notes.append(f"{pid}: not configured")
                 continue
 
-            # Attempt generation
-            res = adapter.generate(mid, clean_prompt)
+            # Attempt generation with optional system_prompt
+            try:
+                import inspect
+                sig = inspect.signature(adapter.generate)
+                if 'system_prompt' in sig.parameters:
+                    res = adapter.generate(mid, clean_prompt, system_prompt=system_prompt)
+                else:
+                    res = adapter.generate(mid, clean_prompt)
+            except Exception as e:
+                res = {'success': False, 'error': str(e), 'error_type': 'exception'}
 
             if res.get('success'):
-                reply = res.get('reply', '')
+                reply = (res.get('reply') or '').strip()
+                if not reply:
+                    fallback_notes.append(f"{pid} ({mid}): empty reply")
+                    continue
+                if reply.lower().startswith('error') or 'error executing' in reply.lower():
+                    fallback_notes.append(f"{pid} ({mid}): {reply[:80]}")
+                    continue
+
                 journal.finish_task(task_id, reply, status='completed')
 
                 fallback_occurred = idx > 0

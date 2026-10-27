@@ -350,10 +350,16 @@ class ProviderManager:
         except urllib.error.HTTPError as e:
             ms = int((time.time() - t0) * 1000)
             body = e.read().decode("utf-8", errors="ignore")
-            if e.code == 401 or e.code == 403:
+            if e.code in (401, 403):
                 return {"ok": False, "status": "Auth Error", "message": "Invalid API Key or unauthorized.", "latency_ms": ms}
-            # Many providers might not support GET /models but work fine for completions
-            return {"ok": True, "status": "Endpoint Reachable", "message": f"Server responded (HTTP {e.code}) in {ms}ms", "latency_ms": ms}
+            if e.code == 429:
+                return {"ok": False, "status": "Rate Limited", "message": f"Rate limit reached (HTTP 429) ({ms}ms).", "latency_ms": ms}
+            if e.code >= 500:
+                return {"ok": False, "status": "Server Error", "message": f"Remote server error (HTTP {e.code}) ({ms}ms).", "latency_ms": ms}
+            if e.code in (404, 405):
+                # Many providers might not support GET /models but work fine for completions
+                return {"ok": True, "status": "Endpoint Reachable", "message": f"Server responded (HTTP {e.code}) in {ms}ms", "latency_ms": ms}
+            return {"ok": False, "status": f"HTTP {e.code}", "message": f"HTTP {e.code}: {body[:100]}", "latency_ms": ms}
         except Exception as e:
             return {"ok": False, "status": "Failed", "message": str(e), "latency_ms": -1}
 
@@ -426,7 +432,9 @@ class ProviderManager:
         """Saves API key to Windows Credential Manager and custom provider definitions."""
         api_key = data.get("key", "").strip()
         if api_key:
-            set_secret(f"ai_key_{p_id}", api_key)
+            saved = set_secret(f"ai_key_{p_id}", api_key)
+            if not saved:
+                return {"ok": False, "message": "Failed to store API Key in Windows Credential Manager."}
 
         is_custom = data.get("custom", False) or not any(p["id"] == p_id for p in self.BUILTIN_PROVIDERS)
         if is_custom:

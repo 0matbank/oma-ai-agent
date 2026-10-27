@@ -1113,7 +1113,8 @@ def watch(what, then, app='', words='', mode='', phrase=''):
         hits = hits + 1 if done else 0
         if hits >= 2:   # twice in a row: one bad read or a flicker between steps must not fire it
             notify(f'{app or what[:40]}: done.' + (f' Now: {then}' if then else ''))
-            return then and subprocess.run([sys.executable, SELF, then])
+            clean_env = {k: v for k, v in os.environ.items() if k not in ('OMA_IN_ATTICUS', 'OMA_EXECUTION_DEPTH')}
+            return then and subprocess.run([sys.executable, SELF, then], env=clean_env)
         time.sleep(5)
     notify('Stopped watching after 3 hours.')
 
@@ -1349,8 +1350,38 @@ def run(task, p=None, shots=()):
     """One request through `claude -p --model haiku` (the user's plan), streaming notes and steps. shots: [(path, label)] sent with it."""
     run.cmds = run.ran = []
     run.ok = False
+    ai_mode = pref('aiMode', 'auto')
+    if ai_mode == 'local_only':
+        try:
+            from multi_ai.router import clean_user_prompt, router
+            clean_task = clean_user_prompt(task)
+            res = router.execute(clean_task, exclude_providers=['claude_code'])
+            if res.get('success'):
+                run.ok = True
+                run.ran = ['<multi_ai_local>']
+                return res.get('reply', ''), 0, ["Completed via " + str(res.get('provider_used')) + " (" + str(res.get('model_used')) + ")"]
+            elif res.get('reply'):
+                return res.get('reply'), 0, []
+        except Exception as e:
+            return f"Error executing local model: {e}", 0, []
+
     p = p or start_claude()
     if not p:
+        if pref('aiFallback', True) and not getattr(run, 'fallback_attempted', False):
+            run.fallback_attempted = True
+            try:
+                from multi_ai.router import clean_user_prompt, router
+                clean_task = clean_user_prompt(task)
+                say('—,', 'Claude not available. Falling back to local Ollama...')
+                fallback_res = router.execute(clean_task, exclude_providers=['claude_code'])
+                if fallback_res.get('success'):
+                    run.ok = True
+                    run.ran = ['<multi_ai_fallback>']
+                    return fallback_res.get('reply', ''), 0, ["Completed via " + str(fallback_res.get('provider_used')) + " (" + str(fallback_res.get('model_used')) + ")"]
+                elif fallback_res.get('reply'):
+                    return fallback_res.get('reply'), 0, []
+            except Exception:
+                pass
         say('!', 'setup')   # Atticus.app opens its setup window
         return plan()['text'] + ' Atticus setup is open to fix it.', 0, []
     content = [b for path, label in shots if os.path.exists(path) for b in ({'type': 'text', 'text': label}, {'type': 'image', 'source': {
@@ -1593,7 +1624,7 @@ def main():
         signal.signal(signal.SIGTERM, stop_workers)   # Atticus.exe also ends the whole tree (a job object)
     if args[:1] == ['--watch'] and (len(args) in (5, 6) and args[3] in ('gone', 'shows') or len(args) in (3, 4) and args[1] == 'cmd'):
         os.makedirs(WATCHING, exist_ok=True)   # the watcher runs on after this ask ends
-        env = {k: v for k, v in os.environ.items() if k not in ('ATTICUS_ASK', 'ATTICUS_COMMIT', 'ATTICUS_UI', 'ATTICUS_LIVE')}   # it runs later, on its own: its follow-up may ask the AI
+        env = {k: v for k, v in os.environ.items() if k not in ('ATTICUS_ASK', 'ATTICUS_COMMIT', 'ATTICUS_UI', 'ATTICUS_LIVE', 'OMA_IN_ATTICUS', 'OMA_EXECUTION_DEPTH')}   # it runs later, on its own: its follow-up may ask the AI
         spawn = lambda flags: subprocess.Popen([sys.executable, SELF, '--watching', *args[1:]], creationflags=flags, env=env,
                                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
         try:
@@ -1765,11 +1796,38 @@ def main():
         from multi_ai.providers import provider_mgr
         return print(json.dumps(provider_mgr.remove_custom_provider(args[1])))
     if args[:1] == ['--oma-ask'] and len(args) > 1:
+        t_start = time.time()
         from multi_ai.router import clean_user_prompt, router
-        prompt = clean_user_prompt(' '.join(args[1:]))
+        user_task = ' '.join(args[1:])
+        prompt = clean_user_prompt(user_task)
+        
+        # Build Atticus memory, workflow, and recent turns context (F12)
+        mem = relevant_rules(prompt) if 'relevant_rules' in dir() or callable(globals().get('relevant_rules')) else ''
+        procedure = workflows(prompt) if pref('learn', True) else ''
+        turns = recent()
+        turns = [r for r in turns if time.time() - r.get('t', 0) < 600][-3:]
+        earlier = earlier_chat(turns)
+        
+        sys_context_parts = []
+        if mem:
+            sys_context_parts.append(f"Memory / User Rules:\n{mem}")
+        if procedure:
+            sys_context_parts.append(f"Saved Procedure:\n{procedure}")
+        if earlier:
+            sys_context_parts.append(f"Recent Conversation:\n{earlier}")
+        
+        system_context = "\n\n".join(sys_context_parts) if sys_context_parts else None
+
         def on_event(ev):
             print("§EVENT§" + json.dumps(ev), flush=True)
-        res = router.execute(prompt, event_callback=on_event)
+            
+        res = router.execute(prompt, system_prompt=system_context, event_callback=on_event)
+        
+        if res.get('success'):
+            reply_text = res.get('reply', '')
+            remember_turn(prompt, reply_text)
+            log_turn(prompt, reply_text, t_start)
+            
         return print("§REPLY§" + json.dumps(res))
     if args[:1] == ['--me'] and len(args) > 1:   # --me name|about|add|drop "<text>"
         return me_set(args[1], ' '.join(args[2:]))
@@ -1797,7 +1855,7 @@ def main():
         return print(__doc__.strip() if args[0] in ('--help', '-h') else f'unknown option {args[0]}. ' + __doc__.strip())   # never an AI ask: the AI's own `atticus --help` must not start another one
     if os.environ.get('ATTICUS_ASK') and args != ['--wait']:   # inside an AI run (its helpers carry ATTICUS_ASK): never start another one
         return print('Atticus helpers only here; a request cannot start another request. Run one of: ' + ', '.join(sorted({c.split()[1] for c in QUIET if c.startswith(ME + ' ')})))
-    warm = start_claude() if args == ['--wait'] else None   # Atticus.app: started at key-down, request comes on stdin at release
+    warm = start_claude() if (args == ['--wait'] and pref('aiMode', 'auto') != 'local_only') else None   # Atticus.app: started at key-down, request comes on stdin at release
     shots = []
     snap = threading.Thread(target=lambda: shots.extend(look()), daemon=True)   # the screen as the user pressed the keys; sent only if the words are about it
     snap.shots = shots

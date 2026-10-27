@@ -291,12 +291,16 @@ class OmaMindMap {
         const btnLocal = document.getElementById('btn-mode-local');
         if (btnAuto && btnLocal) {
           btnAuto.addEventListener('click', () => {
-            fetch('/api/models/mode', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ mode: 'auto' }) });
+            if (window.setMode) { window.setMode('auto'); }
+            else if (window.webkit?.messageHandlers?.st) { window.webkit.messageHandlers.st.postMessage({ do: 'set', k: 'aiMode', v: 'auto' }); }
+            else { try { fetch('/api/models/mode', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ mode: 'auto' }) }); } catch(e){} }
             btnAuto.style.background = '#ffb300'; btnAuto.style.color = '#000';
             btnLocal.style.background = 'rgba(255,255,255,0.06)'; btnLocal.style.color = '#fff';
           });
           btnLocal.addEventListener('click', () => {
-            fetch('/api/models/mode', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ mode: 'local_only' }) });
+            if (window.setMode) { window.setMode('local_only'); }
+            else if (window.webkit?.messageHandlers?.st) { window.webkit.messageHandlers.st.postMessage({ do: 'set', k: 'aiMode', v: 'local_only' }); }
+            else { try { fetch('/api/models/mode', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ mode: 'local_only' }) }); } catch(e){} }
             btnLocal.style.background = '#00f59b'; btnLocal.style.color = '#000';
             btnAuto.style.background = 'rgba(255,255,255,0.06)'; btnAuto.style.color = '#fff';
           });

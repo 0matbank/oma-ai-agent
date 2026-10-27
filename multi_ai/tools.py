@@ -7,6 +7,8 @@ import re
 import subprocess
 import urllib.parse
 import urllib.request
+import tempfile
+import json
 import time
 from typing import Dict, Any, List
 
@@ -29,31 +31,44 @@ def is_safe_command(cmd: str) -> bool:
             return False
     return True
 
-# Duplicate Windows Action Safeguard
-_ACTION_TIMESTAMPS: Dict[str, float] = {}
-_ACTION_COOLDOWN = 3.0  # seconds
+# Durable Cross-Process Action Deduplication Safeguard (F14)
+_DURABLE_ACTION_FILE = os.path.join(tempfile.gettempdir(), 'oma_action_history.json')
 
-def is_duplicate_action(action_key: str, cooldown: float = _ACTION_COOLDOWN) -> bool:
-    """Checks if an identical action was executed within the cooldown window."""
+def is_duplicate_action(action_key: str, cooldown: float = 3.0) -> bool:
+    """Checks if an identical action was executed within cooldown window across processes."""
     now = time.time()
-    last_time = _ACTION_TIMESTAMPS.get(action_key, 0.0)
+    history = {}
+    try:
+        if os.path.exists(_DURABLE_ACTION_FILE):
+            with open(_DURABLE_ACTION_FILE, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+    except Exception:
+        history = {}
+
+    last_time = history.get(action_key, 0.0)
     if now - last_time < cooldown:
         return True
-    _ACTION_TIMESTAMPS[action_key] = now
-    # Periodic cleanup of old history
-    if len(_ACTION_TIMESTAMPS) > 100:
-        for k in list(_ACTION_TIMESTAMPS.keys()):
-            if now - _ACTION_TIMESTAMPS[k] > 60:
-                del _ACTION_TIMESTAMPS[k]
+
+    history[action_key] = now
+    cleaned = {k: v for k, v in history.items() if now - v < 60}
+    try:
+        with open(_DURABLE_ACTION_FILE, 'w', encoding='utf-8') as f:
+            json.dump(cleaned, f)
+    except Exception:
+        pass
     return False
 
 # Tool Implementations
 def tool_open_app(app_name: str) -> str:
-    """Launches an application by name or common alias."""
-    app_lower = app_name.lower().strip()
+    """Launches an application by name or common alias with strict safety checks (F10)."""
+    app_clean = app_name.strip()
+    if not is_safe_command(app_clean):
+        return f"Error: Command '{app_clean}' is blocked by security policy."
+
+    app_lower = app_clean.lower()
     action_key = f"open_app:{app_lower}"
     if is_duplicate_action(action_key, cooldown=4.0):
-        return f"✓ {app_name} is already opening (skipped duplicate action)."
+        return f"✓ {app_clean} is already opening (skipped duplicate action)."
 
     mapping = {
         'chrome': 'chrome',
@@ -71,16 +86,26 @@ def tool_open_app(app_name: str) -> str:
         'edge': 'msedge',
         'settings': 'ms-settings:'
     }
-    target = mapping.get(app_lower, app_lower)
-    try:
-        os.startfile(target)
-        return f"✓ Opened {app_name}."
-    except Exception as e:
+    target = mapping.get(app_lower)
+    if target:
         try:
-            subprocess.Popen(f'start "" "{target}"', shell=True)
-            return f"✓ Opened {app_name}."
-        except Exception as e2:
-            return f"Error opening {app_name}: {str(e2)}"
+            os.startfile(target)
+            return f"✓ Opened {app_clean}."
+        except Exception as e:
+            return f"Error opening {app_clean}: {str(e)}"
+
+    # If not in fixed mapping, use winctl's Start Menu app launcher (never raw shell execution)
+    if winctl and hasattr(winctl, 'launch'):
+        try:
+            res = winctl.launch(app_clean)
+            if res:
+                return f"✓ Opened {app_clean}."
+            else:
+                return f"Error: Application '{app_clean}' was not found in installed apps."
+        except Exception as e:
+            return f"Error opening {app_clean}: {str(e)}"
+
+    return f"Error: Unable to safely launch '{app_clean}'."
 
 def tool_place_window(app: str, position: str = "full", screen: str = "current") -> str:
     """Moves, resizes, or snaps a window (left, right, full, center)."""
@@ -106,26 +131,44 @@ def tool_web_search(query: str) -> str:
             results.append(f"• {t_clean}\n  {sn_clean}")
         if results:
             return "\n\n".join(results)
-    except Exception as e:
+    except Exception:
         pass
     return f"Search completed for '{query}'. No direct web page snippet returned."
 
 def tool_read_screen() -> str:
-    """Takes a screenshot of the active screen and identifies the focused application."""
-    app = winctl.front_app() if winctl and hasattr(winctl, 'front_app') else 'Active Desktop'
-    path = ""
-    if winctl and hasattr(winctl, 'look'):
+    """Takes a screenshot of the active screen and identifies the focused application (F15)."""
+    app_info = "Active Desktop"
+    if winctl and hasattr(winctl, 'front'):
         try:
-            path = winctl.look()
+            f = winctl.front()
+            if f and f[0]:
+                app_info = f"{f[0]} ({f[1]})"
         except Exception:
             pass
-    return f"Active Application: {app}. Screenshot Path: {path or 'Captured to memory'}."
+
+    path = ""
+    if winctl and hasattr(winctl, 'monitors') and hasattr(winctl, 'capture'):
+        try:
+            mons = winctl.monitors()
+            if mons:
+                fd, path = tempfile.mkstemp(prefix='oma-screen-', suffix='.jpg')
+                os.close(fd)
+                winctl.capture(mons[0], path)
+        except Exception:
+            path = ""
+
+    if path and os.path.exists(path):
+        return f"Active Application: {app_info}. Screenshot saved to: {path}"
+    return f"Active Application: {app_info}. Screenshot capture unavailable."
 
 def tool_get_windows(app: str = "") -> str:
-    """Lists visible open windows with titles and processes."""
+    """Lists visible open windows with titles and processes (F15)."""
     if winctl and hasattr(winctl, 'windows'):
         try:
-            wins = winctl.windows(app)
+            wins = winctl.windows()
+            if app:
+                app_lower = app.lower()
+                wins = [w for w in wins if app_lower in w.get('app', '').lower() or app_lower in w.get('title', '').lower()]
             if wins:
                 return "\n".join(f"• {w.get('app', '')}: {w.get('title', '')}" for w in wins[:8])
             return "No matching visible windows found."

@@ -3010,12 +3010,14 @@ class OmaMindMap {
         const btnLocal = document.getElementById('btn-mode-local');
         if (btnAuto && btnLocal) {
           btnAuto.addEventListener('click', () => {
-            fetch('/api/models/mode', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ mode: 'auto' }) });
+            if (typeof set === 'function') set('aiMode', 'auto');
+            else post({ do: 'set', k: 'aiMode', v: 'auto' });
             btnAuto.style.background = '#ffb300'; btnAuto.style.color = '#000';
             btnLocal.style.background = 'rgba(255,255,255,0.06)'; btnLocal.style.color = '#fff';
           });
           btnLocal.addEventListener('click', () => {
-            fetch('/api/models/mode', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ mode: 'local_only' }) });
+            if (typeof set === 'function') set('aiMode', 'local_only');
+            else post({ do: 'set', k: 'aiMode', v: 'local_only' });
             btnLocal.style.background = '#00f59b'; btnLocal.style.color = '#000';
             btnAuto.style.background = 'rgba(255,255,255,0.06)'; btnAuto.style.color = '#fff';
           });
@@ -3216,15 +3218,32 @@ window.OmaMindMap = OmaMindMap;
   $('btnRefreshLocal').onclick = () => post({ do: 'providers' });
   $('btnToProviders').onclick = () => document.querySelector('nav button[data-s=providers]').click();
 
+  // HTML Escaping Helper (Prevents XSS / Arbitrary Markup Injection)
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"']/g, c => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[c]);
+  }
+
   // Chat Execution Feeds
   function appendFeedMessage(role, sender, text, modelTag, isFallback) {
     const stream = $('homeFeedStream');
     const fullStream = $('fullFeedStream');
-    const tagHtml = modelTag ? `<span class="model-tag ${isFallback ? 'fallback' : ''}">${modelTag}</span>` : '';
+    const safeSender = escapeHtml(sender);
+    const safeModelTag = escapeHtml(modelTag);
+    let safeText = escapeHtml(text || '');
+    // Safely format basic bold and linebreaks without allowing arbitrary tags
+    safeText = safeText.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+    const tagHtml = safeModelTag ? `<span class="model-tag ${isFallback ? 'fallback' : ''}">${safeModelTag}</span>` : '';
     const html = `
-      <div class="feed-card ${role}">
-        <div class="feed-meta"><span>${sender}</span>${tagHtml}</div>
-        <div class="feed-text">${text}</div>
+      <div class="feed-card ${escapeHtml(role)}">
+        <div class="feed-meta"><span>${safeSender}</span>${tagHtml}</div>
+        <div class="feed-text">${safeText}</div>
       </div>
     `;
     if (stream) { stream.insertAdjacentHTML('beforeend', html); stream.scrollTop = stream.scrollHeight; }
@@ -3233,19 +3252,25 @@ window.OmaMindMap = OmaMindMap;
 
   function appendFeedEvent(stage, detail, pct) {
     const stream = $('homeFeedStream');
+    const safeStage = escapeHtml(stage);
+    const safeDetail = escapeHtml(detail);
+    const safePct = escapeHtml(pct || '');
     const html = `
       <div class="feed-card event">
-        <div class="feed-meta"><span style="color:var(--neon-cyan);">[EXEC STAGE: ${stage.toUpperCase()}]</span><span>${pct || ''}%</span></div>
-        <div class="feed-text" style="color:var(--fg2);">${detail}</div>
+        <div class="feed-meta"><span style="color:var(--neon-cyan);">[EXEC STAGE: ${safeStage.toUpperCase()}]</span><span>${safePct ? safePct + '%' : ''}</span></div>
+        <div class="feed-text" style="color:var(--fg2);">${safeDetail}</div>
       </div>
     `;
     if (stream) { stream.insertAdjacentHTML('beforeend', html); stream.scrollTop = stream.scrollHeight; }
 
     // Update pipeline status card
-    $('pipelineStatus').innerHTML = `<span class="status-pulse"></span><span>Pipeline Stage: <b style="color:var(--neon-cyan);">${stage.toUpperCase()}</b> — ${detail}</span>`;
+    const statusBox = $('pipelineStatus');
+    if (statusBox) {
+      statusBox.innerHTML = `<span class="status-pulse"></span><span>Pipeline Stage: <b style="color:var(--neon-cyan);">${safeStage.toUpperCase()}</b> — ${safeDetail}</span>`;
+    }
     const logBox = $('pipelineLogs');
     if (logBox) {
-      logBox.insertAdjacentHTML('beforeend', `<div>[${new Date().toLocaleTimeString()}] <b>${stage}</b>: ${detail}</div>`);
+      logBox.insertAdjacentHTML('beforeend', `<div>[${new Date().toLocaleTimeString()}] <b>${safeStage}</b>: ${safeDetail}</div>`);
       logBox.scrollTop = logBox.scrollHeight;
     }
   }
@@ -3269,18 +3294,22 @@ window.OmaMindMap = OmaMindMap;
   $('fullChatInput').onkeydown = e => { if (e.key === 'Enter') { sendDirective($('fullChatInput').value); $('fullChatInput').value = ''; } };
   $('btnClearChat').onclick = () => { $('homeFeedStream').innerHTML = $('fullFeedStream').innerHTML = ''; };
 
-  // Mic Button Trigger
-  $('btnHomeMic').onclick = () => post({ do: 'openOverlay' });
+  // Mic Button Trigger (F16)
+  $('btnHomeMic').onclick = () => post({ do: 'talk' });
   $('btnOverlayTrigger').onclick = () => post({ do: 'openOverlay' });
 
   // Quick Chips
   document.querySelectorAll('.quick-chip').forEach(c => c.onclick = () => sendDirective(c.dataset.prompt));
 
-  // Language Switcher Toggle
+  // Language Switcher Toggle (F16)
   let currentLang = 'bn';
   $('lang-switcher').onclick = () => {
     currentLang = currentLang === 'bn' ? 'en' : 'bn';
     $('current-lang-label').textContent = currentLang === 'bn' ? 'বাংলা' : 'English';
+    if (typeof set === 'function') {
+      set('speechLanguage', currentLang);
+      set('speechModel', currentLang === 'bn' ? 'base' : 'base.en');
+    }
   };
 
   // State & Metrics (Usage & Rules)

@@ -58,12 +58,14 @@ Copy-Item ui\*.html, ui\*.js, ui\*.css, ui\AppIcon.ico, ui\AppIcon.png "$dest\ui
 New-Item -ItemType Directory -Force "$dest\multi_ai" | Out-Null
 Copy-Item multi_ai\* "$dest\multi_ai" -Recurse -Force
 
-# Keep ~/.atticus in sync if present
+# Keep ~/.atticus in sync if present (F22)
 $dotAtticus = Join-Path $HOME '.atticus'
 if (Test-Path $dotAtticus) {
   Copy-Item atticus.py, winctl.py $dotAtticus -Force
   New-Item -ItemType Directory -Force "$dotAtticus\multi_ai" | Out-Null
   Copy-Item multi_ai\* "$dotAtticus\multi_ai" -Recurse -Force
+  New-Item -ItemType Directory -Force "$dotAtticus\ui" | Out-Null
+  Copy-Item ui\* "$dotAtticus\ui" -Recurse -Force
 }
 
 $version = (git log -1 --format='%h - %cd' --date=format:'%b %d, %Y' 2>$null)

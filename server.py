@@ -58,22 +58,28 @@ def run_installed_agent(args):
         return 1, "", str(e)
 
 def parse_bengali_intent(query):
-    """Translates common Bengali commands into agent actionable English directives."""
+    """Translates common Bengali commands into agent actionable English directives, respecting negations (F19)."""
     q_lower = query.lower()
     
-    # App launch mappings
+    # Check for negation or close intent
+    if any(neg in q_lower for neg in ['না', 'করবে না', 'খুলবে না', 'বন্ধ', 'দয়া করে না', "don't", 'do not', 'stop', 'close']):
+        return query
+        
+    has_open_word = any(w in q_lower for w in ['খুলো', 'খোলো', 'ওপেন', 'চালাও', 'স্টার্ট', 'open', 'launch', 'start'])
+    
+    # App launch mappings (only if open intent is explicitly or contextually present)
     if any(w in q_lower for w in ['ক্যালকুলেটর', 'calculator']):
-        return 'open calculator'
+        return 'open calculator' if has_open_word else query
     if any(w in q_lower for w in ['নোটপ্যাড', 'notepad']):
-        return 'open notepad'
+        return 'open notepad' if has_open_word else query
     if any(w in q_lower for w in ['ক্রোম', 'chrome', 'গুগল', 'google']):
-        return 'open google chrome'
+        return 'open google chrome' if has_open_word else query
     if any(w in q_lower for w in ['টার্মিনাল', 'terminal', 'powershell', 'পাওয়ারশেল']):
-        return 'open terminal'
+        return 'open terminal' if has_open_word else query
     if any(w in q_lower for w in ['ইউটিউব', 'youtube']):
-        return 'open youtube'
+        return 'open youtube' if has_open_word else query
     if any(w in q_lower for w in ['ফাইল', 'এক্সপ্লোরার', 'explorer', 'my computer']):
-        return 'open explorer'
+        return 'open explorer' if has_open_word else query
     
     return query
 
@@ -281,7 +287,7 @@ class OmaHandler(http.server.SimpleHTTPRequestHandler):
 
 def run_server(port=PORT, open_browser=True):
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", port), OmaHandler) as httpd:
+    with socketserver.TCPServer(("127.0.0.1", port), OmaHandler) as httpd:
         print(f"\n=======================================================")
         print(f"  OMA AI AGENT - SYNCHRONIZED WITH INSTALLED ATTICUS")
         print(f"  Agent Script: {INSTALLED_SCRIPT}")

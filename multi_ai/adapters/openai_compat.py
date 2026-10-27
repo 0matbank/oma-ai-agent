@@ -62,51 +62,70 @@ class OpenAICompatAdapter:
             messages.append({'role': 'system', 'content': system_prompt})
         messages.append({'role': 'user', 'content': prompt})
 
-        payload = {
-            'model': model_id,
-            'messages': messages,
-            'tools': get_openai_tool_definitions(),
-            'tool_choice': 'auto'
-        }
-
         try:
-            req = urllib.request.Request(
-                f"{self.base_url}/chat/completions",
-                data=json.dumps(payload).encode('utf-8'),
-                headers=headers,
-                method='POST'
-            )
-            with urllib.request.urlopen(req, timeout=30) as res:
-                data = json.loads(res.read().decode('utf-8'))
-                choices = data.get('choices', [])
-                if not choices:
-                    return {'success': False, 'error': 'No choices returned', 'provider': self.provider_id}
-
-                msg = choices[0].get('message', {})
-                tool_calls = msg.get('tool_calls', [])
-
-                if tool_calls:
-                    # Execute tool call
-                    tc = tool_calls[0]
-                    fn_name = tc.get('function', {}).get('name', '')
-                    fn_args = json.loads(tc.get('function', {}).get('arguments', '{}'))
-                    tool_res = execute_tool_call(fn_name, fn_args)
-                    return {
-                        'success': True,
-                        'reply': tool_res,
-                        'tool_called': True,
-                        'tool_name': fn_name,
-                        'model': model_id,
-                        'provider': self.provider_id
-                    }
-
-                reply = msg.get('content', '').strip()
-                return {
-                    'success': True,
-                    'reply': reply,
+            for iteration in range(3):
+                payload = {
                     'model': model_id,
-                    'provider': self.provider_id
+                    'messages': messages,
+                    'tools': get_openai_tool_definitions(),
+                    'tool_choice': 'auto'
                 }
+                req = urllib.request.Request(
+                    f"{self.base_url}/chat/completions",
+                    data=json.dumps(payload).encode('utf-8'),
+                    headers=headers,
+                    method='POST'
+                )
+                with urllib.request.urlopen(req, timeout=30) as res:
+                    data = json.loads(res.read().decode('utf-8'))
+                    choices = data.get('choices', [])
+                    if not choices:
+                        return {'success': False, 'error': 'No choices returned', 'model': model_id, 'provider': self.provider_id}
+
+                    msg = choices[0].get('message', {})
+                    tool_calls = msg.get('tool_calls', [])
+
+                    if not tool_calls:
+                        reply = (msg.get('content') or '').strip()
+                        if not reply:
+                            return {'success': False, 'error': 'Empty response from model', 'model': model_id, 'provider': self.provider_id}
+                        return {
+                            'success': True,
+                            'reply': reply,
+                            'model': model_id,
+                            'provider': self.provider_id
+                        }
+
+                    # Execute all requested tool calls in this turn (F23)
+                    messages.append(msg)
+                    tool_outputs = []
+                    any_err = False
+                    for tc in tool_calls:
+                        fn_name = tc.get('function', {}).get('name', '')
+                        try:
+                            fn_args = json.loads(tc.get('function', {}).get('arguments', '{}'))
+                        except Exception:
+                            fn_args = {}
+                        tool_res = execute_tool_call(fn_name, fn_args)
+                        if isinstance(tool_res, str) and (tool_res.startswith("Error") or "failed" in tool_res.lower()):
+                            any_err = True
+                        tool_outputs.append(str(tool_res))
+                        messages.append({
+                            'role': 'tool',
+                            'tool_call_id': tc.get('id', 'call_default'),
+                            'content': str(tool_res)
+                        })
+
+                    # If this is the last iteration, return the synthesized tool results
+                    if iteration == 2:
+                        combined = "\n\n".join(tool_outputs)
+                        return {
+                            'success': not any_err,
+                            'reply': combined,
+                            'tool_called': True,
+                            'model': model_id,
+                            'provider': self.provider_id
+                        }
         except urllib.error.HTTPError as e:
             err_body = e.read().decode('utf-8', errors='ignore')
             err_type = 'rate_limit' if e.code == 429 else ('auth_error' if e.code in (401, 403) else 'http_error')

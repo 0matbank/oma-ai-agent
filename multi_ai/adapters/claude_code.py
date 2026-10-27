@@ -42,12 +42,12 @@ class ClaudeCodeAdapter:
 
     def generate(self, model_id: str, prompt: str) -> Dict[str, Any]:
         """Runs the query directly through the installed Claude CLI (claude.exe -p)."""
-        # 1. Hard recursion guard: Never invoke Claude Code if already inside Atticus or in a fallback chain
-        if os.environ.get("OMA_IN_ATTICUS") == "1" or os.environ.get("OMA_ROUTER_FALLBACK") == "1":
+        # 1. Hard recursion guard: Never invoke Claude Code if already in a fallback chain (F02)
+        if os.environ.get("OMA_ROUTER_FALLBACK") == "1":
             return {
                 'success': False,
                 'error_type': 'recursion_blocked',
-                'error': 'Direct Claude Code invocation blocked inside Atticus fallback context',
+                'error': 'Direct Claude Code invocation blocked inside fallback context',
                 'model': model_id,
                 'provider': 'claude_code'
             }
@@ -62,8 +62,13 @@ class ClaudeCodeAdapter:
             }
 
         try:
+            clean_model = model_id.split('/')[-1] if model_id else None
+            if clean_model in ('claude', 'claude_code'):
+                clean_model = 'haiku'
             # Run claude -p directly with stdin=subprocess.DEVNULL to avoid stdin blocking
             cmd = [self.claude_path, '-p', prompt, '--output-format', 'text']
+            if clean_model:
+                cmd.extend(['--model', clean_model])
             res = subprocess.run(
                 cmd,
                 stdin=subprocess.DEVNULL,

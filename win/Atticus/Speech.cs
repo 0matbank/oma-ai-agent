@@ -135,7 +135,13 @@ sealed class Speech
 
     async Task<string> Transcribe(float[] a)
     {
-        var b = factory.CreateBuilder().WithLanguage(Prefs.Str("speechModel").EndsWith(".en") ? "en" : "auto")
+        string lang = Prefs.Str("speechLanguage");
+        if (string.IsNullOrEmpty(lang))
+            lang = Prefs.Str("speechModel").EndsWith(".en") ? "en" : "auto";
+        else if (Prefs.Str("speechModel").EndsWith(".en") && lang != "en")
+            lang = "en"; // English-only models cannot transcribe other languages
+            
+        var b = factory.CreateBuilder().WithLanguage(lang)
             .WithThreads(Math.Clamp(Environment.ProcessorCount - 1, 2, 8)).WithNoContext().WithSingleSegment();
         if (Prompt.Length > 0) b = b.WithPrompt(Prompt);
         await using var p = b.Build();
