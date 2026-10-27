@@ -39,6 +39,15 @@ static class Program
             Console.WriteLine(Speech.TranscribeOnce(all.ToArray()).Result + $"  [{(DateTime.Now - t0).TotalSeconds:0.00} s]");
             return;
         }
+        try
+        {
+            var hDesk = Native.OpenDesktop("Default", 0, false, 0x01FF);
+            if (hDesk != IntPtr.Zero)
+            {
+                Native.SetThreadDesktop(hDesk);
+            }
+        }
+        catch { }
         Directory.CreateDirectory(Paths.Config);
         Err("Main started, args: " + string.Join(" ", args));
         using var one = new Mutex(true, @"Local\Atticus", out var first);

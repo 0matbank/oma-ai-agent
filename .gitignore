@@ -33,3 +33,5 @@ backup_*/
 patch_*.py
 fix_*.py
 build_unified_ui.py
+scratch/
+

@@ -31,9 +31,8 @@ class PageWindow : Form
         web = await Web.Load(this, page, (n, b) => {
             if (n == "jsError") Program.Err("JS Error: " + b);
             else if (n == handler) OnMessage(b);
-        }, false);
-        Program.Err("Ensure: Web.Load returned, waiting for navigation...");
-        web.NavigationCompleted += (_, _) => { Program.Err("Ensure: NavigationCompleted fired for " + page); Loaded(); };
+        }, Loaded, false);
+        Program.Err("Ensure: Web.Load returned");
     }
     protected virtual void Loaded() { }
     protected virtual void OnMessage(JsonElement b) { }
@@ -41,14 +40,25 @@ class PageWindow : Form
     protected void Send(string call, object v) => Program.Post(() => Js($"{call}({Web.Json(v)})"));
     protected void Raise() {
         Program.Err("Raise called for " + page + ", Handle=" + Handle);
-        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
-        Visible = true;
-        Show();
-        BringToFront();
-        Native.keybd_event(0xE8, 0, 0, IntPtr.Zero);
-        Native.keybd_event(0xE8, 0, 2, IntPtr.Zero);
-        Activate();
-        Native.SetForegroundWindow(Handle);
+        try
+        {
+            if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+            Visible = true;
+            Show();
+            Native.ShowWindow(Handle, 9); // SW_RESTORE
+            Native.ShowWindow(Handle, 5); // SW_SHOW
+            Native.SetWindowPos(Handle, Native.HWND_TOPMOST, 0, 0, 0, 0, Native.SWP_NOMOVE | Native.SWP_NOSIZE | Native.SWP_SHOWWINDOW);
+            BringToFront();
+            Native.keybd_event(0xE8, 0, 0, IntPtr.Zero);
+            Native.keybd_event(0xE8, 0, 2, IntPtr.Zero);
+            Activate();
+            Native.SetForegroundWindow(Handle);
+            Native.SetWindowPos(Handle, Native.HWND_NOTOPMOST, 0, 0, 0, 0, Native.SWP_NOMOVE | Native.SWP_NOSIZE | Native.SWP_SHOWWINDOW);
+        }
+        catch (Exception ex)
+        {
+            Program.Err("Raise exception: " + ex);
+        }
     }
 }
 
@@ -92,7 +102,9 @@ sealed class SettingsWindow : PageWindow
     {
         if (Prefs.Bool("paused")) return;
         Voice.Shush();
-        Raise();
+        if (web == null) Open();
+        else Raise();
+        TopMost = true;
         toggleTalk = isClick || Prefs.Str("talkMode") == "toggle";
         liveText = "";
         voiceRecording = true;
@@ -147,6 +159,7 @@ sealed class SettingsWindow : PageWindow
     {
         if (!voiceRecording) return;
         voiceRecording = false;
+        TopMost = false;
         holdTimer?.Stop();
         holdTimer?.Dispose();
         holdTimer = null;
@@ -183,6 +196,7 @@ sealed class SettingsWindow : PageWindow
     public void CancelListening()
     {
         voiceRecording = false;
+        TopMost = false;
         holdTimer?.Stop();
         holdTimer?.Dispose();
         holdTimer = null;

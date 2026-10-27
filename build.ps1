@@ -44,7 +44,7 @@ if ($LASTEXITCODE) { Remove-Item $out -Recurse -Force -ErrorAction SilentlyConti
 $dest = if ($Stage) { "$app.next" } else { $app }
 if ($Stage) { Remove-Item $dest -Recurse -Force -ErrorAction SilentlyContinue }
 else {
-  Get-Process Atticus -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$app\*" } | Stop-Process -Force
+  Get-Process Atticus -ErrorAction SilentlyContinue | Stop-Process -Force
   Start-Sleep -Milliseconds 500
   Remove-Item "$app.next" -Recurse -Force -ErrorAction SilentlyContinue   # an older staged update must not replace this build
 }
@@ -92,5 +92,9 @@ Remove-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 
 if ($login) { Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name "Oma AI" -Value "`"$app\Atticus.exe`"" }
 
 if ($env:ATTICUS_NO_RESTART) { exit 0 }
-Start-Process "$app\Atticus.exe"
+try {
+  & explorer.exe "$app\Atticus.exe"
+} catch {
+  Start-Process "$app\Atticus.exe"
+}
 Write-Host 'Oma AI is running. Hold Ctrl+Alt+Space and talk.'

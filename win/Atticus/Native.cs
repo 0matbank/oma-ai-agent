@@ -42,6 +42,14 @@ static class Native
     [DllImport("user32")] public static extern int GetWindowLong(IntPtr h, int i);
     [DllImport("user32")] public static extern int SetWindowLong(IntPtr h, int i, int v);
     [DllImport("user32")] public static extern bool GetCursorPos(out POINT p);
+    [DllImport("user32")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+    public static readonly IntPtr HWND_TOPMOST = new(-1);
+    public static readonly IntPtr HWND_NOTOPMOST = new(-2);
+    public const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_SHOWWINDOW = 0x0040;
+
+    [DllImport("user32.dll", SetLastError = true)] public static extern IntPtr OpenDesktop(string lpszDesktop, int dwFlags, bool fInherit, uint dwDesiredAccess);
+    [DllImport("user32.dll", SetLastError = true)] public static extern bool SetThreadDesktop(IntPtr hDesktop);
 
     public delegate void WinEventProc(IntPtr hook, uint ev, IntPtr hwnd, int obj, int child, uint thread, uint time);
     [DllImport("user32")] public static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr mod, WinEventProc fn, uint pid, uint thread, uint flags);

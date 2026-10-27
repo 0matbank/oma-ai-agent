@@ -89,7 +89,7 @@ addEventListener('DOMContentLoaded', () => {
         Native.Backdrop(Handle);
         if (Environment.GetEnvironmentVariable("ATTICUS_CAPTURABLE") != "1")   // debugging: let screenshots see the box
             Native.SetWindowDisplayAffinity(Handle, 0x11);   // never in screen shares, recordings, or Atticus's own screenshots
-        web = await Web.Load(this, "ui.html", OnMessage, true, PointerScript);
+        web = await Web.Load(this, "ui.html", OnMessage, null, true, PointerScript);
         // Unified Oma AI: Hooks are managed by SettingsWindow; Overlay never intercepts keys
         SystemEvents_DisplayChanged();
     }

@@ -15,7 +15,7 @@ static class Web
     static Task<CoreWebView2Environment> Env => env ??= CoreWebView2Environment.CreateAsync(null, Path.Combine(Paths.Local, "WebView2"));
 
     // A page from ui\ (orbs.js goes in place of its /*ORBS*/ marker); onMessage(handler name, body) on the UI thread.
-    public static async Task<WebView2> Load(Control host, string page, Action<string, JsonElement> onMessage, bool transparent, string extra = "")
+    public static async Task<WebView2> Load(Control host, string page, Action<string, JsonElement> onMessage, Action onLoaded = null, bool transparent = false, string extra = "")
     {
         var v = new WebView2 { Dock = DockStyle.Fill };
         if (transparent) v.DefaultBackgroundColor = Color.Transparent;
@@ -25,7 +25,10 @@ static class Web
         s.AreDevToolsEnabled = Environment.GetEnvironmentVariable("ATTICUS_DEVTOOLS") == "1";
         s.AreDefaultContextMenusEnabled = false; s.IsZoomControlEnabled = false; s.IsStatusBarEnabled = false; s.AreBrowserAcceleratorKeysEnabled = false;
         v.CoreWebView2.ProcessFailed += (_, e) => Program.Err("WebView2 ProcessFailed: " + e.ProcessFailedKind);
-        v.CoreWebView2.NavigationCompleted += (_, e) => Program.Err($"NavigationCompleted for {page}: Success={e.IsSuccess} ErrorStatus={e.WebErrorStatus} Http={e.HttpStatusCode}");
+        v.CoreWebView2.NavigationCompleted += (_, e) => {
+            Program.Err($"NavigationCompleted for {page}: Success={e.IsSuccess} ErrorStatus={e.WebErrorStatus} Http={e.HttpStatusCode}");
+            if (e.IsSuccess && onLoaded != null) onLoaded();
+        };
         await v.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(Shim + extra);
         v.CoreWebView2.WebMessageReceived += (_, e) =>
         {
