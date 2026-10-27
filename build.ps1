@@ -61,16 +61,24 @@ $version = (git log -1 --format='%h - %cd' --date=format:'%b %d, %Y' 2>$null)
 @{ python = "$venv\Scripts\python.exe"; source = $PSScriptRoot; version = "$version" } | ConvertTo-Json | Set-Content "$dest\atticus.json" -Encoding utf8
 if ($Stage) { exit 0 }
 
-# Start menu shortcut, so "Atticus" opens Settings from Start
+# Start menu shortcut: remove old Atticus.lnk and create Oma AI.lnk
+Remove-Item "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Atticus.lnk" -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Atticus.lnk" -Force -ErrorAction SilentlyContinue
+
 $sh = New-Object -ComObject WScript.Shell
 $lnk = $sh.CreateShortcut("$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Oma AI.lnk")
-$lnk.TargetPath = "$app\Atticus.exe"; $lnk.IconLocation = "$app\ui\AppIcon.ico"; $lnk.Description = 'Hold Ctrl+Alt+Space and talk'; $lnk.Save()
+$lnk.TargetPath = "$app\Atticus.exe"
+$lnk.WorkingDirectory = "$app"
+$lnk.IconLocation = "$app\ui\AppIcon.ico,0"
+$lnk.Description = 'Oma AI Desktop Agent - Hold Ctrl+Alt+Space and talk'
+$lnk.Save()
 
 # Starts at login unless turned off in Settings
 $prefs = Join-Path $env:APPDATA 'Atticus\settings.json'
 $login = $true
 if (Test-Path $prefs) { try { $p = Get-Content $prefs -Raw | ConvertFrom-Json; if ($p.login -eq $false) { $login = $false } } catch {} }
-if ($login) { Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name Atticus -Value "`"$app\Atticus.exe`"" }
+Remove-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name Atticus -ErrorAction SilentlyContinue
+if ($login) { Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name "Oma AI" -Value "`"$app\Atticus.exe`"" }
 
 if ($env:ATTICUS_NO_RESTART) { exit 0 }
 Start-Process "$app\Atticus.exe"

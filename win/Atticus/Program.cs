@@ -133,7 +133,10 @@ static class Program
         switch (p[0])
         {
             case "notify": Tray.Notify(p.Length > 1 ? p[1] : ""); break;
-            case "open": if (Prefs.Bool("onboarded")) Settings.Open(); else Onboarding.Open(); break;
+            case "open": Settings.Open(); break;
+            case "talk": Box.clickTalk = true; Box.Start(); break;
+            case "tab": Settings.Js($"st.tab('{(p.Length > 1 ? p[1] : "")}')"); break;
+            case "eval": if (p.Length > 1) Settings.Js(p[1]); break;
             case "update": Updater.Check(() => Settings.Push()); break;   // check now (support and tests)
         }
     }
@@ -218,17 +221,16 @@ sealed class Tray
         var m = icon.ContextMenuStrip; m.Items.Clear();
         var keys = Prefs.Str("hotkeyLabel");
         var hint = Prefs.Str("input") == "type" ? $"Press {keys} to type" : Prefs.Str("talkMode") == "toggle" ? $"Press {keys} to talk · again to send" : $"Hold {keys} and talk";
-        m.Items.Add(new ToolStripMenuItem(Prefs.Bool("paused") ? "Atticus is paused" : hint) { Enabled = false });
+        m.Items.Add(new ToolStripMenuItem(Prefs.Bool("paused") ? "Oma AI is paused" : hint) { Enabled = false });
         m.Items.Add(new ToolStripSeparator());
-        m.Items.Add("Ask Atticus", null, (_, _) => { Program.Box.clickTalk = true; Program.Box.Start(); });
-        m.Items.Add(Prefs.Bool("paused") ? "Resume Atticus" : "Pause Atticus", null, (_, _) => { Program.Settings.Apply("paused", !Prefs.Bool("paused")); Program.Settings.Push(); });
+        m.Items.Add("Ask Oma AI", null, (_, _) => { Program.Box.clickTalk = true; Program.Box.Start(); });
+        m.Items.Add(Prefs.Bool("paused") ? "Resume Oma AI" : "Pause Oma AI", null, (_, _) => { Program.Settings.Apply("paused", !Prefs.Bool("paused")); Program.Settings.Push(); });
         m.Items.Add(new ToolStripSeparator());
         m.Items.Add(new ToolStripMenuItem(Today()) { Enabled = false });
         m.Items.Add(new ToolStripSeparator());
         m.Items.Add("Settings…", null, (_, _) => Program.Settings.Open());
-        m.Items.Add("Setup…", null, (_, _) => Program.Onboarding.Open());
         m.Items.Add(new ToolStripSeparator());
-        m.Items.Add("Quit Atticus", null, (_, _) => { icon.Visible = false; Application.Exit(); });
+        m.Items.Add("Quit Oma AI", null, (_, _) => { icon.Visible = false; Application.Exit(); });
     }
     static string Today()
     {

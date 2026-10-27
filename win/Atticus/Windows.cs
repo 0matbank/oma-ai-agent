@@ -12,18 +12,26 @@ class PageWindow : Form
     protected PageWindow(string page, string handler, string title, int w, int h)
     {
         this.page = page; this.handler = handler;
-        Text = title; StartPosition = FormStartPosition.CenterScreen; BackColor = Color.Black;
+        Text = title; StartPosition = FormStartPosition.CenterScreen; BackColor = Color.FromArgb(7, 10, 15);
         ClientSize = new Size((int)(w * DeviceDpi / 96.0), (int)(h * DeviceDpi / 96.0));
+        MinimumSize = new Size((int)(900 * DeviceDpi / 96.0), (int)(600 * DeviceDpi / 96.0));
         MinimizeBox = true; MaximizeBox = true; FormBorderStyle = FormBorderStyle.Sizable;
+        ShowInTaskbar = true;
         var ico = Path.Combine(Paths.App, "ui", "AppIcon.ico");
         if (File.Exists(ico)) Icon = new Icon(ico);
     }
-    protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); Native.Backdrop(Handle, acrylic: false, round: true); }
+    protected override void OnHandleCreated(EventArgs e) {
+        base.OnHandleCreated(e);
+        Native.Backdrop(Handle, acrylic: false, round: true, extendFrame: false);
+    }
     protected async Task Ensure()
     {
         if (web != null) return;
         Program.Err("Ensure: calling Web.Load for " + page);
-        web = await Web.Load(this, page, (n, b) => { if (n == handler) OnMessage(b); }, true);
+        web = await Web.Load(this, page, (n, b) => {
+            if (n == "jsError") Program.Err("JS Error: " + b);
+            else if (n == handler) OnMessage(b);
+        }, false);
         Program.Err("Ensure: Web.Load returned, waiting for navigation...");
         web.NavigationCompleted += (_, _) => { Program.Err("Ensure: NavigationCompleted fired for " + page); Loaded(); };
     }
@@ -31,7 +39,17 @@ class PageWindow : Form
     protected virtual void OnMessage(JsonElement b) { }
     public void Js(string s) => Web.Js(web, s);
     protected void Send(string call, object v) => Program.Post(() => Js($"{call}({Web.Json(v)})"));
-    protected void Raise() { Program.Err("Raise called for " + page + ", Handle=" + Handle); if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal; Show(); Activate(); Native.SetForegroundWindow(Handle); }
+    protected void Raise() {
+        Program.Err("Raise called for " + page + ", Handle=" + Handle);
+        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        Visible = true;
+        Show();
+        BringToFront();
+        Native.keybd_event(0xE8, 0, 0, IntPtr.Zero);
+        Native.keybd_event(0xE8, 0, 2, IntPtr.Zero);
+        Activate();
+        Native.SetForegroundWindow(Handle);
+    }
 }
 
 sealed class SettingsWindow : PageWindow
@@ -59,6 +77,8 @@ sealed class SettingsWindow : PageWindow
 
     protected override void Loaded() {
         Program.Err("SettingsWindow.Loaded() entered");
+        Visible = true;
+        BringToFront();
         Push(); Refresh2(); Send("st.perms", OnboardingWindow.Perms()); if (tab != "") { Js($"st.tab('{tab}')"); tab = ""; }
     }
 
@@ -92,7 +112,8 @@ sealed class SettingsWindow : PageWindow
     public static void Startup(bool on)
     {
         using var run = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
-        if (on) run.SetValue("Atticus", $"\"{Environment.ProcessPath}\""); else run.DeleteValue("Atticus", false);
+        run.DeleteValue("Atticus", false);
+        if (on) run.SetValue("Oma AI", $"\"{Environment.ProcessPath}\""); else run.DeleteValue("Oma AI", false);
     }
 
     void Record()
@@ -217,6 +238,9 @@ sealed class SettingsWindow : PageWindow
                         Program.Post(() => Js("st.feedDone()"));
                     });
                 }
+                break;
+            case "talk":
+                Program.Post(() => { Program.Box.clickTalk = true; Program.Box.Start(); });
                 break;
             case "openOverlay":
                 Program.Post(() => { Program.Box.ShowBox(); Program.Box.TakeKeys(); });

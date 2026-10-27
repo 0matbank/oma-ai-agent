@@ -1066,7 +1066,7 @@ body {
   body {
     font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: var(--bg); color: var(--fg); height: 100vh; width: 100vw;
-    display: flex; overflow: hidden; user-select: none;
+    display: flex; flex-direction: row !important; overflow: hidden; user-select: none;
   }
   
   /* Left Master Sidebar */
@@ -1106,10 +1106,10 @@ body {
   /* Main Workspace Area */
   main.main-viewport {
     flex: 1; overflow-y: auto; overflow-x: hidden; position: relative;
-    display: flex; flex-direction: column;
+    display: flex; flex-direction: column; min-height: 0; min-width: 0;
   }
   section.tab-section {
-    display: none; width: 100%; height: 100%;
+    display: none; width: 100%; flex: 1; min-height: 0;
   }
   section.tab-section.on {
     display: flex; flex-direction: column; animation: rise .25s var(--out);
@@ -1327,9 +1327,9 @@ body {
     </div>
 
     <!-- Master Layout Grid inside Home -->
-    <div style="flex:1; display:flex; gap:12px; padding:12px; overflow:hidden;">
+    <div style="flex:1; display:flex; gap:12px; padding:12px; overflow:hidden; min-height:0;">
       <!-- Left Column: Holographic Orb + Agent Town -->
-      <div style="flex:1; display:flex; flex-direction:column; gap:12px; min-width:0;">
+      <div style="flex:1; display:flex; flex-direction:column; gap:12px; min-width:0; min-height:0;">
         
         <!-- Upper Deck: Mindmap Cables + Holographic Neural Sphere -->
         <div style="display:flex; gap:12px; height:260px;">
@@ -1753,14 +1753,14 @@ class OmaHoloOrb {
   resize() {
     const rect = this.canvas.parentElement.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    this.width = rect.width;
-    this.height = rect.height;
+    this.width = Math.max(rect.width || 0, 100);
+    this.height = Math.max(rect.height || 0, 100);
     this.canvas.width = this.width * dpr;
     this.canvas.height = this.height * dpr;
-    this.ctx.scale(dpr, dpr);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.centerX = this.width / 2;
     this.centerY = this.height / 2;
-    this.radius = Math.min(this.width, this.height) * 0.26;
+    this.radius = Math.max(Math.min(this.width, this.height) * 0.26, 20);
     this.rings[0].radius = this.radius * 1.35;
     this.rings[1].radius = this.radius * 1.48;
     this.rings[2].radius = this.radius * 1.25;
@@ -1833,9 +1833,10 @@ class OmaHoloOrb {
     this.rotZ += 0.002 * speedMult;
 
     // Draw central glowing aura
+    const rOuter = Math.max(this.radius * 1.4, 10);
     const gradient = this.ctx.createRadialGradient(
       this.centerX, this.centerY, 5,
-      this.centerX, this.centerY, this.radius * 1.4
+      this.centerX, this.centerY, rOuter
     );
     if (this.state === 'thinking') {
       gradient.addColorStop(0, 'rgba(255, 179, 0, 0.22)');
@@ -2146,11 +2147,11 @@ class AgentTown {
   resize() {
     const rect = this.canvas.parentElement.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    this.width = rect.width;
-    this.height = rect.height;
+    this.width = Math.max(rect.width || 0, 100);
+    this.height = Math.max(rect.height || 0, 100);
     this.canvas.width = this.width * dpr;
     this.canvas.height = this.height * dpr;
-    this.ctx.scale(dpr, dpr);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Calculate ideal pixel scale to fit map
     const scaleX = this.width / (this.mapWidth * this.tileSize);
@@ -2782,11 +2783,11 @@ class OmaMindMap {
   resize() {
     const rect = this.canvas.parentElement.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    this.width = rect.width;
-    this.height = rect.height;
+    this.width = Math.max(rect.width || 0, 100);
+    this.height = Math.max(rect.height || 0, 100);
     this.canvas.width = this.width * dpr;
     this.canvas.height = this.height * dpr;
-    this.ctx.scale(dpr, dpr);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   animate() {

@@ -49,12 +49,16 @@ static class Native
     [DllImport("dwmapi")] public static extern int DwmSetWindowAttribute(IntPtr h, int attr, ref int value, int size);
     [DllImport("dwmapi")] public static extern int DwmExtendFrameIntoClientArea(IntPtr h, ref MARGINS m);
 
-    // The look: dark acrylic behind the page, rounded corners, no title bar (Windows 11; Windows 10 gets a plain dark box).
-    public static void Backdrop(IntPtr h, bool acrylic = true, bool round = true)
+    // The look: dark acrylic behind the page, rounded corners, optional frame extension.
+    public static void Backdrop(IntPtr h, bool acrylic = true, bool round = true, bool extendFrame = true)
     {
         int dark = 1; DwmSetWindowAttribute(h, 20, ref dark, 4);   // DWMWA_USE_IMMERSIVE_DARK_MODE
         if (round) { int c = 2; DwmSetWindowAttribute(h, 33, ref c, 4); }   // DWMWA_WINDOW_CORNER_PREFERENCE = ROUND
-        var m = new MARGINS { Left = -1, Right = -1, Top = -1, Bottom = -1 }; DwmExtendFrameIntoClientArea(h, ref m);
+        if (extendFrame)
+        {
+            var m = new MARGINS { Left = -1, Right = -1, Top = -1, Bottom = -1 };
+            DwmExtendFrameIntoClientArea(h, ref m);
+        }
         int b = acrylic ? 3 : 2; DwmSetWindowAttribute(h, 38, ref b, 4);   // DWMWA_SYSTEMBACKDROP_TYPE: 3 = acrylic, 2 = mica
     }
 

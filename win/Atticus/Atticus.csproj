@@ -9,6 +9,13 @@
     <ApplicationIcon>..\..\ui\AppIcon.ico</ApplicationIcon>
     <AssemblyName>Atticus</AssemblyName>
     <RootNamespace>Atticus</RootNamespace>
+    <Product>Oma AI</Product>
+    <Title>Oma AI</Title>
+    <Description>Oma AI Desktop Agent</Description>
+    <Company>Oma AI</Company>
+    <Version>2.8.0</Version>
+    <AssemblyTitle>Oma AI</AssemblyTitle>
+    <AssemblyProduct>Oma AI</AssemblyProduct>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <NoWarn>$(NoWarn);MSB3277</NoWarn>
