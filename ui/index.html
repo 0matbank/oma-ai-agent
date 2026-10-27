@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OMA AI Agent - Futuristic Cybernetic Command Center</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top System Telemetry Bar -->
+  <header id="top-header">
+    <div class="brand-section">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <span class="brand-title">OMA AI</span>
+      <span class="brand-tag">PC 2070</span>
+    </div>
+
+    <div class="top-telemetry">
+      <div class="telem-item">
+        <div class="status-dot"></div>
+        <span>CORE: <b>ONLINE</b></span>
+      </div>
+      <div class="telem-item">
+        <span>LATENCY: <b>18ms</b></span>
+      </div>
+      <div class="telem-item">
+        <span>FPS: <b>60</b></span>
+      </div>
+      <div class="telem-item">
+        <span>HOST: <b>WINDOWS 11</b></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Master Layout Grid -->
+  <main id="app-container">
+
+    <!-- Left Workspace Column -->
+    <section id="workspace-column">
+
+      <!-- Upper Deck: Mindmap + Holographic Particle Sphere -->
+      <div id="upper-deck">
+
+        <!-- Left Mindmap Nodes Card -->
+        <div id="nodes-panel" class="cyber-card">
+          <canvas id="cables-canvas"></canvas>
+          <div id="nodes-group" class="node-group">
+            <!-- Populated dynamically by mindmap.js -->
+          </div>
+        </div>
+
+        <!-- Center Holographic Neural Sphere Card -->
+        <div id="sphere-panel" class="cyber-card">
+          <div class="sphere-header">
+            <div id="sphere-status-badge" class="status-badge active">
+              <span class="badge-dot"></span>
+              <span id="sphere-status-text">SYSTEM ACTIVE</span>
+            </div>
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">
+              NEURAL CORE // V2.8
+            </div>
+          </div>
+
+          <div class="sphere-viewport">
+            <canvas id="orb-canvas"></canvas>
+          </div>
+
+          <div class="sphere-footer">
+            <div class="system-active-label">
+              <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#00e5ff; box-shadow:0 0 8px #00e5ff;"></span>
+              SYSTEM ACTIVE
+            </div>
+            <div class="sphere-controls">
+              <button id="btn-terminate" class="btn-cyber-terminate">TERMINATE</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Lower Deck: AGENT TOWN (2D Pixel Art Office) -->
+      <div id="agent-town-panel" class="cyber-card">
+        
+        <!-- Town Header -->
+        <div class="town-header">
+          <div class="town-title-box">
+            <span class="town-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
+              AGENT TOWN
+            </span>
+            <span class="town-badge">READY</span>
+          </div>
+
+          <div class="town-tabs">
+            <button class="town-tab active" data-tab="agents">agents</button>
+            <button class="town-tab" data-tab="visual hub">visual hub</button>
+            <button class="town-tab" data-tab="gesture">gesture</button>
+          </div>
+
+          <div class="town-controls">
+            <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">MULTI-AGENT OS</span>
+          </div>
+        </div>
+
+        <!-- Agent Status Chips Sub-Bar -->
+        <div class="agent-chips-bar" id="agent-chips-container">
+          <!-- Populated by agent_town.js -->
+        </div>
+
+        <!-- Virtual Office Viewport -->
+        <div class="town-viewport">
+          <canvas id="town-canvas"></canvas>
+        </div>
+
+        <!-- Town Telemetry Footer -->
+        <div class="town-footer">
+          <div class="town-stats">
+            <span>CTX: <b>42%</b></span>
+            <span>SEATS: <b>4/7</b></span>
+            <span id="town-busy-stat"><b>1/4 busy</b></span>
+          </div>
+          <div style="font-size: 10.5px; color: var(--text-muted);">
+            Oma Virtual Workplace Simulation
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- Right Live Feed Column -->
+    <aside id="feed-column" class="cyber-card">
+
+      <div class="feed-header">
+        <div class="feed-tabs">
+          <button class="feed-tab active">VOICE</button>
+          <button class="feed-tab">AGENT</button>
+          <button class="feed-tab">LOGS</button>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 11px; color: var(--neon-cyan);">
+          LIVE FEED
+        </div>
+      </div>
+
+      <!-- Feed Cards Stream -->
+      <div id="feed-stream">
+        <!-- Messages appended dynamically -->
+      </div>
+
+      <!-- Quick Action Prompt Suggestions -->
+      <div class="quick-chips-row">
+        <div class="quick-chip" data-prompt="Research latest AI advancements and summarize findings">🔍 Research AI Tech</div>
+        <div class="quick-chip" data-prompt="Arrange windows: Chrome on left, Terminal on right">💻 Arrange Windows</div>
+        <div class="quick-chip" data-prompt="What is on my screen right now?">🖥️ Screen Vision</div>
+        <div class="quick-chip" data-prompt="Find notes about project in my files">📂 Find Notes</div>
+      </div>
+
+      <!-- Input Dock -->
+      <div class="feed-input-dock">
+        <div class="input-bar-wrapper">
+          <input type="text" id="chat-input" placeholder="Type to Assistant (Oma Active...)" autocomplete="off">
+          <button id="btn-mic" class="btn-mic-toggle" title="Toggle Voice Listening (Mic)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </button>
+          <button id="btn-send" class="btn-send-message" title="Send Directive">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+        <div class="input-hint-row">
+          <span>Press <b>Enter</b> to send</span>
+          <span>Global Voice: <b>Ctrl+Alt+Space</b></span>
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Slide-out Node Inspector Drawer -->
+  <div id="node-drawer" class="node-modal-drawer">
+    <div class="drawer-header">
+      <span id="drawer-title" class="drawer-title">CAPABILITY INSPECTOR</span>
+      <button id="drawer-close" class="drawer-close">✕</button>
+    </div>
+    <div id="drawer-content" class="drawer-body">
+      <!-- Drawer contents -->
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="orb.js"></script>
+  <script src="mindmap.js"></script>
+  <script src="agent_town.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

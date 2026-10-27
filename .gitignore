@@ -1,0 +1,31 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# Local runtime state and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+settings.json
+skills.json
+recent.jsonl
+log.jsonl
+memory.md
+license
+!LICENSE
+app.err
+
+# Build directories
+.venv/
+venv/
+bin/
+obj/
+win/Atticus/bin/
+win/Atticus/obj/
+win/Oma/bin/
+win/Oma/obj/
+screen_tmp.png
