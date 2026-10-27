@@ -13,6 +13,7 @@ class OmaApp {
     this.synth = window.speechSynthesis;
     this.ws = null;
     this.currentAgent = 'alice';
+    this.currentLang = 'bn'; // 'bn' (Bangla) by default, or 'en' (English)
 
     document.addEventListener('DOMContentLoaded', () => this.init());
   }
@@ -34,12 +35,18 @@ class OmaApp {
 
     // 5. Initial Welcome Message
     setTimeout(() => {
+      const welcome = this.currentLang === 'bn'
+        ? 'সিস্টেম সক্রিয় হয়েছে। ওমা এআই আপনার ডিজিটাল কাজের জন্য প্রস্তুত। এজেন্ট টাউনে ৪টি ইউনিট কাজ করতে প্রস্তুত। যেকোনো নির্দেশ বলুন বা লিখুন।'
+        : 'Restored state acknowledged. I adjust your digital affairs from here. Agent Town is initialized with 4 autonomous units. Say or type any command to dispatch.';
       this.addMessageCard(
         'oma',
         'OMA AI',
-        'Restored state acknowledged. I adjust your digital affairs from here. Agent Town is initialized with 4 autonomous units. Say or type any command to dispatch.',
-        '00:01'
+        welcome,
+        '00:01',
+        null,
+        true
       );
+      this.speak(welcome);
     }, 600);
   }
 
@@ -114,6 +121,20 @@ class OmaApp {
       });
     }
 
+    // Language Switcher
+    const langBtn = document.getElementById('lang-switcher');
+    const langLabel = document.getElementById('current-lang-label');
+    if (langBtn) {
+      langBtn.addEventListener('click', () => {
+        this.currentLang = this.currentLang === 'bn' ? 'en' : 'bn';
+        if (langLabel) langLabel.textContent = this.currentLang === 'bn' ? 'বাংলা' : 'English';
+        if (this.recognition) this.recognition.lang = this.currentLang === 'bn' ? 'bn-BD' : 'en-US';
+        const msg = this.currentLang === 'bn' ? 'ভাষা পরিবর্তন করা হয়েছে: বাংলা' : 'Language switched to English';
+        this.addMessageCard('oma', 'OMA AI', msg, this.getTimestamp(), null, true);
+        this.speak(msg);
+      });
+    }
+
     // Drawer Close
     const closeDrawer = document.getElementById('drawer-close');
     if (closeDrawer) {
@@ -129,7 +150,7 @@ class OmaApp {
       this.recognition = new SpeechRecognition();
       this.recognition.continuous = false;
       this.recognition.interimResults = true;
-      this.recognition.lang = 'en-US';
+      this.recognition.lang = this.currentLang === 'bn' ? 'bn-BD' : 'en-US';
 
       this.recognition.onstart = () => {
         this.isListening = true;
@@ -191,13 +212,22 @@ class OmaApp {
     this.synth.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.05;
+    utterance.rate = 1.0;
     utterance.pitch = 1.0;
 
-    // Pick a natural voice if available
+    // Pick a natural Bengali or Hindi or English voice
     const voices = this.synth.getVoices();
-    const naturalVoice = voices.find(v => v.lang.startsWith('hi') || v.lang.startsWith('ur') || v.name.includes('Natural') || v.name.includes('Google'));
-    if (naturalVoice) utterance.voice = naturalVoice;
+    const isBangla = this.currentLang === 'bn' || /[\u0980-\u09FF]/.test(text);
+
+    if (isBangla) {
+      utterance.lang = 'bn-BD';
+      const bnVoice = voices.find(v => v.lang.startsWith('bn') || v.name.includes('Bangla') || v.name.includes('Bengali') || v.name.includes('Nabagata') || v.name.includes('Pradeep'));
+      if (bnVoice) utterance.voice = bnVoice;
+    } else {
+      utterance.lang = 'en-US';
+      const enVoice = voices.find(v => v.lang.startsWith('hi') || v.lang.startsWith('ur') || v.name.includes('Natural') || v.name.includes('Google'));
+      if (enVoice) utterance.voice = enVoice;
+    }
 
     utterance.onstart = () => {
       this.orb.setAudioLevel(0.5);
@@ -224,23 +254,36 @@ class OmaApp {
     let moduleTag = 'research_web';
     let voiceReply = '';
     const qLower = query.toLowerCase();
+    const isBangla = this.currentLang === 'bn' || /[\u0980-\u09FF]/.test(query) ||
+      /\b(ki|koro|bolo|kaj|dekho|kothai|amii|ami|korba|bhai|sir|khobor|khujo|chao|korte|kisu)\b/i.test(query);
 
-    if (qLower.includes('research') || qLower.includes('latest') || qLower.includes('ai') || qLower.includes('info') || qLower.includes('search')) {
+    if (qLower.includes('research') || qLower.includes('latest') || qLower.includes('ai') || qLower.includes('info') || qLower.includes('search') ||
+        qLower.includes('রিসার্চ') || qLower.includes('খবর') || qLower.includes('খোঁজ') || qLower.includes('তথ্য') || qLower.includes('খোজ') || qLower.includes('জানাও')) {
       agentId = 'alice';
       moduleTag = 'research_web';
-      voiceReply = `Ho jaega Sir! Alice ko maine kaam par laga diya hai. Wo ${query} ki latest details aur findings par research kar rahi hai. Jaise hi result aata hai main aapko bataunga.`;
-    } else if (qLower.includes('terminal') || qLower.includes('bash') || qLower.includes('code') || qLower.includes('run') || qLower.includes('build')) {
+      voiceReply = isBangla
+        ? `হয়ে যাবে স্যার! অ্যালিসকে আমি কাজে লাগিয়ে দিয়েছি। সে "${query}" নিয়ে বিস্তারিত রিসার্চ করছে। রেজাল্ট পেলেই আমি আপনাকে জানাচ্ছি।`
+        : `Ho jaega Sir! Alice ko maine kaam par laga diya hai. Wo ${query} ki latest details aur findings par research kar rahi hai. Jaise hi result aata hai main aapko bataunga.`;
+    } else if (qLower.includes('terminal') || qLower.includes('bash') || qLower.includes('code') || qLower.includes('run') || qLower.includes('build') ||
+               qLower.includes('টার্মিনাল') || qLower.includes('কোড') || qLower.includes('রান')) {
       agentId = 'bob';
       moduleTag = 'open_bash_panel';
-      voiceReply = `On it Sir! Bob is opening the terminal and compiling system operations for "${query}".`;
-    } else if (qLower.includes('window') || qLower.includes('chrome') || qLower.includes('open') || qLower.includes('notepad') || qLower.includes('screen')) {
+      voiceReply = isBangla
+        ? `অবশ্যই স্যার! বব টার্মিনাল ওপেন করছে এবং কোড প্রসেস করছে।`
+        : `On it Sir! Bob is opening the terminal and compiling system operations for "${query}".`;
+    } else if (qLower.includes('window') || qLower.includes('chrome') || qLower.includes('open') || qLower.includes('notepad') || qLower.includes('screen') ||
+               qLower.includes('উইন্ডো') || qLower.includes('ওপেন') || qLower.includes('স্ক্রিন') || qLower.includes('সাজাও')) {
       agentId = 'carol';
       moduleTag = 'window_control';
-      voiceReply = `Bilkul Sir! Carol is executing window automation and launching requested application layouts.`;
+      voiceReply = isBangla
+        ? `ঠিক আছে স্যার! ক্যারল সিস্টেম অটোমেশন চালাচ্ছে এবং প্রয়োজনীয় উইন্ডোগুলো সাজিয়ে দিচ্ছে।`
+        : `Bilkul Sir! Carol is executing window automation and launching requested application layouts.`;
     } else {
       agentId = 'dave';
       moduleTag = 'system_action';
-      voiceReply = `Acknowledged. Dave has received the directive: "${query}". Processing system request now.`;
+      voiceReply = isBangla
+        ? `নির্দেশ গ্রহণ করা হয়েছে স্যার! ডেইভ কাজ শুরু করে দিয়েছে, একটু পরেই ফলাফল দেখতে পাবেন।`
+        : `Acknowledged. Dave has received the directive: "${query}". Processing system request now.`;
     }
 
     // 4. Oma Replies verbally & in chat feed

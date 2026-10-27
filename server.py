@@ -130,32 +130,41 @@ class OmaHandler(http.server.SimpleHTTPRequestHandler):
 
     def execute_command(self, query, agent, module):
         q_lower = query.lower()
+        is_bn = any('\u0980' <= ch <= '\u09FF' for ch in query) or any(w in q_lower for w in ['ki', 'koro', 'bolo', 'kaj', 'dekho', 'kothai'])
 
         # 1. Web research
-        if 'research' in q_lower or 'search' in q_lower or 'latest' in q_lower or 'ai' in q_lower:
+        if any(k in q_lower for k in ['research', 'search', 'latest', 'ai', 'রিসার্চ', 'খবর', 'তথ্য', 'খোঁজ', 'খোজ', 'জানাও']):
             search_res = search_duckduckgo(query)
+            if is_bn:
+                return f"অ্যালিস '{query}'-এর উপর ওয়েব রিসার্চ সম্পন্ন করেছে:\n{search_res}"
             return f"Alice completed web research on '{query}':\n{search_res}"
 
         # 2. Window control / app launch
-        if 'open' in q_lower or 'window' in q_lower or 'chrome' in q_lower or 'notepad' in q_lower or 'calc' in q_lower:
+        if any(k in q_lower for k in ['open', 'window', 'chrome', 'notepad', 'calc', 'ওপেন', 'উইন্ডো', 'খুলো', 'চালু']):
             app_name = 'notepad'
-            if 'chrome' in q_lower: app_name = 'chrome'
-            elif 'terminal' in q_lower or 'powershell' in q_lower: app_name = 'wt'
-            elif 'calc' in q_lower: app_name = 'calc'
-            elif 'notepad' in q_lower: app_name = 'notepad'
+            if 'chrome' in q_lower or 'ক্রোম' in q_lower: app_name = 'chrome'
+            elif 'terminal' in q_lower or 'powershell' in q_lower or 'টার্মিনাল' in q_lower: app_name = 'wt'
+            elif 'calc' in q_lower or 'ক্যালকুলেটর' in q_lower: app_name = 'calc'
+            elif 'notepad' in q_lower or 'নোটপ্যাড' in q_lower: app_name = 'notepad'
 
             try:
                 subprocess.Popen(f'start {app_name}', shell=True)
+                if is_bn:
+                    return f"ক্যারল সফলভাবে '{app_name}' অ্যাপ্লিকেশন চালু করেছে এবং উইন্ডো সাজিয়েছে।"
                 return f"Carol executed window automation: launched '{app_name}' and arranged layout."
             except Exception as e:
                 return f"Window control attempted for '{app_name}': {str(e)}"
 
         # 3. Vision / screen query
-        if 'screen' in q_lower or 'look' in q_lower:
+        if any(k in q_lower for k in ['screen', 'look', 'স্ক্রিন', 'দেখো', 'ছবি']):
             app = winctl.front_app() if winctl and hasattr(winctl, 'front_app') else 'Desktop'
+            if is_bn:
+                return f"স্ক্রিন ভিশন ইন্সপেকশন সম্পন্ন: সক্রিয় অ্যাপ হলো '{app}'। স্ক্রিনশট ভিজ্যুয়াল হাবে লোড হয়েছে।"
             return f"Screen vision inspected: Active window is '{app}'. Display parameters captured into Visual Hub."
 
         # 4. Fallback execution
+        if is_bn:
+            return f"নির্দেশনা '{query}' ওমা এজেন্ট {agent.upper()} দ্বারা সফলভাবে সম্পন্ন হয়েছে।"
         return f"Directive '{query}' processed by Oma unit {agent.upper()}. Output verified across active subsystems."
 
     def log_message(self, format, *args):
