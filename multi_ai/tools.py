@@ -84,7 +84,14 @@ def tool_open_app(app_name: str) -> str:
         'code': 'code',
         'spotify': 'spotify:',
         'edge': 'msedge',
-        'settings': 'ms-settings:'
+        'settings': 'ms-settings:',
+        'নোটপ্যাড': 'notepad',
+        'ক্যালকুলেটর': 'calculator:',
+        'ক্রোম': 'chrome',
+        'ব্রাউজার': 'chrome',
+        'টার্মিনাল': 'wt',
+        'ফাইল এক্সপ্লোরার': 'explorer',
+        'পেইন্ট': 'mspaint'
     }
     target = mapping.get(app_lower)
     if target:

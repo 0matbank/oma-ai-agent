@@ -82,8 +82,11 @@ static class Program
             Err("Overlay created, initializing Box...");
             await Box.Init();
             Err("Box.Init() completed");
+            Hooks.Shortcut = pressed => Program.Post(() => Settings?.Shortcut(pressed));
+            Hooks.Escape = () => Program.Post(() => Settings?.OnEscape());
+            Hooks.EscWanted = () => Settings != null && (Settings.Visible || Settings.VoiceRecording);
             Hooks.Install();
-            Err("Hooks installed");
+            Err("Hooks installed to SettingsWindow");
             _ = Speech.Load();
             Listen();
             Err("Listen started");
@@ -134,7 +137,7 @@ static class Program
         {
             case "notify": Tray.Notify(p.Length > 1 ? p[1] : ""); break;
             case "open": Settings.Open(); break;
-            case "talk": Box.clickTalk = true; Box.Start(); break;
+            case "talk": Settings.StartListening(true); break;
             case "tab": Settings.Js($"st.tab('{(p.Length > 1 ? p[1] : "")}')"); break;
             case "eval": if (p.Length > 1) Settings.Js(p[1]); break;
             case "update": Updater.Check(() => Settings.Push()); break;   // check now (support and tests)
@@ -223,7 +226,7 @@ sealed class Tray
         var hint = Prefs.Str("input") == "type" ? $"Press {keys} to type" : Prefs.Str("talkMode") == "toggle" ? $"Press {keys} to talk · again to send" : $"Hold {keys} and talk";
         m.Items.Add(new ToolStripMenuItem(Prefs.Bool("paused") ? "Oma AI is paused" : hint) { Enabled = false });
         m.Items.Add(new ToolStripSeparator());
-        m.Items.Add("Ask Oma AI", null, (_, _) => { Program.Box.clickTalk = true; Program.Box.Start(); });
+        m.Items.Add("Ask Oma AI", null, (_, _) => { Program.Settings.StartListening(true); });
         m.Items.Add(Prefs.Bool("paused") ? "Resume Oma AI" : "Pause Oma AI", null, (_, _) => { Program.Settings.Apply("paused", !Prefs.Bool("paused")); Program.Settings.Push(); });
         m.Items.Add(new ToolStripSeparator());
         m.Items.Add(new ToolStripMenuItem(Today()) { Enabled = false });

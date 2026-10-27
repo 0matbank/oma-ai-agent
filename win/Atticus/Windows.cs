@@ -56,6 +56,178 @@ sealed class SettingsWindow : PageWindow
 {
     string tab = "";
     System.Windows.Forms.Timer perms;
+    bool shortcutDown;
+    bool voiceRecording;
+    bool toggleTalk;
+    string liveText = "";
+    System.Windows.Forms.Timer holdTimer;
+    DateTime recordingBegan;
+    int listenId;
+    Process currentProc;
+
+    public bool VoiceRecording => voiceRecording;
+
+    public void Shortcut(bool pressed)
+    {
+        if (!pressed)
+        {
+            shortcutDown = false;
+            if (voiceRecording && !toggleTalk) StopListening();
+            return;
+        }
+        if (shortcutDown) return;
+        shortcutDown = true;
+        if (Prefs.Bool("paused")) return;
+        if (Voice.Shush()) return;
+        if (voiceRecording)
+        {
+            if (toggleTalk) StopListening();
+            else CancelListening();
+            return;
+        }
+        StartListening(false);
+    }
+
+    public void StartListening(bool isClick)
+    {
+        if (Prefs.Bool("paused")) return;
+        Voice.Shush();
+        Raise();
+        toggleTalk = isClick || Prefs.Str("talkMode") == "toggle";
+        liveText = "";
+        voiceRecording = true;
+        recordingBegan = DateTime.Now;
+        Sound.Cue("soundStart");
+
+        Js("st.voiceStart(); holoOrb?.setState('listening');");
+
+        if (!Program.Speech.Ready)
+        {
+            Js("st.feedLine('§REPLY§' + JSON.stringify({ success: false, reply: 'Speech engine is still loading. Please try again in a moment.', error: 'speech_not_ready' }));");
+            CancelListening();
+            return;
+        }
+
+        Program.Speech.Prompt = Hints();
+        var id = ++listenId;
+        var err = Program.Speech.Start(
+            v => {
+                if (listenId == id && voiceRecording)
+                    Program.Post(() => Js($"st.voiceLevel({v:0.00}); holoOrb?.setAudioLevel({v:0.00});"));
+            },
+            w => {
+                if (listenId == id && voiceRecording)
+                    Program.Post(() => {
+                        liveText = w;
+                        Js($"st.voiceWords({Web.Json(w)});");
+                    });
+            }
+        );
+
+        if (!string.IsNullOrEmpty(err))
+        {
+            Js($"st.feedLine('§REPLY§' + JSON.stringify({{ success: false, reply: {Web.Json(err)}, error: 'speech_error' }}));");
+            CancelListening();
+            return;
+        }
+
+        holdTimer?.Dispose();
+        holdTimer = new System.Windows.Forms.Timer { Interval = 150 };
+        holdTimer.Tick += (_, _) =>
+        {
+            if (!voiceRecording) { holdTimer?.Stop(); return; }
+            var held = (DateTime.Now - recordingBegan).TotalSeconds;
+            if (held > 60) { holdTimer?.Stop(); StopListening(); return; }
+            if (!toggleTalk && !Hooks.ModsHeld()) { holdTimer?.Stop(); StopListening(); }
+        };
+        holdTimer.Start();
+    }
+
+    public async void StopListening()
+    {
+        if (!voiceRecording) return;
+        voiceRecording = false;
+        holdTimer?.Stop();
+        holdTimer?.Dispose();
+        holdTimer = null;
+
+        Js("st.voiceTranscribing(); holoOrb?.setState('thinking');");
+
+        string transcript = null;
+        try
+        {
+            transcript = await Program.Speech.Stop();
+        }
+        catch (Exception ex)
+        {
+            Program.Err("Speech.Stop exception: " + ex.Message);
+        }
+
+        if (string.IsNullOrWhiteSpace(transcript))
+        {
+            transcript = liveText?.Trim() ?? "";
+        }
+
+        if (!string.IsNullOrWhiteSpace(transcript))
+        {
+            Js($"st.voiceDone({Web.Json(transcript)});");
+            _ = ExecuteDirective(transcript, isVoice: true);
+        }
+        else
+        {
+            Sound.Cue("soundStop");
+            Js("st.voiceDone(''); holoOrb?.setState('active');");
+        }
+    }
+
+    public void CancelListening()
+    {
+        voiceRecording = false;
+        holdTimer?.Stop();
+        holdTimer?.Dispose();
+        holdTimer = null;
+        listenId++;
+        Program.Speech.Cancel();
+        Sound.Cue("soundStop");
+        Js("st.voiceDone(''); holoOrb?.setState('active');");
+    }
+
+    public void OnEscape()
+    {
+        if (Voice.Shush()) return;
+        if (voiceRecording)
+        {
+            CancelListening();
+            return;
+        }
+        CancelCurrentTask();
+    }
+
+    void CancelCurrentTask()
+    {
+        if (currentProc != null)
+        {
+            try { currentProc.Kill(true); } catch { }
+            currentProc = null;
+            Js("st.feedLine('§EVENT§' + JSON.stringify({ stage: 'completed', detail: 'Directive cancelled by user.', pct: 100 }));");
+            Js("st.feedDone();");
+            Sound.Cue("soundStop");
+        }
+    }
+
+    static string Hints()
+    {
+        var words = new List<string> { "Oma", "Atticus", "Chrome", "VS Code", "Spotify", "Notepad", "Calculator", "নোটপ্যাড", "ক্যালকুলেটর", "ক্রোম" };
+        try
+        {
+            var me = JsonDocument.Parse(File.ReadAllText(Path.Combine(Paths.Config, "me.json"))).RootElement;
+            if (me.TryGetProperty("name", out var n) && n.GetString() is { Length: > 0 } nm) words.Add(nm);
+        }
+        catch { }
+        try { foreach (var p in JsonDocument.Parse(File.ReadAllText(Path.Combine(Paths.Config, "skills.json"))).RootElement.EnumerateObject()) words.Add(p.Name); } catch { }
+        return string.Join(", ", words.Distinct().Take(40));
+    }
+
     public SettingsWindow() : base("settings.html", "st", "Oma AI", 1260, 820)
     {
         FormClosing += (_, e) => { if (e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; if (Hooks.Recording) Done(0, 0, null); Hide(); perms?.Stop(); } };
@@ -237,88 +409,139 @@ sealed class SettingsWindow : PageWindow
                 }
                 break;
             case "ask":
-                if (S("text") is { } askText) {
-                    var reqId = Guid.NewGuid().ToString("N")[..8];
-                    Task.Run(async () => {
-                        if (!await askLock.WaitAsync(100)) {
-                            var busyMsg = "§REPLY§" + JsonSerializer.Serialize(new {
-                                success = false,
-                                reply = "Oma AI is currently processing another directive. Please wait a moment.",
-                                error = "concurrency_busy",
-                                req_id = reqId
-                            });
-                            Program.Post(() => Js($"st.feedLine({Web.Json(busyMsg)})"));
-                            Program.Post(() => Js("st.feedDone()"));
-                            return;
-                        }
-                        Process p = null;
-                        try {
-                            bool gotReply = false;
-                            p = Py.Start(new[] { "--oma-ask", askText });
-                            var errTask = p.StandardError.ReadToEndAsync();
-                            var lineTask = Task.Run(async () => {
-                                while (await p.StandardOutput.ReadLineAsync() is { } line) {
-                                    var l = line;
-                                    if (l.StartsWith("§REPLY§") || l.StartsWith("— ")) gotReply = true;
-                                    Program.Post(() => Js($"st.feedLine({Web.Json(l)})"));
-                                }
-                            });
-
-                            var completed = await Task.WhenAny(lineTask, Task.Delay(90000));
-                            if (completed != lineTask) {
-                                try { p.Kill(true); } catch { }
-                                var timeoutMsg = "§REPLY§" + JsonSerializer.Serialize(new {
-                                    success = false,
-                                    reply = "Request timed out after 90 seconds. The process was stopped.",
-                                    error = "timeout",
-                                    req_id = reqId
-                                });
-                                Program.Post(() => Js($"st.feedLine({Web.Json(timeoutMsg)})"));
-                            } else {
-                                await p.WaitForExitAsync();
-                                string errOutput = "";
-                                try { errOutput = await errTask; } catch { }
-
-                                if (!gotReply || p.ExitCode != 0) {
-                                    string cleanErr = SanitizeError(errOutput);
-                                    if (string.IsNullOrWhiteSpace(cleanErr)) {
-                                        cleanErr = p.ExitCode != 0 ? $"Process exited with code {p.ExitCode}" : "No response generated by model.";
-                                    }
-                                    var failMsg = "§REPLY§" + JsonSerializer.Serialize(new {
-                                        success = false,
-                                        reply = $"Execution failed: {cleanErr}",
-                                        error = cleanErr,
-                                        req_id = reqId
-                                    });
-                                    Program.Post(() => Js($"st.feedLine({Web.Json(failMsg)})"));
-                                }
-                            }
-                        }
-                        catch (Exception ex) {
-                            Program.Err($"Ask exception ({reqId}): {ex.Message}");
-                            var exMsg = "§REPLY§" + JsonSerializer.Serialize(new {
-                                success = false,
-                                reply = $"Internal system error: {ex.Message}",
-                                error = ex.Message,
-                                req_id = reqId
-                            });
-                            Program.Post(() => Js($"st.feedLine({Web.Json(exMsg)})"));
-                        }
-                        finally {
-                            p?.Dispose();
-                            askLock.Release();
-                            Program.Post(() => Js("st.feedDone()"));
-                        }
-                    });
-                }
+                if (S("text") is { } askText)
+                    _ = ExecuteDirective(askText, isVoice: false);
                 break;
             case "talk":
-                Program.Post(() => { Program.Box.clickTalk = true; Program.Box.Start(); });
+            case "micToggle":
+                Program.Post(() => {
+                    if (voiceRecording) StopListening();
+                    else StartListening(true);
+                });
+                break;
+            case "voiceCancel":
+                Program.Post(CancelListening);
                 break;
             case "openOverlay":
-                Program.Post(() => { Program.Box.ShowBox(); Program.Box.TakeKeys(); });
+                Program.Post(() => Open());
                 break;
             case "quit": Application.Exit(); break;
+        }
+    }
+
+    public async Task ExecuteDirective(string askText, bool isVoice)
+    {
+        if (string.IsNullOrWhiteSpace(askText)) return;
+        var reqId = Guid.NewGuid().ToString("N")[..8];
+        if (!await askLock.WaitAsync(100))
+        {
+            var busyMsg = "§REPLY§" + JsonSerializer.Serialize(new {
+                success = false,
+                reply = "Oma AI is currently processing another directive. Please wait a moment.",
+                error = "concurrency_busy",
+                req_id = reqId
+            });
+            Program.Post(() => {
+                Js($"st.feedLine({Web.Json(busyMsg)})");
+                Js("st.feedDone()");
+            });
+            return;
+        }
+
+        Process p = null;
+        try
+        {
+            bool gotReply = false;
+            string replyTextToSpeak = null;
+
+            p = Py.Start(new[] { "--oma-ask", askText });
+            currentProc = p;
+            var errTask = p.StandardError.ReadToEndAsync();
+            var lineTask = Task.Run(async () =>
+            {
+                while (await p.StandardOutput.ReadLineAsync() is { } line)
+                {
+                    var l = line;
+                    if (l.StartsWith("§REPLY§"))
+                    {
+                        gotReply = true;
+                        try
+                        {
+                            var rep = JsonDocument.Parse(l[7..]).RootElement;
+                            if (rep.TryGetProperty("reply", out var rVal))
+                                replyTextToSpeak = rVal.GetString();
+                        }
+                        catch { }
+                    }
+                    else if (l.StartsWith("— "))
+                    {
+                        gotReply = true;
+                        replyTextToSpeak = l[2..];
+                    }
+                    Program.Post(() => Js($"st.feedLine({Web.Json(l)})"));
+                }
+            });
+
+            var completed = await Task.WhenAny(lineTask, Task.Delay(90000));
+            if (completed != lineTask)
+            {
+                try { p.Kill(true); } catch { }
+                var timeoutMsg = "§REPLY§" + JsonSerializer.Serialize(new {
+                    success = false,
+                    reply = "Request timed out after 90 seconds. The process was stopped.",
+                    error = "timeout",
+                    req_id = reqId
+                });
+                Program.Post(() => Js($"st.feedLine({Web.Json(timeoutMsg)})"));
+            }
+            else
+            {
+                await p.WaitForExitAsync();
+                string errOutput = "";
+                try { errOutput = await errTask; } catch { }
+
+                if (!gotReply || p.ExitCode != 0)
+                {
+                    string cleanErr = SanitizeError(errOutput);
+                    if (string.IsNullOrWhiteSpace(cleanErr))
+                    {
+                        cleanErr = p.ExitCode != 0 ? $"Process exited with code {p.ExitCode}" : "No response generated by model.";
+                    }
+                    var failMsg = "§REPLY§" + JsonSerializer.Serialize(new {
+                        success = false,
+                        reply = $"Execution failed: {cleanErr}",
+                        error = cleanErr,
+                        req_id = reqId
+                    });
+                    Program.Post(() => Js($"st.feedLine({Web.Json(failMsg)})"));
+                }
+                else
+                {
+                    Sound.Cue("soundDone");
+                    if ((isVoice || Prefs.Bool("speak")) && !string.IsNullOrWhiteSpace(replyTextToSpeak))
+                    {
+                        Voice.Say(replyTextToSpeak, () => {});
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Program.Err($"Ask exception ({reqId}): {ex.Message}");
+            var exMsg = "§REPLY§" + JsonSerializer.Serialize(new {
+                success = false,
+                reply = $"Internal system error: {ex.Message}",
+                error = ex.Message,
+                req_id = reqId
+            });
+            Program.Post(() => Js($"st.feedLine({Web.Json(exMsg)})"));
+        }
+        finally
+        {
+            if (currentProc == p) currentProc = null;
+            p?.Dispose();
+            askLock.Release();
+            Program.Post(() => Js("st.feedDone()"));
         }
     }
 }

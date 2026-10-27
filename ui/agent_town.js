@@ -227,6 +227,29 @@ class AgentTown {
     }
   }
 
+  setAgentWorking(agentId, task, subtext, pct) {
+    const agent = this.agents[agentId] || this.agents.bob;
+    if (!agent) return;
+    agent.state = 'working';
+    agent.task = task || agent.task;
+    agent.taskBubble = subtext || task || agent.taskBubble;
+    agent.bubbleProgress = pct || 50;
+    agent.bubbleTimer = 9999;
+    this.updateMetrics();
+    this.updateChipsBar();
+  }
+
+  setAgentIdle(agentId) {
+    const agent = this.agents[agentId];
+    if (!agent) return;
+    agent.state = 'idle';
+    agent.task = 'Standby';
+    agent.taskBubble = null;
+    agent.bubbleProgress = 0;
+    this.updateMetrics();
+    this.updateChipsBar();
+  }
+
   /**
    * Dispatches a real task to an agent (exact replica of video workflow)
    */

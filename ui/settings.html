@@ -3294,9 +3294,9 @@ window.OmaMindMap = OmaMindMap;
   $('fullChatInput').onkeydown = e => { if (e.key === 'Enter') { sendDirective($('fullChatInput').value); $('fullChatInput').value = ''; } };
   $('btnClearChat').onclick = () => { $('homeFeedStream').innerHTML = $('fullFeedStream').innerHTML = ''; };
 
-  // Mic Button Trigger (F16)
-  $('btnHomeMic').onclick = () => post({ do: 'talk' });
-  $('btnOverlayTrigger').onclick = () => post({ do: 'openOverlay' });
+  // Mic Button Trigger (Voice toggle directly in Oma UI)
+  $('btnHomeMic').onclick = () => post({ do: 'micToggle' });
+  $('btnOverlayTrigger').onclick = () => post({ do: 'micToggle' });
 
   // Quick Chips
   document.querySelectorAll('.quick-chip').forEach(c => c.onclick = () => sendDirective(c.dataset.prompt));
@@ -3385,16 +3385,93 @@ window.OmaMindMap = OmaMindMap;
     providerSaveResult(res) {
       post({ do: 'providers' });
     },
+    voiceStart() {
+      holoOrb?.setState('listening');
+      const badge = $('sphere-status-badge');
+      const badgeText = $('sphere-status-text');
+      if (badge && badgeText) {
+        badge.className = 'status-badge listening';
+        badgeText.textContent = 'LISTENING ...';
+      }
+      $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Listening (Mic Active)...</b>';
+      const statusBox = $('pipelineStatus');
+      if (statusBox) {
+        statusBox.innerHTML = '<span class="status-pulse"></span><span>Pipeline Stage: <b style="color:var(--neon-cyan);">LISTENING</b> — Voice recording active</span>';
+      }
+      // Insert or update live voice card
+      ['homeFeedStream', 'fullFeedStream'].forEach(id => {
+        const stream = $(id);
+        if (!stream) return;
+        let card = stream.querySelector('.live-voice-card');
+        if (!card) {
+          const cardHtml = `
+            <div class="feed-card event live-voice-card" style="border-left:3px solid var(--neon-cyan); background:rgba(0,229,255,0.08);">
+              <div class="feed-meta"><span style="color:var(--neon-cyan); font-weight:bold;">● LISTENING...</span><span style="color:#94a3b8; font-size:11px;">Release keys or click Mic to send</span></div>
+              <div class="feed-text live-voice-text" style="color:#fff; font-style:italic;">Listening to microphone...</div>
+            </div>`;
+          stream.insertAdjacentHTML('beforeend', cardHtml);
+          stream.scrollTop = stream.scrollHeight;
+        }
+      });
+    },
+    voiceLevel(lvl) {
+      holoOrb?.setAudioLevel(lvl);
+    },
+    voiceWords(words) {
+      if (!words) return;
+      document.querySelectorAll('.live-voice-text').forEach(el => {
+        el.textContent = words;
+        el.style.fontStyle = 'normal';
+      });
+      const inp = $('homeChatInput');
+      if (inp && !inp.value) inp.placeholder = words;
+    },
+    voiceTranscribing() {
+      holoOrb?.setState('thinking');
+      const badge = $('sphere-status-badge');
+      const badgeText = $('sphere-status-text');
+      if (badge && badgeText) {
+        badge.className = 'status-badge thinking';
+        badgeText.textContent = 'TRANSCRIBING ...';
+      }
+      const statusBox = $('pipelineStatus');
+      if (statusBox) {
+        statusBox.innerHTML = '<span class="status-pulse"></span><span>Pipeline Stage: <b style="color:var(--neon-gold);">TRANSCRIBING</b> — Processing speech audio</span>';
+      }
+      document.querySelectorAll('.live-voice-card').forEach(card => {
+        const meta = card.querySelector('.feed-meta span');
+        if (meta) {
+          meta.style.color = 'var(--neon-gold)';
+          meta.textContent = '⏳ TRANSCRIBING...';
+        }
+        const text = card.querySelector('.live-voice-text');
+        if (text) text.textContent = 'Confirming transcript with Whisper...';
+      });
+    },
+    voiceDone(finalText) {
+      document.querySelectorAll('.live-voice-card').forEach(c => c.remove());
+      const inp = $('homeChatInput');
+      if (inp) inp.placeholder = 'Type your command or task in plain English or Bangla...';
+      if (finalText && finalText.trim()) {
+        appendFeedMessage('user', 'You', finalText.trim());
+        holoOrb?.setState('thinking');
+        agentTown?.setAgentWorking('bob', finalText.trim(), 'Analyzing directive & routing models...', 25);
+        $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Processing Directive</b>';
+      } else {
+        holoOrb?.setState('active');
+        $('agentTownActivity').innerHTML = 'Status: <b>Idle</b>';
+      }
+    },
     feedLine(line) {
       if (!line) return;
       if (line.startsWith('§EVENT§')) {
         try {
           const ev = JSON.parse(line.slice(7));
           appendFeedEvent(ev.stage, ev.detail, ev.pct);
-          if (ev.stage === 'analyzing') {
+          if (ev.stage === 'analyzing' || ev.stage === 'thinking') {
             holoOrb?.setState('thinking');
             agentTown?.setAgentWorking('bob', ev.detail, 'Analyzing task...', 30);
-          } else if (ev.stage === 'executing') {
+          } else if (ev.stage === 'executing' || ev.stage === 'tool') {
             holoOrb?.setState('executing');
             agentTown?.setAgentWorking('carol', ev.detail, 'Executing tool...', 70);
           } else if (ev.stage === 'fallback') {
@@ -3408,7 +3485,9 @@ window.OmaMindMap = OmaMindMap;
       } else if (line.startsWith('§REPLY§')) {
         try {
           const rep = JSON.parse(line.slice(7));
-          appendFeedMessage('oma', 'Oma AI', rep.reply, `${rep.provider_used} (${rep.model_used})`, rep.fallback_occurred);
+          appendFeedMessage('oma', 'Oma AI', rep.reply, `${rep.provider_used || 'Auto'} (${rep.model_used || 'Fast'})`, rep.fallback_occurred);
+          holoOrb?.setState('completed');
+          setTimeout(() => holoOrb?.setState('active'), 3000);
         } catch (_) {}
       } else if (line.startsWith('—, ')) {
         const step = line.slice(3);
@@ -3423,8 +3502,10 @@ window.OmaMindMap = OmaMindMap;
       }
     },
     feedDone() {
-      holoOrb?.setState('active');
-      $('agentTownActivity').innerHTML = 'Status: <b>Idle</b>';
+      setTimeout(() => {
+        holoOrb?.setState('active');
+        $('agentTownActivity').innerHTML = 'Status: <b>Idle</b>';
+      }, 1500);
     },
     tab(name) {
       const b = document.querySelector(`nav button[data-s="${name}"]`);

@@ -119,7 +119,7 @@ class OllamaAdapter:
                 headers={'Content-Type': 'application/json'},
                 method='POST'
             )
-            with urllib.request.urlopen(req, timeout=30) as res:
+            with urllib.request.urlopen(req, timeout=75) as res:
                 data = json.loads(res.read().decode('utf-8'))
                 reply = data.get('response', '').strip()
                 if not reply:

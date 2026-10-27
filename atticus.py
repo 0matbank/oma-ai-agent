@@ -454,7 +454,17 @@ def show(target):
             app = winctl.opener(t)
         else:
             app = app_named(t) or t
-            if not winctl.launch(app):
+            launched = False
+            try:
+                os.startfile(t)
+                launched = True
+            except Exception:
+                try:
+                    os.startfile(app)
+                    launched = True
+                except Exception:
+                    pass
+            if not launched and not winctl.launch(app):
                 return f'no app or file called "{target}"'
     except OSError as e:
         return f'could not open {target}: {e.strerror or e}'
@@ -817,6 +827,30 @@ def fast(text):
     """Simple commands with no AI: learned shortcuts, open <app/site>, snap/move <it/app> left/right/full/center, to laptop/monitor.
     Returns a reply, or None to hand the request to Haiku. fast.cmds: the commands that did it, so "When I say X, …" can save them."""
     fast.cmds = []
+    raw_str = text.strip()
+    bn_open = re.search(r'(?:খোলো|খুলুন|চালু করো|চালু করুন|ওপেন করো|অন করো)\s+(.+)', raw_str, re.I)
+    if not bn_open:
+        bn_open = re.search(r'(.+?)\s*(?:খোলো|খুলুন|চালু করো|চালু করুন|ওপেন করো|অন করো)', raw_str, re.I)
+    if bn_open:
+        bn_target = bn_open.group(1).strip()
+        bn_mapping = {
+            'নোটপ্যাড': 'notepad',
+            'ক্যালকুলেটর': 'calc',
+            'ক্রোম': 'chrome',
+            'ব্রাউজার': 'chrome',
+            'টার্মিনাল': 'cmd',
+            'ফাইল এক্সপ্লোরার': 'explorer',
+            'পেইন্ট': 'mspaint',
+            'ভিএস কোড': 'code',
+            'কোড': 'code',
+            'স্পটিফাই': 'spotify',
+            'সেটিংস': 'ms-settings:'
+        }
+        app_target = bn_mapping.get(bn_target.lower(), bn_target)
+        res = show(app_target)
+        if res and not res.startswith(('no app', 'could not')):
+            fast.cmds = [f'{SHOW} {shlex.quote(app_target)}']
+            return f"Opened {bn_target}."
     named = NAMED.match(text.strip())
     if named and pref('learn', True):   # "When I say work mode, open Spotify": do it now, no AI, and save the words
         if os.environ.get('ATTICUS_LIVE') == '1': return None
@@ -1800,6 +1834,25 @@ def main():
         from multi_ai.router import clean_user_prompt, router
         user_task = ' '.join(args[1:])
         prompt = clean_user_prompt(user_task)
+
+        # Check instant / fast commands (Learned shortcuts, window positioning, app launching)
+        if pref('instant', True):
+            try:
+                fast_reply = fast(prompt)
+                if fast_reply:
+                    remember_turn(prompt, fast_reply)
+                    log_turn(prompt, fast_reply, t_start)
+                    print("§EVENT§" + json.dumps({"stage": "completed", "detail": fast_reply, "pct": 100}), flush=True)
+                    res = {
+                        "success": True,
+                        "reply": fast_reply,
+                        "provider_used": "Fast Engine",
+                        "model_used": "Instant",
+                        "fallback_occurred": False
+                    }
+                    return print("§REPLY§" + json.dumps(res), flush=True)
+            except Exception as e:
+                sys.stderr.write(f"[Fast Engine Notice] {e}\n")
         
         # Build Atticus memory, workflow, and recent turns context (F12)
         mem = relevant_rules(prompt) if 'relevant_rules' in dir() or callable(globals().get('relevant_rules')) else ''

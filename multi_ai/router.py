@@ -165,7 +165,7 @@ class ModelRouter:
             if self.adapters['lm_studio'].is_available() and 'lm_studio' not in excluded:
                 for m in self.adapters['lm_studio'].discover_models():
                     candidates.append(('lm_studio', m.model_id))
-        elif mode == "manual" or (active_model and active_model != "auto"):
+        elif mode == "manual" and (active_model and active_model != "auto"):
             emit("model_selected", f"Manual Mode: Selected {active_model}", 35)
             if "/" in active_model:
                 pid, mid = active_model.split("/", 1)
@@ -283,7 +283,7 @@ class ModelRouter:
             else:
                 err = res.get('error', 'Execution failed')
                 err_type = res.get('error_type', 'generic')
-                fallback_notes.append(f"{pid} ({mid}): {err_type}")
+                fallback_notes.append(f"{pid} ({mid}): {err}")
 
         # All candidates in the finite chain failed
         journal.finish_task(task_id, "; ".join(fallback_notes), status='failed')

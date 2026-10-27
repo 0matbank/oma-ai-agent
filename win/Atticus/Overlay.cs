@@ -90,14 +90,7 @@ addEventListener('DOMContentLoaded', () => {
         if (Environment.GetEnvironmentVariable("ATTICUS_CAPTURABLE") != "1")   // debugging: let screenshots see the box
             Native.SetWindowDisplayAffinity(Handle, 0x11);   // never in screen shares, recordings, or Atticus's own screenshots
         web = await Web.Load(this, "ui.html", OnMessage, true, PointerScript);
-        Hooks.EscWanted = () => Visible && Opacity > 0;
-        Hooks.Escape = Escape;
-        Hooks.Shortcut = Shortcut;
-        Hooks.ClickAt = (x, y) =>   // click anywhere else closes the box once the answer is up
-        {
-            if (!Visible || busy || listening || stuck || Bounds.Contains(x, y)) return;
-            Close(false);
-        };
+        // Unified Oma AI: Hooks are managed by SettingsWindow; Overlay never intercepts keys
         SystemEvents_DisplayChanged();
     }
 
@@ -214,16 +207,8 @@ addEventListener('DOMContentLoaded', () => {
     // ---- showing and hiding ----
     public void ShowBox()
     {
-        gen++; js("visible", true); js("mode", Prefs.Bool("safe"));
-        if (Visible && Opacity > 0) { Fade(1, 0.18); return; }   // still up: stay where the user dragged it
-        var scr = Hooks.MineHwnd != IntPtr.Zero ? Screen.FromHandle(Hooks.MineHwnd) : Screen.FromPoint(Cursor.Position);
-        var vf = scr.WorkingArea;
-        var w = (int)(Math.Max(340, Prefs.Num("boxW")) * Dpi);
-        var x = Prefs.Str("corner") == "top-right" ? vf.Right - w - (int)(14 * Dpi) : vf.Left + (int)(14 * Dpi);
-        Opacity = 0;
-        if (!Visible) Show();
-        Frame(new Rectangle(x, vf.Top + (int)(10 * Dpi), w, Height));
-        Fade(1, 0.18);
+        // Unified Oma AI: Divert to single unified interface
+        Program.Post(() => Program.Settings?.Open());
     }
 
     System.Windows.Forms.Timer fader;
