@@ -19,6 +19,13 @@ class OmaApp {
   }
 
   init() {
+    if (location.protocol === 'file:') {
+      const banner = document.createElement('div');
+      banner.style = 'background:#ff2a5f; color:#fff; padding:8px 16px; text-align:center; font-size:12.5px; font-weight:bold; position:fixed; top:0; left:0; right:0; z-index:9999; box-shadow:0 4px 15px rgba(255,42,95,0.5);';
+      banner.innerHTML = '⚠️ আপনি সরাসরি ফাইল ওপেন করেছেন! আপনার PC-র ইন্সটল করা এজেন্টের সাথে কাজ করার জন্য প্রজেক্ট ফোল্ডারের <b>start.bat</b> ডাবল ক্লিক করে চালান (http://localhost:8765)।';
+      document.body.prepend(banner);
+    }
+
     // 1. Initialize Visual Subsystems
     this.orb = new window.OmaHoloOrb('orb-canvas');
     this.mindmap = new window.OmaMindMap('cables-canvas');
@@ -303,14 +310,9 @@ class OmaApp {
   }
 
   sendToBackend(query, agentId, moduleTag) {
-    // If WebSocket is open
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ query, agent: agentId, module: moduleTag }));
-      return;
-    }
+    const targetUrl = location.protocol === 'file:' ? 'http://localhost:8765/api/command' : '/api/command';
 
-    // HTTP fetch fallback
-    fetch('/api/command', {
+    fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, agent: agentId, module: moduleTag })
@@ -319,21 +321,30 @@ class OmaApp {
     .then(data => {
       if (data && data.result) {
         this.addMessageCard('agent-action', `RESULT: ${agentId.toUpperCase()}`, data.result, this.getTimestamp(), moduleTag);
+
+        // Update Agent Town bubble with real outcome
+        const agent = this.town.agents[agentId] || this.town.agents.alice;
+        agent.taskBubble = '✓ ' + (data.spoken ? data.spoken.substring(0, 75) : 'Complete');
+        agent.actionBubble = '✅';
+        agent.actionBubbleTimer = 220;
+        agent.state = 'idle';
+        this.town.updateChipsBar();
+
+        // Speak the real result out loud!
+        const toSpeak = data.spoken || data.result;
+        this.speak(toSpeak);
+
+        this.orb.setState('active');
       }
     })
-    .catch(() => {
-      // In offline / preview demo mode, generate dynamic intelligent mock report
-      setTimeout(() => {
-        let resultReport = '';
-        if (moduleTag === 'research_web') {
-          resultReport = `Research summary compiled for "${query}":\n• Major advancements observed in autonomous agent architectures and real-time local synthesis.\n• Multi-agent virtualization (Agent Town) confirms 4x parallel task throughput.\n• System benchmarks verified on Windows 11 host.`;
-        } else if (moduleTag === 'window_control') {
-          resultReport = `Window automation finished: Window arrangement applied across monitors. Process focus set to active.`;
-        } else {
-          resultReport = `Execution completed successfully. Zero errors reported. Output written to system log.`;
-        }
-        this.addMessageCard('agent-action', `RESULT: ${agentId.toUpperCase()}`, resultReport, this.getTimestamp(), moduleTag);
-      }, 4200);
+    .catch((err) => {
+      console.warn("Backend fetch failed:", err);
+      const errMsg = this.currentLang === 'bn'
+        ? "⚠️ সার্ভারের সাথে কানেক্ট হতে পারেনি। দয়া করে ফোল্ডার থেকে 'start.bat' চালিয়ে 'http://localhost:8765' ওপেন করুন।"
+        : "⚠️ Cannot connect to backend server. Please run 'start.bat' and open 'http://localhost:8765'.";
+      this.addMessageCard('agent-action', 'SYSTEM', errMsg, this.getTimestamp());
+      this.speak(errMsg);
+      this.orb.setState('active');
     });
   }
 

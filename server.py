@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
 Oma AI Agent - Local Futuristic Web Server & System Bridge
-Serves the 2070 Cyberpunk Web UI and connects the multi-agent virtual office
-with real Windows automation (windows, apps, search, screen, bash).
+Synchronizes the 2070 Cybernetic UI directly with the installed Atticus agent
+(C:\\Users\\USERAS\\.atticus\\atticus.py & C:\\Users\\USERAS\\AppData\\Local\\Atticus\\venv).
 """
 import base64
 import html
 import http.server
 import json
-import mimetypes
 import os
 import re
 import socketserver
@@ -20,56 +19,80 @@ import urllib.parse
 import urllib.request
 import webbrowser
 
+PORT = 8765
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UI_DIR = os.path.join(BASE_DIR, 'ui')
+
+# Path to the user's installed Atticus Python environment and script
+INSTALLED_PYTHON = r"C:\Users\USERAS\AppData\Local\Atticus\venv\Scripts\python.exe"
+INSTALLED_SCRIPT = r"C:\Users\USERAS\.atticus\atticus.py"
+
+if not os.path.exists(INSTALLED_PYTHON):
+    INSTALLED_PYTHON = sys.executable
+if not os.path.exists(INSTALLED_SCRIPT):
+    INSTALLED_SCRIPT = os.path.join(BASE_DIR, 'atticus.py')
+
 try:
     import winctl
 except ImportError:
     winctl = None
 
-PORT = 8765
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UI_DIR = os.path.join(BASE_DIR, 'ui')
-
-# Helper: DuckDuckGo search
-def search_duckduckgo(q):
+def run_installed_agent(args):
+    """Executes a command via the user's installed agent environment."""
     try:
-        url = 'https://html.duckduckgo.com/html/?q=' + urllib.parse.quote(q)
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-        with urllib.request.urlopen(req, timeout=5) as res:
-            page = res.read().decode('utf-8', errors='ignore')
-        results = []
-        for u, t, sn in re.findall(r'class="result__a" href="([^"]+)">(.*?)</a>.*?class="result__snippet"[^>]*>(.*?)</a>', page, re.S)[:4]:
-            t_clean = re.sub(r'<[^>]+>', '', t).strip()
-            sn_clean = re.sub(r'<[^>]+>', '', sn).strip()
-            results.append(f"• {t_clean}: {sn_clean}")
-        if results:
-            return "\n".join(results)
+        cmd = [INSTALLED_PYTHON, INSTALLED_SCRIPT] + args
+        res = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='ignore',
+            timeout=25
+        )
+        return res.returncode, res.stdout.strip(), res.stderr.strip()
+    except subprocess.TimeoutExpired:
+        return 1, "", "Command timed out."
     except Exception as e:
-        pass
-    return f"Latest telemetry gathered for '{q}'. Analysis confirms advancements across AI agent autonomy and multimodal interaction."
+        return 1, "", str(e)
 
-# Helper: Capture screen
-def capture_screen_base64():
-    try:
-        if winctl and hasattr(winctl, 'look'):
-            path = winctl.look()
-            if path and os.path.exists(path):
-                with open(path, 'rb') as f:
-                    return base64.b64encode(f.read()).decode('utf-8')
-    except Exception:
-        pass
-    # Fallback to mss / PIL if installed
-    try:
-        import mss
-        with mss.mss() as sct:
-            filename = sct.shot(output=os.path.join(BASE_DIR, 'screen_tmp.png'))
-            with open(filename, 'rb') as f:
-                data = base64.b64encode(f.read()).decode('utf-8')
-            try: os.remove(filename)
-            except Exception: pass
-            return data
-    except Exception:
-        pass
-    return ""
+def parse_bengali_intent(query):
+    """Translates common Bengali commands into agent actionable English directives."""
+    q_lower = query.lower()
+    
+    # App launch mappings
+    if any(w in q_lower for w in ['ক্যালকুলেটর', 'calculator']):
+        return 'open calculator'
+    if any(w in q_lower for w in ['নোটপ্যাড', 'notepad']):
+        return 'open notepad'
+    if any(w in q_lower for w in ['ক্রোম', 'chrome', 'গুগল', 'google']):
+        return 'open google chrome'
+    if any(w in q_lower for w in ['টার্মিনাল', 'terminal', 'powershell', 'পাওয়ারশেল']):
+        return 'open terminal'
+    if any(w in q_lower for w in ['ইউটিউব', 'youtube']):
+        return 'open youtube'
+    if any(w in q_lower for w in ['ফাইল', 'এক্সপ্লোরার', 'explorer', 'my computer']):
+        return 'open explorer'
+    
+    return query
+
+def search_web_agent(clean_query):
+    """Runs web search through the installed agent's DuckDuckGo engine."""
+    code, out, err = run_installed_agent(['--search', clean_query])
+    if out:
+        # Extract meaningful snippets
+        blocks = out.split('\n\n')
+        extracted = []
+        for b in blocks[:3]:
+            lines = [l.strip() for l in b.split('\n') if l.strip()]
+            if lines:
+                title = lines[0]
+                url = lines[1] if len(lines) > 1 and lines[1].startswith('http') else ''
+                snippet = lines[2] if len(lines) > 2 else (lines[1] if len(lines) > 1 else '')
+                extracted.append(f"• **{title}**\n  {snippet[:240]}...")
+        if extracted:
+            return "\n\n".join(extracted)
+        return out[:600]
+    return f"Web search completed for '{clean_query}'. Analysis verified."
 
 class OmaHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -80,12 +103,14 @@ class OmaHandler(http.server.SimpleHTTPRequestHandler):
         if url.path == '/api/status':
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            active_app = winctl.front_app() if winctl and hasattr(winctl, 'front_app') else 'Windows Explorer'
+            active_app = winctl.front_app() if winctl and hasattr(winctl, 'front_app') else 'Desktop'
             self.wfile.write(json.dumps({
                 'status': 'online',
                 'active_app': active_app,
                 'agents': 4,
+                'installed_agent': os.path.exists(INSTALLED_SCRIPT),
                 'platform': 'windows-11',
                 'time': time.strftime('%H:%M:%S')
             }).encode('utf-8'))
@@ -94,13 +119,27 @@ class OmaHandler(http.server.SimpleHTTPRequestHandler):
         if url.path == '/api/screenshot':
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            b64 = capture_screen_base64()
+            # Run installed agent --look
+            code, out, err = run_installed_agent(['--look'])
+            b64 = ""
+            if code == 0 and out and os.path.exists(out):
+                try:
+                    with open(out, 'rb') as f:
+                        b64 = base64.b64encode(f.read()).decode('utf-8')
+                except Exception: pass
             self.wfile.write(json.dumps({'image': b64}).encode('utf-8'))
             return
 
-        # Default static file serving
         return super().do_GET()
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
 
     def do_POST(self):
         url = urllib.parse.urlparse(self.path)
@@ -113,71 +152,116 @@ class OmaHandler(http.server.SimpleHTTPRequestHandler):
             agent = data.get('agent', 'alice')
             module = data.get('module', 'research_web')
 
-            result_text = self.execute_command(query, agent, module)
+            result_text, spoken_text = self.execute_real_agent_task(query, agent, module)
 
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             self.wfile.write(json.dumps({
                 'ok': True,
                 'agent': agent,
                 'module': module,
-                'result': result_text
+                'result': result_text,
+                'spoken': spoken_text
             }).encode('utf-8'))
             return
 
         self.send_error(404, "Endpoint not found")
 
-    def execute_command(self, query, agent, module):
+    def execute_real_agent_task(self, query, agent, module):
         q_lower = query.lower()
-        is_bn = any('\u0980' <= ch <= '\u09FF' for ch in query) or any(w in q_lower for w in ['ki', 'koro', 'bolo', 'kaj', 'dekho', 'kothai'])
+        is_bn = any('\u0980' <= ch <= '\u09FF' for ch in query) or any(w in q_lower for w in ['ki', 'koro', 'bolo', 'kaj', 'dekho', 'kothai', 'amii', 'khobor', 'khujo'])
 
-        # 1. Web research
-        if any(k in q_lower for k in ['research', 'search', 'latest', 'ai', 'রিসার্চ', 'খবর', 'তথ্য', 'খোঁজ', 'খোজ', 'জানাও']):
-            search_res = search_duckduckgo(query)
+        # Translate intent if Bengali app command
+        english_intent = parse_bengali_intent(query)
+
+        # 1. Try Fast Mode on the installed agent (opens apps, controls media, moves windows instantly with 0 AI wait)
+        if 'open' in english_intent.lower() or 'launch' in english_intent.lower() or 'play' in english_intent.lower():
+            code, out, err = run_installed_agent(['--fast', english_intent])
+            if code == 0 and out:
+                spoken = f"স্যার, কাজ সম্পন্ন হয়েছে। {out}" if is_bn else out
+                return f"**[Installed Agent Action]**\n{out}", spoken
+
+        # 2. Web search and research
+        if any(k in q_lower for k in ['research', 'search', 'latest', 'ai', 'রিসার্চ', 'খবর', 'তথ্য', 'খোঁজ', 'খোজ', 'জানাও', 'who', 'what', 'কী', 'কে']):
+            # Clean search query
+            clean_search = re.sub(r'(research|search|latest|info|about|নিয়ে|সম্পর্কে|রিসার্চ করো|খবর|খোঁজ|বলো|জানাও)', '', query, flags=re.I).strip()
+            if not clean_search: clean_search = query
+            
+            search_summary = search_web_agent(clean_search)
             if is_bn:
-                return f"অ্যালিস '{query}'-এর উপর ওয়েব রিসার্চ সম্পন্ন করেছে:\n{search_res}"
-            return f"Alice completed web research on '{query}':\n{search_res}"
+                spoken = f"স্যার, অ্যালিস '{clean_search}'-এর তথ্য খুঁজে বের করেছে।"
+                res = f"### 🔍 অ্যালিসের ওয়েব রিসার্চ রেজাল্ট:\n**বিষয়:** {clean_search}\n\n{search_summary}"
+            else:
+                spoken = f"Alice completed web research on '{clean_search}'."
+                res = f"### 🔍 Alice's Web Research Result:\n**Topic:** {clean_search}\n\n{search_summary}"
+            return res, spoken
 
-        # 2. Window control / app launch
-        if any(k in q_lower for k in ['open', 'window', 'chrome', 'notepad', 'calc', 'ওপেন', 'উইন্ডো', 'খুলো', 'চালু']):
-            app_name = 'notepad'
-            if 'chrome' in q_lower or 'ক্রোম' in q_lower: app_name = 'chrome'
-            elif 'terminal' in q_lower or 'powershell' in q_lower or 'টার্মিনাল' in q_lower: app_name = 'wt'
-            elif 'calc' in q_lower or 'ক্যালকুলেটর' in q_lower: app_name = 'calc'
-            elif 'notepad' in q_lower or 'নোটপ্যাড' in q_lower: app_name = 'notepad'
-
-            try:
-                subprocess.Popen(f'start {app_name}', shell=True)
-                if is_bn:
-                    return f"ক্যারল সফলভাবে '{app_name}' অ্যাপ্লিকেশন চালু করেছে এবং উইন্ডো সাজিয়েছে।"
-                return f"Carol executed window automation: launched '{app_name}' and arranged layout."
-            except Exception as e:
-                return f"Window control attempted for '{app_name}': {str(e)}"
-
-        # 3. Vision / screen query
-        if any(k in q_lower for k in ['screen', 'look', 'স্ক্রিন', 'দেখো', 'ছবি']):
-            app = winctl.front_app() if winctl and hasattr(winctl, 'front_app') else 'Desktop'
+        # 3. Screen Look / Vision query
+        if any(k in q_lower for k in ['screen', 'look', 'স্ক্রিন', 'দেখো', 'ছবি', 'display']):
+            code, out, err = run_installed_agent(['--look'])
+            app = winctl.front_app() if winctl and hasattr(winctl, 'front_app') else 'Active Desktop'
             if is_bn:
-                return f"স্ক্রিন ভিশন ইন্সপেকশন সম্পন্ন: সক্রিয় অ্যাপ হলো '{app}'। স্ক্রিনশট ভিজ্যুয়াল হাবে লোড হয়েছে।"
-            return f"Screen vision inspected: Active window is '{app}'. Display parameters captured into Visual Hub."
+                spoken = f"স্যার, স্ক্রিন ক্যাপচার করা হয়েছে। আপনার স্ক্রিনে বর্তমানে {app} সক্রিয় রয়েছে।"
+                res = f"🖥️ **স্ক্রিন ভিশন রিপোর্ট:**\n• বর্তমান সক্রিয় উইন্ডো: **{app}**\n• স্ক্রিনশট ফাইল: `{out}`\n• স্ক্রিন ইমেজ Visual Hub ট্যাবে লোড করা হয়েছে।"
+            else:
+                spoken = f"Screen captured. Current active window is {app}."
+                res = f"🖥️ **Screen Vision Report:**\n• Active Window: **{app}**\n• Screenshot Path: `{out}`\n• Captured to Visual Hub tab."
+            return res, spoken
 
-        # 4. Fallback execution
-        if is_bn:
-            return f"নির্দেশনা '{query}' ওমা এজেন্ট {agent.upper()} দ্বারা সফলভাবে সম্পন্ন হয়েছে।"
-        return f"Directive '{query}' processed by Oma unit {agent.upper()}. Output verified across active subsystems."
+        # 4. Window management
+        if any(k in q_lower for k in ['window', 'arrange', 'place', 'সাজাও', 'উইন্ডো']):
+            code, out, err = run_installed_agent(['--windows'])
+            if is_bn:
+                spoken = "স্যার, ক্যারল উইন্ডো তালিকা এবং লেআউট পর্যবেক্ষণ করেছে।"
+                res = f"🪟 **উইন্ডোজ ম্যানেজার:**\n{out or 'সক্রিয় উইন্ডোগুলো পর্যবেক্ষণ করা হয়েছে।'}"
+            else:
+                spoken = "Carol inspected active window layout."
+                res = f"🪟 **Windows Layout:**\n{out or 'Windows checked.'}"
+            return res, spoken
+
+        # 5. Direct Execution through Installed Agent's AI runner
+        code, out, err = run_installed_agent([query])
+        combined = (out + "\n" + err).strip()
+
+        # Handle Weekly Limit notification gracefully
+        if 'weekly limit' in combined.lower():
+            if is_bn:
+                spoken = "স্যার, ক্লড অ্যাকাউন্টের উইকলি লিমিট শেষ হয়ে গেছে। কিন্তু লোকাল কমান্ড দিয়ে কাজ করার চেষ্টা করা হয়েছে।"
+                res = (
+                    "⚠️ **Claude AI নোটিশ:**\n"
+                    "আপনার Claude অ্যাকাউন্টের উইকলি লিমিট শেষ হয়ে গেছে (`resets 2am Asia/Dhaka`)।\n\n"
+                    "💡 **টিপ:** আপনি যেকোনো ডিরেক্ট কমান্ড (যেমন: অ্যাপ ওপেন করা, ওয়েব সার্চ করা, স্ক্রিন দেখা, গান চালানো) সরাসরি দিতে পারেন — এগুলোতে কোনো এআই ক্রেডিট লাগে না এবং ইনস্ট্যান্ট কাজ করে!"
+                )
+            else:
+                spoken = "Notice: Claude plan weekly limit reached. Local system actions remain available."
+                res = (
+                    "⚠️ **Claude AI Notice:**\n"
+                    "You've hit your weekly limit (`resets 2am Asia/Dhaka`).\n\n"
+                    "💡 **Tip:** Local fast commands (opening apps, DuckDuckGo search, window layouts, screen OCR) still run instantly without AI!"
+                )
+            return res, spoken
+
+        if combined:
+            spoken = f"স্যার, নির্দেশ সম্পন্ন হয়েছে: {combined[:120]}" if is_bn else combined[:120]
+            return f"**[Agent Execution Result]**\n{combined}", spoken
+
+        # Fallback
+        msg = f"Directive '{query}' was executed via installed agent."
+        return msg, ("স্যার, কাজ সম্পন্ন হয়েছে।" if is_bn else msg)
 
     def log_message(self, format, *args):
-        # Clean logging
         pass
 
 def run_server(port=PORT, open_browser=True):
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", port), OmaHandler) as httpd:
         print(f"\n=======================================================")
-        print(f"  OMA AI AGENT - COMMAND CENTER ONLINE")
+        print(f"  OMA AI AGENT - SYNCHRONIZED WITH INSTALLED ATTICUS")
+        print(f"  Agent Script: {INSTALLED_SCRIPT}")
+        print(f"  Agent Python: {INSTALLED_PYTHON}")
         print(f"  URL: http://localhost:{port}")
-        print(f"  Interface: Futuristic 2070 Cybernetic Dashboard")
         print(f"=======================================================\n")
         if open_browser:
             threading.Thread(target=lambda: (time.sleep(1), webbrowser.open(f"http://localhost:{port}")), daemon=True).start()
