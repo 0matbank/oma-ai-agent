@@ -223,29 +223,85 @@ class OmaMindMap {
         </div>
       `;
     } else if (type === 'setting') {
-      title.textContent = 'SYSTEM SETTINGS';
+      title.textContent = 'MULTI-AI PROVIDERS & SYSTEM CONFIG';
       title.style.color = '#ffb300';
       body.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:12px;">
-          <div>
-            <label style="display:block; font-size:11.5px; color:#94a3b8; margin-bottom:4px;">Global Voice Hotkey</label>
-            <input type="text" value="Ctrl + Alt + Space" readonly style="width:100%; padding:6px 10px; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff; font-family:monospace;">
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <!-- Smart Routing Mode -->
+          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:8px; border:1px solid rgba(255,179,0,0.3);">
+            <b style="color:#ffb300; font-size:12px;">⚡ SMART ROUTING MODE:</b>
+            <div style="margin-top:8px; display:flex; gap:6px;">
+              <button id="btn-mode-auto" style="flex:1; padding:6px; border-radius:4px; font-size:11px; background:#ffb300; color:#000; font-weight:bold; border:none; cursor:pointer;">Auto Fallback</button>
+              <button id="btn-mode-local" style="flex:1; padding:6px; border-radius:4px; font-size:11px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(255,255,255,0.1); cursor:pointer;">Local Only</button>
+            </div>
+            <p style="margin-top:6px; font-size:10.5px; color:#94a3b8;">
+              Auto Mode: Claude Code ➔ Local Ollama (Qwen) ➔ Cloud. Auto-switches on rate limits.
+            </p>
           </div>
-          <div>
-            <label style="display:block; font-size:11.5px; color:#94a3b8; margin-bottom:4px;">AI Reasoning Model</label>
-            <select style="width:100%; padding:6px 10px; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff;">
-              <option selected>Oma Neural Core (Claude 3.5 Haiku)</option>
-              <option>Oma Pro (Claude 3.7 Sonnet)</option>
-              <option>Gemini 2.0 Flash</option>
-            </select>
+
+          <!-- Connected Providers -->
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <b style="font-size:12px; color:#fff;">CONNECTED AI PROVIDERS:</b>
+            
+            <!-- Ollama -->
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,245,155,0.08); padding:8px 10px; border-radius:6px; border:1px solid rgba(0,245,155,0.3);">
+              <div>
+                <b style="color:#00f59b; font-size:12px;">● Local Ollama (11434)</b>
+                <div style="font-size:10.5px; color:#94a3b8;">Detected: qwen3-vl:8b, qwen3:8b (RTX 5060 Ti)</div>
+              </div>
+              <span style="font-size:10px; background:#00f59b; color:#000; padding:2px 6px; border-radius:4px; font-weight:bold;">READY</span>
+            </div>
+
+            <!-- Claude Code -->
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,179,0,0.08); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,179,0,0.3);">
+              <div>
+                <b style="color:#ffb300; font-size:12px;">▲ Claude Code CLI</b>
+                <div style="font-size:10.5px; color:#94a3b8;">Subscription: Claude Team (Weekly Limit resets 2am)</div>
+              </div>
+              <span style="font-size:10px; background:rgba(255,179,0,0.2); color:#ffb300; padding:2px 6px; border-radius:4px; font-weight:bold;">AUTO-FALLBACK</span>
+            </div>
+
+            <!-- LM Studio -->
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
+              <div>
+                <b style="color:#cbd5e1; font-size:12px;">○ LM Studio (1234)</b>
+                <div style="font-size:10.5px; color:#64748b;">Localhost endpoint (Connect when server running)</div>
+              </div>
+              <span style="font-size:10px; background:rgba(255,255,255,0.1); color:#94a3b8; padding:2px 6px; border-radius:4px;">STANDBY</span>
+            </div>
           </div>
-          <div>
-            <label style="display:block; font-size:11.5px; color:#94a3b8; margin-bottom:4px;">Local Speech Model</label>
-            <input type="text" value="Whisper Base (Local & Private)" readonly style="width:100%; padding:6px 10px; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff;">
+
+          <!-- Shortcuts & Hardware -->
+          <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11.5px;">
+              <span style="color:#94a3b8;">Global Voice:</span>
+              <kbd style="background:#222; padding:2px 6px; border-radius:4px; color:#00e5ff; font-family:monospace;">Ctrl + Alt + Space</kbd>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:11.5px;">
+              <span style="color:#94a3b8;">Inference Device:</span>
+              <b style="color:#fff;">NVIDIA RTX 5060 Ti 16GB</b>
+            </div>
           </div>
         </div>
       `;
-    }
+
+      // Event listeners for routing buttons
+      setTimeout(() => {
+        const btnAuto = document.getElementById('btn-mode-auto');
+        const btnLocal = document.getElementById('btn-mode-local');
+        if (btnAuto && btnLocal) {
+          btnAuto.addEventListener('click', () => {
+            fetch('/api/models/mode', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ mode: 'auto' }) });
+            btnAuto.style.background = '#ffb300'; btnAuto.style.color = '#000';
+            btnLocal.style.background = 'rgba(255,255,255,0.06)'; btnLocal.style.color = '#fff';
+          });
+          btnLocal.addEventListener('click', () => {
+            fetch('/api/models/mode', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ mode: 'local_only' }) });
+            btnLocal.style.background = '#00f59b'; btnLocal.style.color = '#000';
+            btnAuto.style.background = 'rgba(255,255,255,0.06)'; btnAuto.style.color = '#fff';
+          });
+        }
+      }, 50);
   }
 
   closeDrawer() {

@@ -1,0 +1,32 @@
+MISSION: UPDATE FindlayHi/atticus-windows TO A UNIVERSAL MULTI-AI PERSONAL ASSISTANT
+Target: https://github.com/FindlayHi/atticus-windows
+
+Act as a senior Python/C# Windows desktop agent engineer, security engineer and AI inference integration developer. Read ALL repository source files and tests before coding. Also read the attached ATTICUS_FULL_UPGRADE_PLAN_BN.md and README_BN.md. This bundle contains multi_ai/ as a text-only tested prototype. Do not falsely claim it is already integrated. Integrate incrementally, reusing or replacing its design if testing shows a better choice.
+
+GOALS:
+1. Preserve the exact existing Atticus desktop/voice/overlay workflow, shortcut learning, memory, UI automation, permissions and UI theme.
+2. Replace the Claude-only assumption with a provider-neutral abstraction. Keep original Claude Code subscription/CLI path functioning. Add native/API adapters for OpenAI, Claude API, Gemini, DeepSeek, Groq, OpenRouter, xAI, Mistral, Together, Fireworks, Custom OpenAI-compatible, Ollama, LM Studio and eventually llama.cpp/vLLM. Add a plugin interface for future providers without changing the router.
+3. Discover already installed LOCAL AI through live localhost runtime APIs, starting with Ollama and LM Studio. Do not reinstall models. Detect exact model IDs and independently test tool/vision capabilities instead of guessing.
+4. Add Provider Connections UI: API Key, official provider browser/OAuth/PKCE sign-in only if supported, existing CLI auth where officially supported, Local server connection; use Windows Credential Manager. NEVER request, store, or intercept Gmail/Google/ChatGPT/Claude account passwords. A Google account OAuth for Gemini is NOT Gmail mailbox permission.
+5. Add dynamic Model Library and per-task Smart Router. Auto mode, Manual mode, Local-only mode, priority, spending cap and capability filters. On legitimate rate limit/quota/unavailable/timeout automatically fail over to an eligible connected provider while preserving state and user intent. Respect provider ToS and use only user's authorized quotas. Never bypass authorization or denials.
+6. Implement common tool schemas and secure shared action executor with user approval outside the LLM. For non-Claude providers don't just give a raw unrestricted shell. Keep all user confirmation/deny semantics.
+7. Implement Task Checkpoint + SQLite action journal. Verified effects must not be duplicated after failover. Unknown result of a side-effect must require verification or user approval. Security denials must not be retried via another provider.
+8. Add Settings pages Accounts/Providers, Models, Smart Routing, Local AI, Usage & Health while preserving existing visual layout. Support Bangla/English/Banglish optional multilingual speech model.
+9. Build and run ALL tests and Windows 11 smoke tests. New tests for fallback, model filtering, local only, auth, quota, tool permissions, double-send prevention, auth logging, UI regression, update rollback. Never claim success without evidence.
+10. Source installs are custom fork: prevent upstream automatic update from erasing patches. Keep backups and rollback strategy. Avoid breaking changes in user data/settings.
+
+IMPORTANT SOURCE SEAMS:
+- atticus.py: start_claude() ~1184, run() ~1243, gate() ~258, current retry section ~1694-1708.
+- ui/settings.html Intelligence section ~198, C# WebView settings host must be inspected.
+- winctl.py Windows actions, integrations/* MCP.
+- Existing response streams are Claude Code-specific; create canonical events that all adapters can map to.
+
+DEVELOPMENT PROCESS:
+Phase 0 audit/backup -> Phase 1 provider abstraction -> Phase 2 secret vault and supported account auth -> Phase 3 local discovery -> Phase 4 cloud -> Phase 5 secure tool bridge -> Phase 6 safe action state and fallback -> Phase 7 UI -> Phase 8 cost/privacy -> Phase 9 multilingual speech -> Phase 10 build/CI/manual tests and release.
+Do not skip phases. Each phase must include code changes, tests, migration and test report. Complete as much as possible; clearly identify remaining blockers instead of claiming anything untested.
+
+FINAL OUTPUT REQUIRED:
+- Actual modified files/patch, not just an explanation.
+- Provider/model capability matrix and verified versions/endpoints.
+- Test logs, Windows build result, security checks, rollback plan.
+- Clear exact install/update steps for Windows 11 and how to connect Local AI/API accounts using legitimate auth.

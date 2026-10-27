@@ -37,6 +37,8 @@ try:
 except ImportError:
     winctl = None
 
+from multi_ai.router import router
+
 def run_installed_agent(args):
     """Executes a command via the user's installed agent environment."""
     try:
@@ -132,6 +134,15 @@ class OmaHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps({'image': b64}).encode('utf-8'))
             return
 
+        if url.path == '/api/models':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            overview = router.get_status_overview()
+            self.wfile.write(json.dumps(overview).encode('utf-8'))
+            return
+
         return super().do_GET()
 
     def do_OPTIONS(self):
@@ -143,6 +154,20 @@ class OmaHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         url = urllib.parse.urlparse(self.path)
+        if url.path == '/api/models/mode':
+            length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(length).decode('utf-8')
+            data = json.loads(body) if body else {}
+            mode = data.get('mode', 'auto')
+            manual_model = data.get('model', '')
+            router.set_mode(mode, manual_model)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({'ok': True, 'mode': mode, 'model': manual_model}).encode('utf-8'))
+            return
+
         if url.path == '/api/command':
             length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(length).decode('utf-8')
@@ -184,8 +209,7 @@ class OmaHandler(http.server.SimpleHTTPRequestHandler):
                 return f"**[Installed Agent Action]**\n{out}", spoken
 
         # 2. Web search and research
-        if any(k in q_lower for k in ['research', 'search', 'latest', 'ai', 'রিসার্চ', 'খবর', 'তথ্য', 'খোঁজ', 'খোজ', 'জানাও', 'who', 'what', 'কী', 'কে']):
-            # Clean search query
+        if any(k in q_lower for k in ['research', 'search', 'latest', 'ai', 'রিসার্চ', 'খবর', 'তথ্য', 'খোঁজ', 'খোজ', 'who', 'what', 'কী', 'কে', 'বলো']):
             clean_search = re.sub(r'(research|search|latest|info|about|নিয়ে|সম্পর্কে|রিসার্চ করো|খবর|খোঁজ|বলো|জানাও)', '', query, flags=re.I).strip()
             if not clean_search: clean_search = query
             
@@ -221,35 +245,36 @@ class OmaHandler(http.server.SimpleHTTPRequestHandler):
                 res = f"🪟 **Windows Layout:**\n{out or 'Windows checked.'}"
             return res, spoken
 
-        # 5. Direct Execution through Installed Agent's AI runner
-        code, out, err = run_installed_agent([query])
-        combined = (out + "\n" + err).strip()
+        # 5. Multi-AI Intelligent Router with Automatic Fallback (Claude Code -> Local Ollama Qwen -> Cloud)
+        ai_res = router.execute(query)
 
-        # Handle Weekly Limit notification gracefully
-        if 'weekly limit' in combined.lower():
+        if ai_res.get('success'):
+            reply = ai_res.get('reply', '')
+            model_used = ai_res.get('model_used', '')
+            provider_used = ai_res.get('provider_used', '')
+            fallback = ai_res.get('fallback_occurred', False)
+            notice = ai_res.get('fallback_notice', '')
+
+            header = f"**[AI Model: {model_used} ({provider_used})]**"
+            if fallback:
+                header = f"⚡ `[Auto-Fallback: Claude Limit → Local {model_used}]`\n" + header
+
+            full_result = f"{header}\n\n{reply}"
             if is_bn:
-                spoken = "স্যার, ক্লড অ্যাকাউন্টের উইকলি লিমিট শেষ হয়ে গেছে। কিন্তু লোকাল কমান্ড দিয়ে কাজ করার চেষ্টা করা হয়েছে।"
-                res = (
-                    "⚠️ **Claude AI নোটিশ:**\n"
-                    "আপনার Claude অ্যাকাউন্টের উইকলি লিমিট শেষ হয়ে গেছে (`resets 2am Asia/Dhaka`)।\n\n"
-                    "💡 **টিপ:** আপনি যেকোনো ডিরেক্ট কমান্ড (যেমন: অ্যাপ ওপেন করা, ওয়েব সার্চ করা, স্ক্রিন দেখা, গান চালানো) সরাসরি দিতে পারেন — এগুলোতে কোনো এআই ক্রেডিট লাগে না এবং ইনস্ট্যান্ট কাজ করে!"
-                )
+                spoken = f"স্যার, {model_used} মডেল দিয়ে সম্পন্ন হয়েছে: {reply[:120]}" if fallback else f"স্যার, সম্পন্ন হয়েছে: {reply[:120]}"
             else:
-                spoken = "Notice: Claude plan weekly limit reached. Local system actions remain available."
-                res = (
-                    "⚠️ **Claude AI Notice:**\n"
-                    "You've hit your weekly limit (`resets 2am Asia/Dhaka`).\n\n"
-                    "💡 **Tip:** Local fast commands (opening apps, DuckDuckGo search, window layouts, screen OCR) still run instantly without AI!"
-                )
-            return res, spoken
+                spoken = f"Done via {model_used}: {reply[:120]}"
+            return full_result, spoken
 
-        if combined:
-            spoken = f"স্যার, নির্দেশ সম্পন্ন হয়েছে: {combined[:120]}" if is_bn else combined[:120]
-            return f"**[Agent Execution Result]**\n{combined}", spoken
-
-        # Fallback
-        msg = f"Directive '{query}' was executed via installed agent."
-        return msg, ("স্যার, কাজ সম্পন্ন হয়েছে।" if is_bn else msg)
+        # If all AI providers failed
+        err_msg = ai_res.get('error', 'Execution failed')
+        if is_bn:
+            spoken = "স্যার, এআই প্রোভাইডারে সমস্যা হয়েছে।"
+            res = f"⚠️ **এআই প্রসেসিং ত্রুটি:**\n{err_msg}"
+        else:
+            spoken = "Error occurred across AI providers."
+            res = f"⚠️ **AI Processing Error:**\n{err_msg}"
+        return res, spoken
 
     def log_message(self, format, *args):
         pass
