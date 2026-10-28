@@ -189,7 +189,7 @@ sealed class SettingsWindow : PageWindow
         else
         {
             Sound.Cue("soundStop");
-            Js("st.voiceDone(''); holoOrb?.setState('active');");
+            Js("st.voiceDone(''); holoOrb?.setState('idle');");
         }
     }
 
@@ -203,11 +203,42 @@ sealed class SettingsWindow : PageWindow
         listenId++;
         Program.Speech.Cancel();
         Sound.Cue("soundStop");
-        Js("st.voiceDone(''); holoOrb?.setState('active');");
+        Js("st.voiceDone(''); holoOrb?.setState('idle');");
+    }
+
+    public void TelegramPush() => Js($"st.telegram({Web.Json(new { state = TelegramBridge.State, bot = TelegramBridge.Bot, code = TelegramBridge.Code, paired = TelegramBridge.Chat != 0, error = TelegramBridge.State == "error" ? TelegramBridge.Error : "" })})");
+
+    FloatWindow floating;
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        if (WindowState == FormWindowState.Minimized && Prefs.D.GetValueOrDefault("floatOrb") is not false) (floating ??= new FloatWindow()).Open();
+        else if (WindowState != FormWindowState.Minimized) floating?.Close2();
+    }
+    public void RestoreFromFloat() { floating?.Close2(); Raise(); }
+
+    bool gestureOn;   // the cursor follows the hand only while the gesture tab says so; Esc always ends it
+    void Gesture(string act, JsonElement b)
+    {
+        if (act == "on") { gestureOn = true; Program.Err("Gesture: on"); return; }
+        if (act == "off") { gestureOn = false; Program.Err("Gesture: off"); return; }
+        if (!gestureOn) return;
+        var v = SystemInformation.VirtualScreen;
+        double N(string k) => b.TryGetProperty(k, out var x) && x.ValueKind == JsonValueKind.Number ? x.GetDouble() : 0;
+        switch (act)
+        {
+            case "move": Native.SetCursorPos(v.Left + (int)(Math.Clamp(N("x"), 0, 1) * (v.Width - 1)), v.Top + (int)(Math.Clamp(N("y"), 0, 1) * (v.Height - 1))); break;
+            case "click": Native.mouse_event(0x0002, 0, 0, 0, IntPtr.Zero); Native.mouse_event(0x0004, 0, 0, 0, IntPtr.Zero); break;
+            case "right": Native.mouse_event(0x0008, 0, 0, 0, IntPtr.Zero); Native.mouse_event(0x0010, 0, 0, 0, IntPtr.Zero); break;
+            case "down": Native.mouse_event(0x0002, 0, 0, 0, IntPtr.Zero); break;
+            case "up": Native.mouse_event(0x0004, 0, 0, 0, IntPtr.Zero); break;
+            case "scroll": Native.mouse_event(0x0800, 0, 0, (int)Math.Clamp(N("dy"), -600, 600), IntPtr.Zero); break;
+        }
     }
 
     public void OnEscape()
     {
+        if (gestureOn) { gestureOn = false; Js("window.omaGesture?.stop()"); return; }
         if (Voice.Shush()) return;
         if (voiceRecording)
         {
@@ -303,6 +334,12 @@ sealed class SettingsWindow : PageWindow
                 if (ts.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.taskState({ts})"));
             } catch { }
         });
+        var today = DateTime.Now.ToString("yyyy-MM-dd");
+        if (Prefs.D.GetValueOrDefault("brief") is not false && Prefs.Str("briefDate") != today)   // the first open of the day: Stonic-style opening line, no AI
+        {
+            Prefs.Set("briefDate", today);
+            Task.Run(() => { var j = Py.Run(new[] { "--brief" }, 40); if (j.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.brief({j})")); });
+        }
         Task.Run(() => {
             try {
                 var notes = Py.Run(new[] { "--notes-list" });
@@ -430,6 +467,16 @@ sealed class SettingsWindow : PageWindow
                     Program.Post(() => { if (j.TrimStart().StartsWith("[")) Js($"st.integrations({j})"); Js($"st.intResult({Web.Json(new[] { name, r })})"); });
                 });
                 break;
+            case "telegramConnect":
+                if (S("token") is { } tok) Task.Run(() => { Py.RunWithInput(new[] { "--secret-set", "remote_telegram" }, tok.Trim() + "\n", 15); Prefs.Set("telegramChat", 0.0); TelegramBridge.Start(); });
+                break;
+            case "telegramDisconnect":
+                TelegramBridge.Stop(); Prefs.Set("telegramChat", 0.0);
+                Task.Run(() => Py.RunWithInput(new[] { "--secret-set", "remote_telegram" }, "\n", 15)); TelegramPush();
+                break;
+            case "telegramStatus": TelegramPush(); break;
+            case "orbState": floating?.SetState(S("s") ?? "idle", S("theme") ?? ""); break;
+            case "gesture": if (S("act") is { } ga) Gesture(ga, b); break;
             case "providerHealth":
                 if (ProviderHealth.Last != "") Js($"st.providerHealth({ProviderHealth.Last})");
                 ProviderHealth.Refresh("opened");
@@ -474,8 +521,18 @@ sealed class SettingsWindow : PageWindow
                 break;
             case "ask":
                 if (S("text") is { } askText)
-                    _ = ExecuteDirective(askText, isVoice: false);
+                    _ = ExecuteDirective(askText, isVoice: false, image: SaveImage(S("image")));
                 break;
+            case "headlines":
+                var refresh = b.TryGetProperty("refresh", out var rf) && rf.ValueKind == JsonValueKind.True;
+                Task.Run(() => { var j = Py.Run(refresh ? new[] { "--headlines", "refresh" } : new[] { "--headlines" }, 40); if (j.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.headlines({j})")); });
+                break;
+            case "memoryList": Task.Run(() => { var j = Py.Run(new[] { "--memory-list" }); if (j.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.memory({j})")); }); break;
+            case "skillSave":
+                if (b.TryGetProperty("skill", out var sk)) { var sj = sk.GetRawText(); Task.Run(() => { var r = Py.RunWithInput(new[] { "--skill-save" }, sj, 20); Program.Post(() => Js($"st.skillSaved({Web.Json(r)})")); }); }
+                break;
+            case "skillDelete": if (S("name") is { } skn) Task.Run(() => Py.Run(new[] { "--skill-delete", skn })); break;
+            case "openMonitor": MonitorWindow.Show(S("url") ?? "https://www.worldmonitor.app/"); break;
             case "talk":
             case "micToggle":
                 Program.Post(() => {
@@ -539,13 +596,37 @@ sealed class SettingsWindow : PageWindow
     // One request from the Oma window through the original Atticus pipeline (atticus.py --oma-ask). Every line it prints
     // is a real engine event; the final §REPLY§ carries COMPLETED / PARTIAL / FAILED. Safety-gate questions, "which one?"
     // choices and setting changes are answered here, exactly like the classic overlay.
-    public async Task ExecuteDirective(string askText, bool isVoice)
+    // Media Link: the page sends a JPEG data URL; it becomes a temp file the engine attaches to this one request
+    static string SaveImage(string dataUrl)
+    {
+        if (string.IsNullOrEmpty(dataUrl) || !dataUrl.StartsWith("data:image/jpeg;base64,")) return "";
+        try
+        {
+            var dir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "atticus-media")).FullName;
+            var f = Path.Combine(dir, Guid.NewGuid().ToString("N")[..10] + ".jpg");
+            File.WriteAllBytes(f, Convert.FromBase64String(dataUrl[23..]));
+            return f;
+        }
+        catch { return ""; }
+    }
+
+    Action<string> remoteDone;   // a request from the phone (Telegram): its result goes back there too
+    public void RemoteAsk(string text, Action<string> done)
+    {
+        remoteDone = done;
+        Js($"st.remoteIn({Web.Json(text)})");
+        _ = ExecuteDirective(text, isVoice: false, source: "telegram");
+    }
+    public void RemoteAnswer(string v) { Answer(v); Js("st.remoteAnswered && st.remoteAnswered()"); }
+
+    public async Task ExecuteDirective(string askText, bool isVoice, string image = "", string source = null)
     {
         if (string.IsNullOrWhiteSpace(askText)) return;
         var reqId = Guid.NewGuid().ToString("N")[..8];
         if (!await askLock.WaitAsync(100))
         {
             var busy = ReplyJson("FAILED", "Oma is still working on the previous request. Wait for it to finish or press TERMINATE.", "busy", reqId);
+            if (source == "telegram") { remoteDone?.Invoke("✕ Oma is busy with another request. Try again in a moment."); remoteDone = null; }
             Program.Post(() => Js($"st.feedLine({Web.Json(busy)})"));
             return;
         }
@@ -554,7 +635,7 @@ sealed class SettingsWindow : PageWindow
         try
         {
             string status = null, replyText = null;
-            p = Py.Start(new[] { "--oma-ask", askText }, new() { ["ATTICUS_UI"] = "1", ["ATTICUS_FRONT"] = Hooks.Mine ?? "", ["OMA_SOURCE"] = isVoice ? "voice" : "typed", ["OMA_REQ_ID"] = reqId });
+            p = Py.Start(new[] { "--oma-ask", askText }, new() { ["ATTICUS_UI"] = "1", ["ATTICUS_FRONT"] = Hooks.Mine ?? "", ["OMA_SOURCE"] = source ?? (isVoice ? "voice" : "typed"), ["OMA_REQ_ID"] = reqId, ["OMA_IMAGE"] = image ?? "" });
             currentProc = p;
             var errTask = p.StandardError.ReadToEndAsync();
             var lineTask = Task.Run(async () =>
@@ -596,13 +677,19 @@ sealed class SettingsWindow : PageWindow
                 Program.Err($"Ask {reqId} ended without a reply: {why}");
                 Program.Post(() => Js($"st.feedLine({Web.Json(ReplyJson("FAILED", "The request ended without a result.", why, reqId))})"));
             }
+            if (source == "telegram" && remoteDone != null)
+            {
+                remoteDone((status == "COMPLETED" ? "✓ " : status == "PARTIAL" ? "⚠ " : "✕ ") + (status ?? "FAILED") + "\n" + (replyText ?? (cancelled ? "Stopped on the PC." : "No result.")));
+                remoteDone = null;
+            }
+            if (cancelled || status == null) { }
             else
             {
                 Sound.Cue(status == "COMPLETED" ? "soundDone" : "soundStop");
                 if (!string.IsNullOrWhiteSpace(replyText))
                 {
                     if (Prefs.Bool("autoCopy")) { var t = replyText; Program.Post(() => { try { Clipboard.SetText(t); } catch { } }); }
-                    if (isVoice || Prefs.Bool("speak")) { var t = replyText; Program.Post(() => { Js("holoOrb?.setState('speaking')"); Voice.Say(t, () => Js("holoOrb?.setState('active')")); }); }
+                    if (isVoice || Prefs.Bool("speak")) { var t = replyText; Program.Post(() => { Js("holoOrb?.setState('speaking')"); Voice.Say(t, () => Js("holoOrb?.setState('idle')")); }); }
                 }
             }
         }
@@ -615,6 +702,7 @@ sealed class SettingsWindow : PageWindow
         {
             if (currentProc == p) currentProc = null;
             p?.Dispose();
+            if (!string.IsNullOrEmpty(image)) try { File.Delete(image); } catch { }
             askFile = "";
             askLock.Release();
             Program.Post(() => Js("st.feedDone()"));
@@ -625,7 +713,8 @@ sealed class SettingsWindow : PageWindow
     // Lines from the engine, on the UI thread.
     void OnEngineLine(string line)
     {
-        if (line == "! setup") { Program.Onboarding.Open(); return; }   // Claude not installed, signed out or no plan
+        if (line == "! setup") { Program.Onboarding.Open(); return; }
+        if (line.StartsWith("▶ {")) { Js($"st.player({line[2..]})"); return; }   // {ME} --player: the neural player   // Claude not installed, signed out or no plan
         if (line.StartsWith("@ ")) { Ring.At(line); return; }   // experimental "show me where"
         if (line.StartsWith("? "))   // "? <question>\t<command>\t<answer file>[\t<escalate>[\tretry]]"
         {
@@ -634,6 +723,7 @@ sealed class SettingsWindow : PageWindow
             askFile = q[2];
             var retry = q.Length == 5 && q[4] == "retry";
             Js($"st.askCard({Web.Json(new { q = q[0], cmd = retry ? "" : q[1], kind = retry ? "retry" : "permission", escalate = q.Length >= 4 && q[3] == "escalate" })})");
+            if (remoteDone != null && !retry) TelegramBridge.AskPhone(q[0], q[1]);   // the request came from the phone: ask there too
             if (!Visible || WindowState == FormWindowState.Minimized) Raise();
             return;
         }

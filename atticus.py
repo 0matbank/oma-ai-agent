@@ -99,6 +99,86 @@ def me_set(what, text):
     json.dump(m, open(ME_FILE, 'w'), indent=1)
 
 
+USER_SKILLS = os.path.join(DIR, 'user_skills.json')
+
+
+def user_skills():
+    try:
+        return json.load(open(USER_SKILLS, encoding='utf-8'))
+    except (OSError, ValueError):
+        return []
+
+
+def skills_for(task, most=2):
+    """Skills the user wrote (Skills dialog) whose name or description shares words with the request; only those ride
+    along, so a long skill list costs nothing on unrelated requests."""
+    words = set(re.findall(r'\w{4,}', task.lower()))
+    scored = []
+    for sk in user_skills():
+        name = set(re.findall(r'\w{4,}', sk.get('name', '').lower()))
+        desc = set(re.findall(r'\w{4,}', sk.get('description', '').lower()))
+        score = 2 * len(words & name) + len(words & desc)
+        if score >= 2:
+            scored.append((score, sk))
+    return [sk for _, sk in sorted(scored, key=lambda x: -x[0])[:most]]
+
+
+def memory_list():
+    rules = [l.strip()[2:] if l.startswith('- ') else l.strip() for l in open(MEMORY, encoding='utf-8')] if os.path.exists(MEMORY) else []
+    try:
+        from multi_ai.orchestrator import get_all_notes
+        notes = [{'title': n.get('title', ''), 'content': n.get('content', '')[:300], 'context': bool(n.get('use_as_context'))} for n in get_all_notes()]
+    except Exception:
+        notes = []
+    return {'me': me(), 'rules': [r for r in rules if r], 'notes': notes, 'skills': user_skills()}
+
+
+def player(what):
+    """{ME} --player <youtube url | words>: the video plays in the Oma window's player (through the ask folder's relay),
+    or opens in the browser when Oma's window is not the one asking."""
+    from multi_ai.workers.youtube import discover
+    vid = discover.video_id(what.strip()) if re.search(r'youtu\.?be|^[\w-]{11}$', what.strip()) else ''
+    title = ''
+    if not vid:
+        try:
+            hits = discover.search(what, 1)
+        except Exception as e:
+            return f'Error: YouTube search failed: {e}'
+        if not hits:
+            return f'No YouTube video found for "{what}".'
+        vid, title = hits[0]['id'], hits[0]['title'] or ''
+    item = {'id': vid, 'title': title or what, 'url': f'https://www.youtube.com/watch?v={vid}'}
+    ask = os.environ.get('ATTICUS_ASK')
+    if not ask:
+        show(item['url'])
+        return f"opened {item['url']} in the browser"
+    with open(os.path.join(ask, 'q.tmp'), 'w', encoding='utf-8') as f:
+        json.dump({'player': item}, f)
+    os.replace(os.path.join(ask, 'q.tmp'), os.path.join(ask, 'q'))
+    a = os.path.join(ask, 'a')
+    for _ in range(50):
+        if os.path.exists(a):
+            os.remove(a)
+            return f"playing \"{item['title']}\" in the Oma player ({item['url']})"
+        time.sleep(0.1)
+    return 'Error: the Oma player did not answer'
+
+
+def brief():
+    """Daily brief like Stonic's opening line, built without a model: who, when, weather where the user is, top news."""
+    from multi_ai import world
+    m, h = me(), time.localtime().tm_hour
+    hello = 'শুভ সকাল' if 5 <= h < 12 else 'শুভ দুপুর' if h < 17 else 'শুভ সন্ধ্যা' if h < 21 else 'শুভ রাত্রি'
+    city = next((f.split(':', 1)[1].strip() for f in m['facts'] if f.lower().startswith(('city:', 'lives in:'))), '')
+    wx = world.weather(city)
+    news = world.headlines()
+    top = [i for i in news.get('items', []) if i.get('alert')][:2] + [i for i in news.get('items', []) if not i.get('alert')][:1]
+    text = f"{hello}{', ' + m['name'] if m['name'] else ''}! এখন {time.strftime('%I:%M %p').lstrip('0')}।" + (f' আবহাওয়া: {wx}।' if wx and '<' not in wx else '')
+    if top:
+        text += ' আজকের শিরোনাম: ' + ' · '.join(i['title'] for i in top)
+    return {'text': text, 'weather': wx, 'news': top, 'date': time.strftime('%Y-%m-%d')}
+
+
 def me_line():
     m = me()
     parts = ([f"Name: {m['name']}."] if m['name'] else []) + ([m['about'].rstrip('.') + '.'] if m['about'] else []) + m['facts']
@@ -139,6 +219,7 @@ Tools (atticus is a command on your PATH):
 - Clipboard: {CLIP}. Music (Spotify or any player): {MEDIA} playpause|next|previous.
 - Inside an app, when nothing above does it (buttons, menus, tabs, fields): {UI} see "<app>" ["title words"] lists them with IDs (B3 Button "Play", E1 Edit "To" = "text", X2 Text "Display is 9"); then {UI} click <ID or exact name>..., several in one call in order ({UI} click "Seven" "Plus" "Two"), or {UI} set <ID> "<text>" to fill a field. IDs last until the next see. Keys: {KEYS} "<app>" ctrl+s (alt+f4, f5, enter…).
 - Spotify: play any song, album, artist or the user's own playlist: {PLAY} "<name, plus artist if known>". Music requests mean Spotify unless the user names another app.
+- YouTube in Oma's own player: {ME} --player "<url | words>".
 - To-do, "remind me", "note this": {NOTE} "<text>" keeps it in the user's notes file. For a time ("remind me in 20 minutes"): {WATCH} cmd '[ $(date +%s) -ge <unix time> ]' and say when. "Where are my notes" = {SHOW} "~/Documents/Atticus Notes.md".
 - "Tell me when / watch / monitor X" (a reply finishes, a build or download ends, a page shows something): look once, pick a short phrase on screen that shows the state, then ONE call: {WATCH} "<app>" "<window title words or empty>" <gone|shows> "<phrase>" ["<what to do then, as a request>"]. gone = done when the phrase disappears; shows = done when it appears. It reads that window every 5 s with no AI (it must stay open, covered is fine, not minimized), notifies the user, then runs the request. Without the screen: {WATCH} cmd '<shell test, exit 0 = done>' ["<request>"]; prefer cmd when it fits. A Codex task is done when: tail -n 2 "$(ls -t ~/.codex/sessions/*/*/*/*.jsonl | head -1)" | grep -q task_complete. Reply that you are watching. "Stop watching": {ME} --unwatch.
 - Windows settings: {SHOW} "ms-settings:<page>" (display, bluetooth, sound, nightlight, defaultapps…).
@@ -197,7 +278,7 @@ RISKY = [('Delete something?', r'\b(rm|rmdir|srm|unlink|shred|trash|mv|del|erase
          ('Buy this?', r'\b(buy|purchase|checkout|check out|place (an |the )?order|pay)\b'),
          ('Change a file?', r'(?<![0-9&])>>?\s*(?!/dev/null|\$null|&|/tmp/|nul\b)\S|\btee\s|curl\b.*\s(-o|--output|-O)\b|\b(set-content|add-content|out-file|new-item|rename-item|copy-item|ren|copy|xcopy|robocopy)\b'),
          ('Run a system command?', r'\bsudo\b|\bkillall\b|\btaskkill\b|\bstop-process\b|\breg(\.exe)?\s+(add|delete|import)|set-itemproperty|new-itemproperty|\bsc(\.exe)?\s+(config|delete|stop|create)|\bschtasks\b|-verb\s+runas|\bnetsh\b|\bsetx\b|set-executionpolicy|\b(shutdown|stop-computer|restart-computer)\b|\bwinget\s+(install|uninstall)')]
-QUIET = (SEARCH, READ, LOOK, FRONT, SHOW, PLACE, PLAY, TYPE, REMEMBER, FORGET, ABOUT, PICK, SET, HISTORY, FIND, CLIP, MEDIA, NOTE, WINDOWS, UI + ' see', JOPLIN, 'start "" "http', 'start http')   # never delete, send or buy
+QUIET = (ME + ' --player', SEARCH, READ, LOOK, FRONT, SHOW, PLACE, PLAY, TYPE, REMEMBER, FORGET, ABOUT, PICK, SET, HISTORY, FIND, CLIP, MEDIA, NOTE, WINDOWS, UI + ' see', JOPLIN, 'start "" "http', 'start http')   # never delete, send or buy
 
 
 # Enter after typing a message sends it in chat apps (Discord, Slack, Teams…); Enter after typing into a search box
@@ -617,6 +698,7 @@ UNSAFE = re.compile(r'(^|[;&|(`\s])(rm|rmdir|sudo|dd|diskutil|shutdown|reboot|ha
 
 NAMED = re.compile(r'(?:from now on,? )?when(?:ever)? i say (?:["“\']([^"”\']{2,40})["”\']|([^,:;"“]{2,40}?)\s*(?:[,:;]|\b(?:do|then|can you|please|you)\b))', re.I)   # "When I say work mode, …"
 MORE = re.compile(r'\b(and|then|after that|also)\b', re.I)   # a second step after an instant command's free text
+DIAGRAM_WORDS = re.compile(r'\b(diagram|flow ?chart|mind ?map|chart|graph|timeline|org ?chart)\b|ডায়াগ্রাম|চার্ট|গ্রাফ', re.I)
 FAILED = re.compile(r"\b(can't|cannot|couldn't|could not|unable|not able|failed|not done|not completed|didn't work)\b", re.I)   # the reply admits it did not work
 
 
@@ -1086,6 +1168,8 @@ def label(name, inp):
         return 'Asking you which one'
     if c.startswith(SET):
         return 'Changing a setting'
+    if c.startswith(ME + ' --player'):
+        return 'Playing in the Oma player: ' + c[len(ME + ' --player'):].strip(' "\'')
     if c.startswith(PLAY):
         return 'Playing ' + c[len(PLAY):].strip(' "\'') + ' on Spotify'
     if c.startswith(LOOK):
@@ -1397,7 +1481,7 @@ def relay(p):
             j = json.load(open(q))
             os.remove(q)
             a = os.path.join(p.ask, 'a')
-            if TRACK is not None and 'set' not in j:
+            if TRACK is not None and 'set' not in j and 'player' not in j:   # a player hand-off does not wait for the user
                 TRACK.waiting(j.get('q') or j.get('pick') or 'Waiting for your answer')
                 threading.Thread(target=_resume_when_answered, args=(os.path.join(p.ask, 'a'),), daemon=True).start()
             if 'set' in j:   # "⚙ <key> <true|false>": the app flips it, so the Settings window and the app agree
@@ -1405,6 +1489,13 @@ def relay(p):
                     print(f"⚙ {j['set']} {j['value'] if isinstance(j['value'], str) else 'true' if j['value'] else 'false'}", flush=True)
                 else:   # no app running: it reads the file when it starts
                     json.dump({**(json.load(open(PREFS)) if os.path.exists(PREFS) else {}), j['set']: j['value']}, open(PREFS, 'w'), indent=1)
+                open(a + '.tmp', 'w').write('ok')
+                os.rename(a + '.tmp', a)
+            elif 'player' in j:   # "▶ {json}": the Oma window's neural player (no window: the user's browser)
+                if os.environ.get('ATTICUS_UI') == '1':
+                    print('▶ ' + json.dumps(j['player'], ensure_ascii=False), flush=True)
+                else:
+                    show(j['player']['url'])
                 open(a + '.tmp', 'w').write('ok')
                 os.rename(a + '.tmp', a)
             elif 'pick' in j and os.environ.get('ATTICUS_UI') == '1':   # "◇ {json}": the choices card
@@ -2024,6 +2115,32 @@ def main():
         return print(json.dumps({'today': use(time.strftime('%Y-%m-%d')), 'week': use(week), 'all': use(''),
                                  'rules': [r for r in rules if r], 'plan': plan(), 'providers': providers_info,
                                  'skills': [{'say': k, 'reply': v} for k, v in sorted(learned.items())], 'me': me()}))
+    if args[:1] in (['--secret-get'], ['--secret-set']) and len(args) == 2 and args[1].startswith('remote_') and winctl:   # phone bridges only
+        if args[0] == '--secret-get':
+            return print(winctl.secret_get(args[1]))
+        return print('saved' if winctl.secret_set(args[1], sys.stdin.readline().strip()) else 'cleared')
+    if args == ['--memory-list']:
+        return print(json.dumps(memory_list(), ensure_ascii=False))
+    if args == ['--skill-save']:   # one skill as JSON on stdin (name, description, instructions); same name replaces
+        sk = json.loads(sys.stdin.read() or '{}')
+        sk = {k: ' '.join(str(sk.get(k, '')).split()) if k != 'instructions' else str(sk.get(k, '')).strip()[:4000] for k in ('name', 'description', 'instructions')}
+        if not sk['name'] or not sk['instructions']:
+            return print('Error: a skill needs a name and instructions')
+        rest = [x for x in user_skills() if x.get('name', '').lower() != sk['name'].lower()]
+        os.makedirs(DIR, exist_ok=True)
+        json.dump(rest + [{**sk, 'at': time.strftime('%Y-%m-%d')}], open(USER_SKILLS, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+        return print('saved')
+    if args[:1] == ['--skill-delete'] and len(args) > 1:
+        name = ' '.join(args[1:]).lower()
+        json.dump([x for x in user_skills() if x.get('name', '').lower() != name], open(USER_SKILLS, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+        return print('deleted')
+    if args[:1] == ['--player'] and len(args) > 1:
+        return print(player(' '.join(args[1:])))
+    if args[:1] == ['--headlines']:   # Sat-Link globe + Today Headlines (RSS, no AI)
+        from multi_ai import world
+        return print(json.dumps(world.headlines(refresh='refresh' in args), ensure_ascii=False))
+    if args == ['--brief']:   # the first open of the day: greeting, time, weather, top headlines (no AI tokens)
+        return print(json.dumps(brief(), ensure_ascii=False))
     if args == ['--voice-server']:
         from multi_ai import voice_server
         return voice_server.serve()
@@ -2279,11 +2396,19 @@ def serve(task, warm=None, snap=None):
     turns = [r for r in turns if time.time() - r['t'] < 600][-3:]   # this chat only (Atticus.app clears it for a new one); 10 min cap for typed asks
     earlier = earlier_chat(turns)
     images = screen_for(task, snap, fx) if snap is not None else None
+    cam = os.environ.get('OMA_IMAGE', '')
+    if cam and os.path.exists(cam):   # Media Link: a photo the user just took or the shared screen, sent only with this request
+        images = [(cam, 'Image the user just shared from the Oma Media Link (webcam or screen):')] + list(images or [])
     if images == []:
         ctx += ' Screen capture unavailable. Do not guess screen contents; explain how to enable Screen Recording for Atticus.'
     helping.join(4)
     from multi_ai.router import clean_user_prompt
     clean_task = clean_user_prompt(task)
+    for sk in skills_for(task):   # the user's own skills, only when the request is about them
+        int_hints = (int_hints + '\n' if int_hints else '') + f"User skill \"{sk['name']}\" ({sk.get('description', '')}): {sk['instructions'][:1200]}"
+    if DIAGRAM_WORDS.search(task):   # only then: no extra tokens on other requests
+        int_hints = (int_hints + '\n' if int_hints else '') + ('Diagram request: reply with one short sentence plus ONE ```mermaid block (flowchart, mindmap, '
+                     "pie, timeline or xychart-beta; at most 25 nodes; labels in the user's language). It is drawn in the Oma Visual Hub; do not open any app for it.")
     prompt = (f'Context: {ctx}\n' + (f'Earlier:\n{earlier}' if earlier else '') + (f'Memory:\n{mem}\n' if mem else '') +
               (f'Integrations:\n{int_hints}\n' if int_hints else '') + ''.join(helps) +
               (f'Saved workflow (historical guidance):\n{procedure}\n' if procedure else '') + f'Request: {clean_task}')
@@ -2377,7 +2502,11 @@ def oma_ask(task, source='typed'):
         TRACK.error = why
     TRACK.finish(status, reply, TRACK.error if status != 'COMPLETED' else '')
     m = TRACK.model or {}
+    dia = re.search(r'```mermaid\s*\n(.*?)```', reply or '', re.S)   # drawn in the Visual Hub, not shown as code
+    if dia:
+        reply = (reply[:dia.start()] + reply[dia.end():]).strip() or 'The diagram is in the Visual Hub.'
     print('§REPLY§' + json.dumps({
+        'diagram': dia[1].strip() if dia else '',
         'success': status == 'COMPLETED', 'status': status, 'reply': reply, 'task_id': TRACK.id,
         'provider_used': m.get('provider', ''), 'model_used': m.get('resolved') or m.get('model', ''),
         'fallback_occurred': len([a for a in TRACK.models_tried if not a['ok']]) > 0 and bool(m),

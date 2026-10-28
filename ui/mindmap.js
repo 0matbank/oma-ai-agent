@@ -62,6 +62,7 @@ class OmaMindMap {
 
       // Clicking any module opens its actual corresponding functional Settings tab!
       el.addEventListener('click', () => {
+        if (window.omaPanels && window.omaPanels[node.id]) return window.omaPanels[node.id]();   // Core Memory / Skills dialogs
         if (window.OmaController && window.OmaController.openSettings) {
           window.OmaController.openSettings(node.tab);
         } else if (window.st && window.st.openSettings) {

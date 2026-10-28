@@ -15,11 +15,12 @@
   --bg-glass-strong: rgba(18, 26, 40, 0.92);
 
   --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-glow: rgba(0, 229, 255, 0.28);
+  --border-glow: rgba(var(--accent-rgb), 0.28);
   --border-active: #00e5ff;
 
   --neon-cyan: #00e5ff;
-  --neon-cyan-glow: rgba(0, 229, 255, 0.45);
+  --accent-rgb: 0, 229, 255;
+  --neon-cyan-glow: rgba(var(--accent-rgb), 0.45);
   --neon-green: #00f59b;
   --neon-green-glow: rgba(0, 245, 155, 0.4);
   --neon-amber: #ffb300;
@@ -52,7 +53,7 @@
 body {
   background-color: var(--bg-deep);
   background-image: 
-    radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.07) 0%, transparent 60%),
+    radial-gradient(circle at 50% 0%, rgba(var(--accent-rgb), 0.07) 0%, transparent 60%),
     radial-gradient(circle at 10% 90%, rgba(179, 136, 255, 0.05) 0%, transparent 50%),
     linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
@@ -138,7 +139,7 @@ body {
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  background: linear-gradient(135deg, #00e5ff 0%, #7c4dff 100%);
+  background: linear-gradient(135deg, var(--neon-cyan) 0%, #7c4dff 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -156,7 +157,7 @@ body {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 1.5px;
-  background: linear-gradient(90deg, #fff 0%, #00e5ff 100%);
+  background: linear-gradient(90deg, #fff 0%, var(--neon-cyan) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -166,8 +167,8 @@ body {
   font-size: 12px;
   font-weight: 600;
   color: var(--neon-cyan);
-  background: rgba(0, 229, 255, 0.12);
-  border: 1px solid rgba(0, 229, 255, 0.3);
+  background: rgba(var(--accent-rgb), 0.12);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   padding: 2px 7px;
   border-radius: 4px;
   letter-spacing: 1px;
@@ -604,6 +605,30 @@ body {
 }
 
 /* Virtual Office Canvas Viewport */
+#omaModal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; place-items:center; z-index:100; }
+#omaModal .om-box { width:min(560px, 92vw); max-height:84vh; overflow:auto; background:var(--bg-surface-elevated); border:1px solid var(--border-subtle); border-radius:12px; padding:16px 18px; box-shadow:0 20px 60px rgba(0,0,0,.6); }
+#omaModal .om-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+#omaModal .om-head b { font-size:16px; } #omSub { font-size:11.5px; color:var(--text-muted); }
+#omaModal h4 { margin:12px 0 4px; font-size:11px; letter-spacing:1.5px; color:var(--neon-cyan); text-transform:uppercase; }
+.om-row { display:flex; justify-content:space-between; gap:10px; padding:7px 8px; border:1px solid var(--border-subtle); border-radius:6px; margin-bottom:5px; font-size:12.5px; }
+.om-row small { color:var(--text-muted); } .om-empty { color:var(--text-muted); font-size:12px; padding:4px 0; } .om-l { display:block; font-size:11px; color:var(--text-muted); margin:8px 0 3px; }
+.wcard { padding:10px; }
+.whead { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; font:700 10.5px var(--font-mono, Consolas); letter-spacing:1.5px; color:var(--neon-cyan); }
+.wbtn { all:unset; cursor:pointer; padding:1px 6px; margin-left:2px; border:1px solid var(--border-subtle); border-radius:4px; font-size:11px; color:var(--text-secondary); }
+.wbtn:hover { border-color:var(--neon-cyan); color:var(--neon-cyan); }
+.livepill { font-size:9px; background:#ff3344; color:#fff; padding:0 5px; border-radius:3px; margin-left:4px; }
+.hl { display:flex; gap:8px; padding:6px 2px; border-bottom:1px solid var(--border-subtle); font-size:11.5px; line-height:1.35; color:var(--text-primary); text-decoration:none; }
+.hl:hover { background:rgba(var(--accent-rgb), .06); }
+.hl .n { color:var(--text-muted); font:10px Consolas,monospace; padding-top:2px; }
+.hl.alert .n { color:#ff6a4a; }
+.module-chip { display:flex; align-items:center; gap:8px; padding:6px 10px; border:1px solid var(--border-subtle); border-radius:8px; background:rgba(255,255,255,.025); font-size:11.5px; }
+.module-chip .mod { flex:1; color:var(--text-muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.module-chip .mod code { color:#e2e7f2; font-family:Consolas, monospace; font-size:11px; }
+.module-chip .dur { color:var(--text-muted); font-family:Consolas, monospace; font-size:10.5px; white-space:nowrap; }
+.module-chip.failed { border-color:rgba(255,69,58,.45); }
+.module-chip .spin { display:inline-block; animation:omaspin 1s linear infinite; }
+@keyframes omaspin { to { transform:rotate(360deg); } }
+.town-tab { white-space:nowrap; }
 .town-viewport {
   flex: 1;
   position: relative;
@@ -740,9 +765,9 @@ body {
 }
 
 .feed-tab.active {
-  background: rgba(0, 229, 255, 0.1);
+  background: rgba(var(--accent-rgb), 0.1);
   color: var(--neon-cyan);
-  border: 1px solid rgba(0, 229, 255, 0.3);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
 }
 
 /* Live Feed Messages Stream */
@@ -839,8 +864,8 @@ body {
 }
 
 .module-pill.bash {
-  background: rgba(0, 229, 255, 0.1);
-  border-color: rgba(0, 229, 255, 0.3);
+  background: rgba(var(--accent-rgb), 0.1);
+  border-color: rgba(var(--accent-rgb), 0.3);
   color: var(--neon-cyan);
 }
 
@@ -895,7 +920,7 @@ body {
 }
 
 .quick-chip:hover {
-  background: rgba(0, 229, 255, 0.1);
+  background: rgba(var(--accent-rgb), 0.1);
   border-color: var(--neon-cyan);
   color: #fff;
 }
@@ -956,7 +981,7 @@ body {
 }
 
 .btn-mic-toggle:hover {
-  background: rgba(0, 229, 255, 0.15);
+  background: rgba(var(--accent-rgb), 0.15);
   border-color: var(--neon-cyan);
   color: var(--neon-cyan);
 }
@@ -1058,7 +1083,7 @@ body {
 
   :root {
     --bg: #070a0f; --sidebar: #05070b; --card: rgba(14, 21, 33, 0.78); --line: rgba(255,255,255,0.08);
-    --fg: #f1f5f9; --fg2: #94a3b8; --fg3: #64748b; --accent: #00e5ff; --sel: rgba(0, 229, 255, 0.12);
+    --fg: #f1f5f9; --fg2: #94a3b8; --fg3: #64748b; --accent: #00e5ff; --sel: rgba(var(--accent-rgb), 0.12);
     --green: #00f59b; --track: rgba(255,255,255,0.1); --neon-cyan: #00e5ff; --neon-green: #00f59b;
     --neon-amber: #ffb300; --neon-crimson: #ff2a5f; --neon-purple: #b388ff;
     --out: cubic-bezier(0.16, 1, 0.3, 1); --ease: cubic-bezier(0.25, 1, 0.5, 1);
@@ -1081,8 +1106,8 @@ body {
     border-bottom: 1px solid var(--line); margin-bottom: 8px;
   }
   .brand-logo {
-    width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #00e5ff, #0077ff);
-    display: grid; place-items: center; box-shadow: 0 0 12px rgba(0,229,255,0.4); flex: none;
+    width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, var(--neon-cyan), #0077ff);
+    display: grid; place-items: center; box-shadow: 0 0 12px rgba(var(--accent-rgb),0.4); flex: none;
   }
   .brand-logo svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2.2; }
   .brand-text b { display: block; font: 700 14px 'Orbitron', system-ui; letter-spacing: 0.5px; color: #fff; }
@@ -1098,7 +1123,7 @@ body {
     cursor: pointer; transition: all 0.15s var(--ease);
   }
   nav button.nav-btn:hover { background: var(--sel); color: #fff; }
-  nav button.nav-btn.on { background: rgba(0,229,255,0.15); color: #00e5ff; box-shadow: inset 0 0 0 1px rgba(0,229,255,0.3); }
+  nav button.nav-btn.on { background: rgba(var(--accent-rgb),0.15); color: var(--neon-cyan); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),0.3); }
   .ni { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; flex: none; }
   .ni svg { width: 13px; height: 13px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   nav .spacer { flex: 1; }
@@ -1142,7 +1167,7 @@ body {
   /* Segmented Button */
   .seg { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--track); flex: none; }
   .seg button { all: unset; padding: 4px 11px; border-radius: 6px; font-size: 12px; color: var(--fg2); cursor: pointer; transition: all .15s; }
-  .seg button.on { background: rgba(0,229,255,0.2); color: #00e5ff; box-shadow: 0 1px 3px rgba(0,0,0,.3), inset 0 0 0 .5px rgba(0,229,255,0.4); }
+  .seg button.on { background: rgba(var(--accent-rgb),0.2); color: var(--neon-cyan); box-shadow: 0 1px 3px rgba(0,0,0,.3), inset 0 0 0 .5px rgba(var(--accent-rgb),0.4); }
 
   select { font: 12.5px system-ui; color: #fff; background: #131b28; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; outline: 0; }
   input[type=range] { width: 140px; accent-color: var(--neon-cyan); }
@@ -1151,7 +1176,7 @@ body {
   /* Buttons */
   .btn { all: unset; height: 26px; padding: 0 12px; border-radius: 7px; font-size: 12px; font-weight: 500; flex: none; background: #151f2e; box-shadow: inset 0 0 0 .5px var(--line); color: #fff; cursor: pointer; transition: filter .15s, transform .1s; display: inline-flex; align-items: center; justify-content: center; }
   .btn:hover { filter: brightness(1.15); } .btn:active { transform: scale(.97); }
-  .btn.blue { background: var(--neon-cyan); color: #07090e; font-weight: 600; box-shadow: 0 0 10px rgba(0,229,255,0.3); }
+  .btn.blue { background: var(--neon-cyan); color: #07090e; font-weight: 600; box-shadow: 0 0 10px rgba(var(--accent-rgb),0.3); }
   .btn.red { color: #ff453a; }
 
   /* Pills */
@@ -1162,7 +1187,7 @@ body {
   @keyframes blink { 50% { opacity: .4; } }
 
   .field { flex: 1; font: 12.5px system-ui; color: #fff; background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; outline: 0; min-width: 0; }
-  .field:focus { border-color: var(--neon-cyan); box-shadow: 0 0 8px rgba(0,229,255,0.25); }
+  .field:focus { border-color: var(--neon-cyan); box-shadow: 0 0 8px rgba(var(--accent-rgb),0.25); }
 
   /* Shortcut recorder */
   .shortcut { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 20px 16px; border-radius: 11px; background: var(--card); box-shadow: inset 0 0 0 .5px var(--line); }
@@ -1210,20 +1235,20 @@ body {
     background: rgba(14, 20, 32, 0.85); border: 1px solid var(--line); border-radius: 9px;
     padding: 10px 14px; max-width: 92%; animation: rise .2s var(--out);
   }
-  .feed-card.user { align-self: flex-end; border-color: rgba(0,229,255,0.3); background: rgba(0,229,255,0.08); }
+  .feed-card.user { align-self: flex-end; border-color: rgba(var(--accent-rgb),0.3); background: rgba(var(--accent-rgb),0.08); }
   .feed-card.oma { align-self: flex-start; border-color: rgba(0,245,155,0.25); }
   .feed-card.event { align-self: stretch; max-width: 100%; background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.05); font-size: 11.5px; }
   .feed-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 10.5px; color: var(--fg3); }
   .feed-text { font-size: 12.5px; line-height: 1.45; color: #f1f5f9; white-space: pre-wrap; word-break: break-word; }
 
   /* Model badge */
-  .model-tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: rgba(0,229,255,0.15); color: #00e5ff; font-weight: 600; }
+  .model-tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: rgba(var(--accent-rgb),0.15); color: var(--neon-cyan); font-weight: 600; }
   .model-tag.fallback { background: rgba(255,179,0,0.15); color: #ffb300; }
 
   /* Reference Video Specific Matching Styles */
   .btn-settings-pill {
-    background: rgba(0, 229, 255, 0.12);
-    border: 1px solid rgba(0, 229, 255, 0.35);
+    background: rgba(var(--accent-rgb), 0.12);
+    border: 1px solid rgba(var(--accent-rgb), 0.35);
     color: var(--neon-cyan);
     font-family: var(--font-tech);
     font-weight: 700;
@@ -1235,9 +1260,9 @@ body {
     transition: all 0.2s;
   }
   .btn-settings-pill:hover {
-    background: rgba(0, 229, 255, 0.25);
+    background: rgba(var(--accent-rgb), 0.25);
     border-color: var(--neon-cyan);
-    box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+    box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.3);
   }
 
   .btn-cyber-terminate {
@@ -1264,8 +1289,8 @@ body {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: rgba(0, 229, 255, 0.1);
-    border: 1px solid rgba(0, 229, 255, 0.3);
+    background: rgba(var(--accent-rgb), 0.1);
+    border: 1px solid rgba(var(--accent-rgb), 0.3);
     color: var(--neon-cyan);
     display: inline-flex;
     align-items: center;
@@ -1274,8 +1299,8 @@ body {
     transition: all 0.2s;
   }
   .btn-icon-sparkle:hover {
-    background: rgba(0, 229, 255, 0.25);
-    box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+    background: rgba(var(--accent-rgb), 0.25);
+    box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.4);
   }
 
   /* Settings Slide-Over Drawer */
@@ -1343,7 +1368,7 @@ body {
   .system-node:hover {
     background: rgba(255, 255, 255, 0.07);
     border-color: var(--node-color, var(--neon-cyan));
-    box-shadow: 0 0 10px var(--node-glow, rgba(0, 229, 255, 0.3));
+    box-shadow: 0 0 10px var(--node-glow, rgba(var(--accent-rgb), 0.3));
   }
   .node-icon-box {
     width: 28px;
@@ -1409,15 +1434,29 @@ body {
     overflow: hidden !important;
     min-height: 0 !important;
   }
+
+/* Themes (Settings: header Theme menu). Each only re-tints the accent; layout and worker colours stay. */
+:root[data-theme="hacker"] { --neon-cyan: #39ff6a; --accent-rgb: 57, 255, 106; --border-active: #39ff6a; --accent: #39ff6a; --neon-cyan-glow: rgba(57,255,106,.45); --bg-deep: #050a06; }
+:root[data-theme="cyberpunk"] { --neon-cyan: #ff2bd6; --accent-rgb: 255, 43, 214; --border-active: #ff2bd6; --accent: #ff2bd6; --neon-cyan-glow: rgba(255,43,214,.45); --bg-deep: #0b0610; }
+:root[data-theme="danger"] { --neon-cyan: #ff3344; --accent-rgb: 255, 51, 68; --border-active: #ff3344; --accent: #ff3344; --neon-cyan-glow: rgba(255,51,68,.45); --bg-deep: #0d0607; }
+:root[data-theme="aurora"] { --neon-cyan: #a78bfa; --accent-rgb: 167, 139, 250; --border-active: #a78bfa; --accent: #a78bfa; --neon-cyan-glow: rgba(167,139,250,.45); --bg-deep: #08071a; }
+:root[data-theme="solar"] { --neon-cyan: #ffb547; --accent-rgb: 255, 181, 71; --border-active: #ffb547; --accent: #ffb547; --neon-cyan-glow: rgba(255,181,71,.45); --bg-deep: #0c0905; }
+:root[data-theme] { --border-glow: rgba(var(--accent-rgb), .28); --sel: rgba(var(--accent-rgb), .12); }
+.theme-menu { position:absolute; top:34px; right:0; background:var(--bg-surface-elevated); border:1px solid var(--border-subtle); border-radius:8px; padding:6px; z-index:50; display:none; min-width:170px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
+.theme-menu.open { display:block; }
+.theme-menu button { all:unset; display:flex; align-items:center; gap:8px; width:100%; box-sizing:border-box; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:12px; color:var(--text-primary); }
+.theme-menu button:hover, .theme-menu button.on { background:rgba(var(--accent-rgb), .12); }
+.theme-menu i { width:10px; height:10px; border-radius:50%; display:inline-block; }
 </style>
 
+<style>/*INCLUDE:office_town.css*/</style>
 </head>
 <body>
 
 <!-- Top System Telemetry Bar (Across full width) -->
 <header id="top-header" class="telemetry-bar">
   <div class="brand-section" style="display:flex; align-items:center; gap:8px;">
-    <div class="brand-logo" style="width:26px; height:26px; background:linear-gradient(135deg, #00e5ff, #0077ff); border-radius:6px; display:flex; align-items:center; justify-content:center;">
+    <div class="brand-logo" style="width:26px; height:26px; background:linear-gradient(135deg, var(--neon-cyan), #0077ff); border-radius:6px; display:flex; align-items:center; justify-content:center;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
     </div>
     <div>
@@ -1427,7 +1466,7 @@ body {
   </div>
 
   <div class="telem-group" style="display:flex; align-items:center; gap:10px;">
-    <div class="telem-chip" id="lang-switcher" style="cursor:pointer; background:rgba(0,229,255,0.12); padding:3px 10px; border-radius:5px; border:1px solid rgba(0,229,255,0.3);" title="ক্লিক করে ভাষা পরিবর্তন করুন (বাংলা / English)">
+    <div class="telem-chip" id="lang-switcher" style="cursor:pointer; background:rgba(var(--accent-rgb),0.12); padding:3px 10px; border-radius:5px; border:1px solid rgba(var(--accent-rgb),0.3);" title="ক্লিক করে ভাষা পরিবর্তন করুন (বাংলা / English)">
       <span style="color:var(--neon-cyan);">🌐 ভয়েস:</span> <b id="current-lang-label" style="color:#fff;">বাংলা</b>
     </div>
     <div class="telem-chip">
@@ -1445,12 +1484,42 @@ body {
       <span style="color:var(--neon-green);">⚡ PC HEALTH:</span> <b id="header-pchealth-val" style="color:#fff;">Measuring...</b>
     </div>
     <div class="telem-chip"><span>HOTKEY: <b id="telemHotkey">Ctrl+Alt+Space</b></span></div>
+    <div style="position:relative;"><button id="btn-theme" class="btn-settings-pill" title="Interface theme">🎨 THEME</button>
+      <div class="theme-menu" id="themeMenu">
+        <button data-theme="stonic"><i style="background:#00e5ff"></i>Stonic Default</button>
+        <button data-theme="hacker"><i style="background:#39ff6a"></i>Hacker</button>
+        <button data-theme="cyberpunk"><i style="background:#ff2bd6"></i>Cyberpunk</button>
+        <button data-theme="danger"><i style="background:#ff3344"></i>Danger Red</button>
+        <button data-theme="aurora"><i style="background:#a78bfa"></i>Aurora (new)</button>
+        <button data-theme="solar"><i style="background:#ffb547"></i>Solar (new)</button>
+      </div></div>
     <button id="btn-toggle-settings" class="btn-settings-pill">⚙️ SETTINGS</button>
   </div>
 </header>
 
 <!-- Master Dashboard Viewport (100% width) -->
 <main id="dashboard-viewport" style="flex:1; display:flex; gap:12px; padding:12px; overflow:hidden; min-height:0;">
+
+  <!-- World column (Stonic layout): Media Link, Sat-Link globe, Today Headlines -->
+  <aside id="world-column" style="width:250px; flex:none; display:flex; flex-direction:column; gap:12px; min-height:0;">
+    <div class="cyber-card wcard" style="flex:none;">
+      <div class="whead"><span>● MEDIA LINK <b id="mediaLive" class="livepill" style="display:none;">LIVE</b></span>
+        <span><button class="wbtn" id="mediaCam" title="Show the camera">📷</button><button class="wbtn" id="mediaScreen" title="Share a screen or window">🖥</button><button class="wbtn" id="mediaStop" title="Stop">■</button></span></div>
+      <div style="height:118px; display:grid; place-items:center; background:rgba(0,0,0,.35); border-radius:6px; overflow:hidden; position:relative;">
+        <video id="mediaVideo" playsinline muted style="width:100%; height:100%; object-fit:cover; display:none;"></video>
+        <div id="mediaNote" style="font:10px Consolas,monospace; letter-spacing:2px; color:var(--text-muted); text-align:center; padding:6px;">SYSTEM OFFLINE</div>
+      </div>
+      <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">While live, a frame goes with your next question.</div>
+    </div>
+    <div class="cyber-card wcard" style="flex:1; min-height:200px; display:flex; flex-direction:column;">
+      <div class="whead"><span>● SAT-LINK FEED</span><span><button class="wbtn" id="globeMode" title="Flat map / globe">2D</button><button class="wbtn" id="globeOpen" title="Open World Monitor">⤢</button></span></div>
+      <canvas id="globeCanvas" style="flex:1; width:100%; min-height:150px; cursor:grab;"></canvas>
+    </div>
+    <div class="cyber-card wcard" style="flex:1; min-height:160px; display:flex; flex-direction:column;">
+      <div class="whead"><span>● TODAY HEADLINES <i id="headlineStamp" style="font-style:normal; color:var(--text-muted);"></i></span><button class="wbtn" id="headlineRefresh" title="Refresh">↻</button></div>
+      <div id="headlineList" style="flex:1; overflow-y:auto;"><div class="hl">Loading…</div></div>
+    </div>
+  </aside>
 
   <!-- Left Workspace Column (~65% width) -->
   <section id="workspace-column" style="flex:1.8; display:flex; flex-direction:column; gap:12px; min-width:0; min-height:0;">
@@ -1478,7 +1547,7 @@ body {
             <span class="status-pulse"></span>
             <span id="sphere-status-text">SYSTEM ACTIVE</span>
           </div>
-          <span style="font-size:10px; color:var(--text-muted); font-family:monospace; letter-spacing:1px;">AUTONOMOUS AI FACE</span>
+          <span style="font-size:10px; color:var(--text-muted); font-family:monospace; letter-spacing:1px;">OMA CORE</span>
         </div>
 
         <!-- 3D Particle Face Canvas -->
@@ -1489,13 +1558,13 @@ body {
         <!-- Footer with glowing SYSTEM ACTIVE, Animation Speed Controls (M2), TERMINATE button, and sparkle icon -->
         <div class="sphere-footer" style="display:flex; align-items:center; justify-content:space-between; padding-top:4px;">
           <div style="font-family:'Rajdhani', sans-serif; font-weight:700; font-size:11px; color:var(--neon-cyan); letter-spacing:1px; display:flex; align-items:center; gap:5px;">
-            <span style="display:inline-block; width:5px; height:5px; border-radius:50%; background:#00e5ff; box-shadow:0 0 6px #00e5ff;"></span>
-            SYSTEM ACTIVE
+            <span style="display:inline-block; width:5px; height:5px; border-radius:50%; background:currentColor; box-shadow:0 0 6px currentColor;"></span>
+            <span id="orb-state-label">STANDBY</span>
           </div>
           <div style="display:flex; align-items:center; gap:6px;">
             <!-- Animation Speed Controls (M2) -->
             <div style="display:flex; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.08); border-radius:5px; padding:1px;">
-              <button id="btn-speed-slow" class="speed-btn active" style="all:unset; cursor:pointer; font-size:9.5px; padding:2px 6px; border-radius:4px; color:#fff; background:rgba(0,229,255,0.25);">Slow</button>
+              <button id="btn-speed-slow" class="speed-btn active" style="all:unset; cursor:pointer; font-size:9.5px; padding:2px 6px; border-radius:4px; color:#fff; background:rgba(var(--accent-rgb),0.25);">Slow</button>
               <button id="btn-speed-normal" class="speed-btn" style="all:unset; cursor:pointer; font-size:9.5px; padding:2px 6px; border-radius:4px; color:var(--text-muted);">Normal</button>
               <button id="btn-speed-fast" class="speed-btn" style="all:unset; cursor:pointer; font-size:9.5px; padding:2px 6px; border-radius:4px; color:var(--text-muted);">Fast</button>
             </div>
@@ -1512,7 +1581,7 @@ body {
       <!-- Town Header -->
       <div class="town-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex:none;">
         <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-weight:700; color:#fff; font-family:'Orbitron', monospace; font-size:12px; letter-spacing:0.5px;">🏢 AGENT TOWN</span>
+          <span style="font-weight:700; color:#fff; font-family:'Orbitron', monospace; font-size:12px; letter-spacing:0.5px; white-space:nowrap;">🏢 AGENT TOWN</span>
           <span class="town-badge">READY</span>
         </div>
 
@@ -1523,7 +1592,6 @@ body {
         </div>
 
         <div style="font-size:11px; color:var(--text-muted); display:flex; gap:10px;">
-          <span>Units: <b>Alice, Bob, Carol, Dave, Eve</b></span>
           <span id="agentTownActivity">Status: <b>Idle</b></span>
         </div>
       </div>
@@ -1536,6 +1604,31 @@ body {
       <!-- Virtual Office Canvas Viewport -->
       <div class="town-viewport" style="flex:1; border-radius:8px; border:1px solid rgba(255,255,255,0.06); position:relative; overflow:hidden;">
         <canvas id="town-canvas"></canvas>
+        <div id="neuralPlayer" style="display:none; position:absolute; left:10px; bottom:10px; width:min(360px, 60%); z-index:6; background:#05070b; border:1px solid var(--border-glow); border-radius:8px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.6);">
+          <div style="display:flex; align-items:center; gap:6px; padding:4px 8px; font:700 10px Consolas,monospace; letter-spacing:1.5px; color:var(--neon-cyan);">
+            <span style="width:6px;height:6px;border-radius:50%;background:#ff3344;display:inline-block"></span> OMA NEURAL PLAYER
+            <span id="npTitle" style="flex:1; color:var(--text-secondary); font-weight:400; letter-spacing:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+            <button class="wbtn" id="npClose" title="Stop">✕</button></div>
+          <div style="aspect-ratio:16/9;"><iframe id="npFrame" style="border:0; width:100%; height:100%;" allow="autoplay; encrypted-media; fullscreen"></iframe></div>
+        </div>
+        <div class="town-pane" data-pane="visual hub" style="display:none; position:absolute; inset:0; flex-direction:column; background:#070b10;">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; border-bottom:1px solid var(--border-subtle); font-size:11px; color:var(--text-muted);">
+            <span id="vhTitle">VISUAL HUB · diagrams and charts Oma makes appear here</span>
+            <span><button class="btn" id="vhSave" style="font-size:11px; padding:2px 8px;" disabled>Save PNG</button></span>
+          </div>
+          <div id="vhBody" style="flex:1; overflow:auto; display:grid; place-items:center; padding:10px; color:var(--text-muted); font-size:12px;">Ask for a diagram, e.g. “Elon Musk-er company gular diagram banao”.</div>
+        </div>
+        <div class="town-pane" data-pane="gesture" style="display:none; position:absolute; inset:0; flex-direction:column; background:#070b10;">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; border-bottom:1px solid var(--border-subtle); font-size:11px; color:var(--text-muted);">
+            <span>GESTURE CONTROL · mouse by hand, through the webcam (off until you press Activate; Esc stops)</span>
+            <button class="btn blue" id="gestureBtn" style="font-size:11px; padding:2px 10px;">Activate</button>
+          </div>
+          <div style="flex:1; position:relative; display:grid; place-items:center;">
+            <video id="gestureVideo" playsinline muted style="max-width:100%; max-height:100%; transform:scaleX(-1); display:none;"></video>
+            <canvas id="gestureCanvas" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;"></canvas>
+            <div id="gestureNote" style="font-size:12px; color:var(--text-muted); text-align:center; max-width:360px;">✋ Move: index + middle up · Click: thumb to index · Right click: thumb to middle · Scroll: three fingers · Drag: fist</div>
+          </div>
+        </div>
       </div>
 
       <!-- Town Footer Telemetry -->
@@ -1598,7 +1691,7 @@ body {
 
     <!-- AGENT VIEW: Real multi-agent coordination activity stream -->
     <div class="feed-view-pane" id="feedAgentView" style="flex:1; display:none; flex-direction:column; min-height:0; overflow:hidden;">
-      <div style="padding:10px 14px; background:rgba(0,229,255,0.06); border-bottom:1px solid var(--line); font-size:11.5px; display:flex; justify-content:space-between;">
+      <div style="padding:10px 14px; background:rgba(var(--accent-rgb),0.06); border-bottom:1px solid var(--line); font-size:11.5px; display:flex; justify-content:space-between;">
         <span>Multi-Agent Task Stream</span>
         <b id="agentStreamTask" style="color:var(--text-muted);">no task yet</b>
       </div>
@@ -1671,11 +1764,11 @@ body {
     </div>
 
     <!-- GPU Card -->
-    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(0,229,255,0.2); border-radius:8px; padding:12px;">
+    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(var(--accent-rgb),0.2); border-radius:8px; padding:12px;">
       <span style="color:var(--neon-cyan); font-size:11px; text-transform:uppercase; font-weight:bold;">NVIDIA GPU Telemetry (NVML / SMI)</span>
       <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:8px;">
         <div><span style="color:var(--text-muted);">GPU Model:</span> <b style="display:block; color:#fff;" id="pch-gpu-name">--</b></div>
-        <div><span style="color:var(--text-muted);">GPU Core Load:</span> <b style="display:block; color:#00e5ff;" id="pch-gpu-pct">--%</b></div>
+        <div><span style="color:var(--text-muted);">GPU Core Load:</span> <b style="display:block; color:var(--neon-cyan);" id="pch-gpu-pct">--%</b></div>
         <div><span style="color:var(--text-muted);">GPU Temp:</span> <b style="display:block; color:#ffb300;" id="pch-gpu-temp">--°C</b></div>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
@@ -1697,7 +1790,7 @@ body {
         </div>
         <div style="display:flex; justify-content:space-between; padding:4px 6px; background:rgba(0,0,0,0.3); border-radius:4px;">
           <span>• WebView2 Cluster (Renderer &amp; GPU):</span>
-          <b id="pch-proc-webview" style="color:#00e5ff;">-- MB</b>
+          <b id="pch-proc-webview" style="color:var(--neon-cyan);">-- MB</b>
         </div>
         <div style="display:flex; justify-content:space-between; padding:4px 6px; background:rgba(0,0,0,0.3); border-radius:4px;">
           <span>• Python AI Backend processes:</span>
@@ -1994,6 +2087,13 @@ body {
     <div class="settings-container">
       <h1>Integrations</h1>
       <p class="lede">Your own servers. Set up the ones you run: Oma only mentions a service to the AI when you ask about it. Keys stay in Windows Credential Manager.</p>
+      <h3>Phone remote: chat with Oma</h3>
+      <div class="group">
+        <div class="row"><div class="t"><b>Telegram</b><span id="tgStatus">Create a bot with @BotFather in Telegram, paste its token here, then send /pair and the code to your bot. Only your paired chat is obeyed; risky steps ask you on the phone.</span></div>
+          <span style="display:flex; gap:6px;"><input class="field" id="tgToken" type="password" placeholder="Bot token" spellcheck="false" style="max-width:200px"><button class="btn blue" id="tgConnect">Connect</button><button class="btn" id="tgDisconnect" style="display:none">Disconnect</button></span></div>
+        <div class="row"><div class="t"><b>WhatsApp</b><span>Not connected. WhatsApp has no free personal bot API. Options: (1) WhatsApp Business Cloud API: official, needs a Meta business app, a separate phone number and a public webhook (a tunnel such as Cloudflare); (2) a linked-device bridge (like WhatsApp Web): works with your own number, but it is unofficial and WhatsApp may ban the number. Tell Oma's developer which one you want.</span></div>
+          <span class="pill">Not set up</span></div>
+      </div>
       <div id="ints"><div class="group"><div class="empty">Loading integrations...</div></div></div>
     </div>
   </section>
@@ -2072,7 +2172,13 @@ body {
 <!-- Injected Subsystems Scripts (always up to date via Web.cs) -->
 <script>/*ORB_JS*/</script>
 <script>/*MINDMAP_JS*/</script>
+<script>/*INCLUDE:office_town.js*/</script>
 <script>/*AGENT_TOWN_JS*/</script>
+<script>/*INCLUDE:visual_hub.js*/</script>
+<script>/*INCLUDE:world_mask.js*/</script>
+<script>/*INCLUDE:world_panel.js*/</script>
+<script>/*INCLUDE:panels.js*/</script>
+<script>/*INCLUDE:gesture.js*/</script>
 
 <!-- Master Controller with Single Authoritative Task-State Coordinator -->
 <script>
@@ -2195,7 +2301,7 @@ body {
           <div class="provider-header">
             <div class="provider-title">
               <span>${p.name}</span>
-              ${p.local ? '<span class="pill ok">Local GPU</span>' : '<span class="pill" style="background:rgba(0,229,255,0.15);color:#00e5ff;">Cloud</span>'}
+              ${p.local ? '<span class="pill ok">Local GPU</span>' : '<span class="pill" style="background:rgba(var(--accent-rgb),0.15);color:var(--neon-cyan);">Cloud</span>'}
             </div>
             <span class="pill ${p.badge || 'wait'}">${p.status || 'Offline'}</span>
           </div>
@@ -2258,6 +2364,9 @@ body {
     $('cpId').value = $('cpName').value = $('cpUrl').value = $('cpKey').value = $('cpModel').value = '';
   };
   $('btnRefreshLocal').onclick = () => post({ do: 'providers' });
+  $('tgConnect').onclick = () => { const v = $('tgToken').value.trim(); if (v.length < 20) return; post({ do: 'telegramConnect', token: v }); $('tgToken').value = ''; $('tgStatus').textContent = 'Checking the bot…'; };
+  $('tgDisconnect').onclick = () => post({ do: 'telegramDisconnect' });
+  post({ do: 'telegramStatus' });
   $('btnHealth').onclick = () => { $('phSummary').textContent = 'Checking...'; post({ do: 'providerHealth' }); };
   const PH_COL = { READY: '#00f59b', DEGRADED: '#ffc857', UNKNOWN: '#8a93a6', RATE_LIMITED: '#ffc857', COOLDOWN: '#ffc857',
                    QUOTA_EXHAUSTED: '#ff5a6a', AUTH_REQUIRED: '#ff5a6a', MODEL_RETIRED: '#ff5a6a', OFFLINE: '#ff5a6a' };
@@ -2354,7 +2463,9 @@ body {
     holoOrb?.setState('thinking');
     if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Sent to Oma</b>';
 
-    post({ do: 'ask', text: text.trim() });
+    const image = window.omaWorld?.live() ? window.omaWorld.frame() : '';   // Media Link is on: this question is about what it shows
+    post({ do: 'ask', text: text.trim(), image });
+    if (image) appendFeedEvent('MEDIA LINK', 'A frame from the camera / shared screen went with this question.');
   }
 
   $('btnHomeSend').onclick = () => { const inp = $('homeChatInput'); sendDirective(inp.value); inp.value = ''; };
@@ -2437,7 +2548,7 @@ body {
       if (ev.status === 'COMPLETED') return 'completed';
       if (ev.status === 'FAILED') return 'error';
       if (ev.status === 'PARTIAL') return 'partial';
-      if (ev.status === 'CANCELLED') return 'active';
+      if (ev.status === 'CANCELLED') return 'idle';
       return ({ analyzing: 'thinking', planning: 'planning', executing: 'executing', verifying: 'verifying', fallback: 'thinking', retry: 'planning', permission: 'waiting' })[ev.stage] || 'thinking';
     };
     const modelText = m => m ? `${m.provider} · ${m.resolved || m.model}` : '';
@@ -2455,6 +2566,26 @@ body {
       }
       return [ev.kind, ev.detail || ''];
     }
+    const COLORS = { alice: '#00e5ff', bob: '#ffb300', carol: '#b388ff', dave: '#00f59b', eve: '#ff4d6d' };
+    function stepChip(ev) {   // one line per real step: worker, what it does, how long it took
+      const st = ev.step || {}, key = `${ev.task_id}:${st.id}`;
+      let el = document.querySelector(`.module-chip[data-key="${CSS.escape(key)}"]`);
+      const secs = st.ended && st.started ? `${(st.ended - st.started).toFixed(1)}s` : '';
+      const mark = st.status === 'DONE' ? '✓' : st.status === 'FAILED' ? '✕' : '<span class="spin">◌</span>';
+      const html = `<span style="color:${COLORS[ev.worker] || '#9fb4d8'};font-weight:700">${esc(WN[ev.worker] || ev.worker)}</span>
+        <span class="mod">Module: <code>${esc(st.label || ev.detail || st.tool || '')}</code></span><span class="dur">${mark} ${secs}</span>`;
+      if (!el) {
+        if (!document.querySelector(`.module-chip[data-task="${CSS.escape(ev.task_id)}"]`)) {   // the first step of a task: say it is under way
+          appendFeedMessage('oma', 'OMA AI', `On it: ${WN[ev.worker] || 'a worker'} is ${(st.label || 'working').slice(0, 70).replace(/^\w/, c => c.toLowerCase())}…`);
+        }
+        const stream = $('homeFeedStream'); if (!stream) return;
+        el = document.createElement('div'); el.className = 'module-chip'; el.dataset.key = key; el.dataset.task = ev.task_id;
+        stream.appendChild(el); stream.scrollTop = stream.scrollHeight;
+      }
+      el.classList.toggle('failed', st.status === 'FAILED');
+      el.title = st.status === 'FAILED' ? (st.error || '') : (st.output || '').slice(0, 400);
+      el.innerHTML = html;
+    }
     function agentLine(ev, head, text) {
       const box = $('agentCoordStream');
       if (!box) return;
@@ -2467,7 +2598,8 @@ body {
       if (!cur || cur.id !== ev.task_id) cur = { id: ev.task_id, status: ev.status };
       cur.status = ev.status; cur.stage = ev.stage; cur.model = ev.active_model; cur.workers = ev.workers;
       const [head, text] = describe(ev);
-      if (ev.kind !== 'result') appendFeedEvent(head, text);
+      if (ev.kind === 'step') stepChip(ev);   // the chat shows each step as one module chip (Stonic style); the Agent tab keeps every event
+      else if (['task', 'permission', 'evidence'].includes(ev.kind) || (ev.kind === 'model' && ev.attempt && !ev.attempt.ok)) appendFeedEvent(head, text);
       agentLine(ev, head, text);
       if ($('agentStreamTask')) $('agentStreamTask').textContent = `${ev.task_id} · ${ev.status}`;
       const act = $('agentTownActivity');
@@ -2489,7 +2621,9 @@ body {
       if (tried) body += `<div style="margin-top:4px;color:var(--text-muted);font-size:11px;">Model attempts that failed: ${esc(tried)}</div>`;
       const html = `<div class="feed-card oma" style="border-left:3px solid ${color};"><div class="feed-meta"><span>OMA AI <b style="color:${color};">${label}</b></span>${model ? `<span class="model-tag ${rep.fallback_occurred ? 'fallback' : ''}">${esc(model)}${rep.text_only ? ' · text only' : ''}</span>` : ''}</div><div class="feed-text">${body}</div></div>`;
       ['homeFeedStream', 'fullFeedStream'].forEach(id => { const el = $(id); if (el) { el.insertAdjacentHTML('beforeend', html); el.scrollTop = el.scrollHeight; } });
-      holoOrb?.setState(status === 'COMPLETED' ? 'completed' : status === 'FAILED' ? 'error' : status === 'PARTIAL' ? 'partial' : 'active');
+      holoOrb?.setState(status === 'COMPLETED' ? 'completed' : status === 'FAILED' ? 'error' : status === 'PARTIAL' ? 'partial' : 'idle');
+      if (rep.diagram) window.omaVisualHub?.show(rep.diagram, rep.reply || '');
+      window.agentTown?.applyReply(rep);
       if (!rep.task_id) {   // the app itself refused (busy / timeout / crash): no backend task exists
         const act = $('agentTownActivity'); if (act) act.innerHTML = `Status: <b style="color:${color};">${esc(status)}</b>`;
       }
@@ -2531,7 +2665,7 @@ body {
     }
     function done() {
       document.querySelectorAll('.ask-card button').forEach(b => b.disabled = true);
-      setTimeout(() => { if (holoOrb && ['completed', 'error', 'partial'].includes(holoOrb.state)) holoOrb.setState('active'); }, 4000);
+      setTimeout(() => { if (holoOrb && ['completed', 'error', 'partial'].includes(holoOrb.state)) holoOrb.setState('idle'); }, 4000);
     }
     function restore(snap) {
       const t = snap && snap.task;
@@ -2548,6 +2682,7 @@ body {
       P = { talkMode: 'hold', ...d.prefs };
       if (d.version) if ($('aboutver')) $('aboutver').textContent = 'Oma AI • Version ' + d.version; if ($('ver')) $('ver').textContent = 'Oma AI • Version ' + d.version;
       paint();
+      window.omaApplyTheme?.(P.theme || 'stonic');
       if (d.state) state(d.state);
       post({ do: 'providers' });
     },
@@ -2567,6 +2702,27 @@ body {
     },
     providers: renderProviders,
     providerHealth,
+    headlines(d) { window.omaWorld?.headlines(d); },
+    telegram(t) {
+      const msg = { off: 'Not connected. Create a bot with @BotFather, paste its token, press Connect.', checking: 'Checking the bot…',
+        error: 'Could not connect: ' + (t.error || 'check the token'), pairing: `Bot @${t.bot} is ready. From your phone, send this to the bot:  /pair ${t.code}`,
+        connected: `Connected: @${t.bot} · paired with your chat. Send it any request.` }[t.state] || t.state;
+      $('tgStatus').textContent = msg;
+      $('tgDisconnect').style.display = t.state === 'off' ? 'none' : '';
+      $('tgToken').style.display = $('tgConnect').style.display = ['connected', 'pairing', 'checking'].includes(t.state) ? 'none' : '';
+    },
+    remoteIn(text) { appendFeedMessage('user', '📱 Telegram', text); holoOrb?.setState('thinking'); },
+    remoteAnswered() { document.querySelectorAll('.ask-card button').forEach(b => b.disabled = true); },
+    memory(d) { window.omaPanels?.data(d); },
+    skillSaved(r) { window.omaPanels?.saved(r); },
+    player(it) {   // the engine's {ME} --player: a YouTube video in the Agent Town panel
+      if (!it || !/^[\w-]{11}$/.test(it.id || '')) return;
+      $('npFrame').src = 'https://oma.ui/player.html?v=' + it.id;
+      $('npTitle').textContent = it.title || '';
+      $('neuralPlayer').style.display = 'block';
+      $('npClose').onclick = () => { $('npFrame').src = 'about:blank'; $('neuralPlayer').style.display = 'none'; };
+    },
+    brief(b) { if (b && b.text) appendFeedMessage('oma', 'OMA AI', b.text); },
     providerTestResult(res) {
       const card = document.querySelector(`.provider-card[data-pid="${res.id || ''}"]`);
       if (card) {
@@ -2602,7 +2758,7 @@ body {
         let card = stream.querySelector('.live-voice-card');
         if (!card) {
           const cardHtml = `
-            <div class="feed-card event live-voice-card" style="border-left:3px solid var(--neon-cyan); background:rgba(0,229,255,0.08);">
+            <div class="feed-card event live-voice-card" style="border-left:3px solid var(--neon-cyan); background:rgba(var(--accent-rgb),0.08);">
               <div class="feed-meta"><span style="color:var(--neon-cyan); font-weight:bold;">● LISTENING...</span><span style="color:#94a3b8; font-size:11px;">Release keys or click Mic to send</span></div>
               <div class="feed-text live-voice-text" style="color:#fff; font-style:italic;">Listening to microphone...</div>
             </div>`;
@@ -2654,7 +2810,7 @@ body {
         holoOrb?.setState('thinking');
         if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Voice command sent</b>';
       } else {
-        holoOrb?.setState('active');
+        holoOrb?.setState('idle');
         if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b>Idle</b>';
       }
     },
@@ -2766,7 +2922,14 @@ body {
   // Wire UI Controls
   window.addEventListener('DOMContentLoaded', () => {
     try {
-      holoOrb = new window.OmaHoloOrb('orb-canvas');
+      holoOrb = new window.OmaHoloOrb('orb-canvas', { theme: (P && P.theme) || 'stonic' });
+      holoOrb.onLabel = (label, s) => {   // the orb's real state names the footer and the button
+        const l = $('orb-state-label'), c = holoOrb.colorsFor(s).a;
+        if (l) { l.textContent = label; l.parentElement.style.color = `rgb(${c})`; }
+        const b = $('btn-terminate'); if (b) b.textContent = s === 'idle' ? 'START AI' : 'TERMINATE';
+        post({ do: 'orbState', s, theme: P.theme || 'stonic' });   // the floating orb mirrors it while Oma is minimized
+      };
+      holoOrb.onLabel('STANDBY', 'idle');
       agentTown = new window.AgentTown('town-canvas');
       mindMap = new window.OmaMindMap('cables-canvas');
       window.holoOrb = holoOrb;
@@ -2847,7 +3010,7 @@ body {
           Object.values(speedBtns).forEach(b => { if (b) { b.classList.remove('active'); b.style.color = 'var(--text-muted)'; b.style.background = 'transparent'; } });
           btn.classList.add('active');
           btn.style.color = '#fff';
-          btn.style.background = 'rgba(0,229,255,0.25)';
+          btn.style.background = 'rgba(var(--accent-rgb),0.25)';
           if (window.holoOrb && window.holoOrb.setSpeedMode) {
             window.holoOrb.setSpeedMode(spd);
           }
@@ -2931,9 +3094,22 @@ body {
     if (btnToggleSettings && drawer) btnToggleSettings.onclick = () => drawer.classList.add('open');
     if (btnCloseSettings && drawer) btnCloseSettings.onclick = () => drawer.classList.remove('open');
 
+    const applyTheme = t => {   // CSS accent + the orb's palette; saved like every other setting
+      document.documentElement.dataset.theme = t === 'stonic' ? '' : t;
+      if (t === 'stonic') delete document.documentElement.dataset.theme;
+      holoOrb?.setTheme(t);
+      post({ do: 'orbState', s: holoOrb?.state || 'idle', theme: t });   // the floating orb follows the theme too
+      document.querySelectorAll('#themeMenu button').forEach(b => b.classList.toggle('on', b.dataset.theme === t));
+    };
+    window.omaApplyTheme = applyTheme;
+    applyTheme(P.theme || 'stonic');
+    if ($('btn-theme')) $('btn-theme').onclick = e => { e.stopPropagation(); $('themeMenu').classList.toggle('open'); };
+    document.addEventListener('click', () => $('themeMenu')?.classList.remove('open'));
+    document.querySelectorAll('#themeMenu button').forEach(b => b.onclick = () => { applyTheme(b.dataset.theme); set('theme', b.dataset.theme); });
     const btnTerminate = $('btn-terminate');
     if (btnTerminate) {
       btnTerminate.onclick = () => {
+        if (holoOrb && holoOrb.state === 'idle') return post({ do: 'micToggle' });   // START AI: listen
         post({ do: 'voiceCancel' });
         post({ do: 'cancelTask' });   // the backend reports CANCELLED; worker states follow its event
       };

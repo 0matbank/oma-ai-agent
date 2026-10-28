@@ -42,7 +42,7 @@ TERMINAL = ('COMPLETED', 'PARTIAL', 'FAILED', 'CANCELLED')
 # Helper commands the engine runs (see atticus.py). Kept as plain prefixes so this module has no atticus import.
 _ME = 'atticus'
 _RESEARCH = tuple(f'{_ME} --{c}' for c in ('search', 'read', 'history'))
-_YOUTUBE = (f'{_ME} --int youtube', f'{_ME} --yt')
+_YOUTUBE = (f'{_ME} --int youtube', f'{_ME} --yt', f'{_ME} --player')
 _URL = re.compile(r'https?://', re.I)
 _BROWSERS = re.compile(r'\b(chrome|msedge|edge|firefox|opera|brave)\b', re.I)
 

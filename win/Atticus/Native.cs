@@ -42,6 +42,18 @@ static class Native
     [DllImport("user32")] public static extern int GetWindowLong(IntPtr h, int i);
     [DllImport("user32")] public static extern int SetWindowLong(IntPtr h, int i, int v);
     [DllImport("user32")] public static extern bool GetCursorPos(out POINT p);
+    [DllImport("user32")] public static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32")] static extern bool GetWindowRect(IntPtr h, out RECT r);
+    public static bool ForegroundIsFullScreen()   // a game, video or slideshow covers the whole screen
+    {
+        var h = GetForegroundWindow();
+        if (h == IntPtr.Zero || !GetWindowRect(h, out var r)) return false;
+        var s = Screen.FromHandle(h).Bounds;
+        return r.Left <= s.Left && r.Top <= s.Top && r.Right >= s.Right && r.Bottom >= s.Bottom && h != GetShellWindow() && h != GetDesktopWindow();
+    }
+    [DllImport("user32")] static extern IntPtr GetShellWindow();
+    [DllImport("user32")] static extern IntPtr GetDesktopWindow();
+    [DllImport("user32")] public static extern void mouse_event(uint flags, int dx, int dy, int data, IntPtr extra);
     [DllImport("user32")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     [DllImport("user32")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     public static readonly IntPtr HWND_TOPMOST = new(-1);

@@ -1,0 +1,11 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Oma</title>
+<style>html,body{margin:0;height:100%;background:#05070b;overflow:hidden;cursor:pointer}canvas{width:100vw;height:100vh;display:block}</style></head>
+<body><canvas id="o"></canvas>
+<script>/*ORB_JS*/</script>
+<script>
+  // Floating Oma: the same orb as the main window, mirroring its state while the window is minimized. Click: open Oma.
+  const holoOrb = new OmaParticleOrb('o', { count: 1400 });
+  window.holoOrb = holoOrb;
+  document.body.onclick = () => window.webkit.messageHandlers.float.postMessage({ do: 'restore' });
+</script></body></html>

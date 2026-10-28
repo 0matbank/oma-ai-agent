@@ -55,6 +55,7 @@ Copy-Item atticus.py, winctl.py $dest -Force
 New-Item -ItemType Directory -Force "$dest\integrations" | Out-Null
 Copy-Item integrations\*.py "$dest\integrations" -Force
 Copy-Item ui\*.html, ui\*.js, ui\*.css, ui\AppIcon.ico, ui\AppIcon.png "$dest\ui" -Force
+if (Test-Path ui\vendor) { Copy-Item ui\vendor "$dest\ui" -Recurse -Force }   # Mermaid for the Visual Hub (served as https://oma.ui/)
 New-Item -ItemType Directory -Force "$dest\multi_ai" | Out-Null
 Copy-Item multi_ai\* "$dest\multi_ai" -Recurse -Force
 

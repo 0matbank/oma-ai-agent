@@ -33,6 +33,8 @@ class OmaParticleOrb {
     hacker:    { a: [57, 255, 106], b: [170, 255, 190], core: [235, 255, 240] },
     cyberpunk: { a: [255, 43, 214], b: [122, 92, 255], core: [255, 225, 250] },
     danger:    { a: [255, 51, 68],  b: [255, 138, 138], core: [255, 236, 236] },
+    aurora:    { a: [167, 139, 250], b: [94, 234, 212], core: [240, 236, 255] },
+    solar:     { a: [255, 181, 71], b: [255, 225, 150], core: [255, 248, 230] },
   };
   static STATE = {   // colour override, energy, swirl, label
     idle:      { energy: 0.22, swirl: 0,    label: 'STANDBY' },
@@ -40,6 +42,9 @@ class OmaParticleOrb {
     thinking:  { energy: 0.75, swirl: 1,    label: 'CALIBRATING', tint: [255, 181, 71] },
     active:    { energy: 0.9,  swirl: 0.25, label: 'ACTIVE' },
     speaking:  { energy: 1,    swirl: 0.15, label: 'SPEAKING' },
+    planning:  { energy: 0.7,  swirl: 0.8,  label: 'PLANNING', tint: [255, 181, 71] },
+    executing: { energy: 0.9,  swirl: 0.3,  label: 'EXECUTING' },
+    verifying: { energy: 0.75, swirl: 0.5,  label: 'VERIFYING', tint: [183, 156, 255] },
     waiting:   { energy: 0.55, swirl: 0,    label: 'WAITING FOR YOU', tint: [255, 200, 87] },
     partial:   { energy: 0.6,  swirl: 0,    label: 'PARTIAL', tint: [255, 200, 87] },
     completed: { energy: 0.95, swirl: 0,    label: 'DONE', tint: [0, 245, 155] },

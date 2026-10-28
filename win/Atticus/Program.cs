@@ -100,6 +100,8 @@ static class Program
             _ = Speech.Load();
             ProviderHealth.Changed = j => Program.Post(() => { if (Settings is { Visible: true } w) w.Js($"st.providerHealth({j})"); });
             ProviderHealth.Start();
+            TelegramBridge.Changed = () => Program.Post(() => { if (Settings is { Visible: true } w) w.TelegramPush(); });
+            _ = Task.Run(TelegramBridge.Start);
             Listen();
             Err("Listen started");
             Updater.Schedule();

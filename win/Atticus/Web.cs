@@ -12,7 +12,7 @@ static class Web
                         "window.atticusPlatform = 'win';" +
                         "window.addEventListener('error', e => chrome.webview.postMessage({ n: 'jsError', b: { msg: String(e.message || e), file: String(e.filename || ''), line: e.lineno || 0 } }));";
     static Task<CoreWebView2Environment> env;
-    static Task<CoreWebView2Environment> Env => env ??= CoreWebView2Environment.CreateAsync(null, Path.Combine(Paths.Local, "WebView2"));
+    public static Task<CoreWebView2Environment> Env => env ??= CoreWebView2Environment.CreateAsync(null, Path.Combine(Paths.Local, "WebView2"));
 
     // A page from ui\ (orbs.js goes in place of its /*ORBS*/ marker); onMessage(handler name, body) on the UI thread.
     public static async Task<WebView2> Load(Control host, string page, Action<string, JsonElement> onMessage, Action onLoaded = null, bool transparent = false, string extra = "")
@@ -40,13 +40,26 @@ static class Web
             catch (Exception ex) { Program.Err("WebMessageReceived parse error: " + ex.Message); }
         };
         v.CoreWebView2.NewWindowRequested += (_, e) => { e.Handled = true; Open(e.Uri); };   // links open in the user's browser
+        // https://oma.ui/ = the ui folder: big local libraries (Mermaid) and pages that need a real origin (the YouTube player)
+        try { v.CoreWebView2.SetVirtualHostNameToFolderMapping("oma.ui", Path.GetDirectoryName(Paths.Ui(page))!, CoreWebView2HostResourceAccessKind.Allow); } catch (Exception ex) { Program.Err("oma.ui mapping: " + ex.Message); }
+        // the camera only ever starts from a button the user clicks in Oma's own page (Media Link, Gesture)
+        v.CoreWebView2.PermissionRequested += (_, e) => { if (e.PermissionKind == CoreWebView2PermissionKind.Camera) e.State = CoreWebView2PermissionState.Allow; };
         string html;
         try { html = File.ReadAllText(Paths.Ui(page)); } catch { html = $"missing {page}"; }
         if (html.Contains("/*ORBS*/")) html = html.Replace("/*ORBS*/", File.Exists(Paths.Ui("orbs.js")) ? File.ReadAllText(Paths.Ui("orbs.js")) : "");
         if (html.Contains("/*ORB_JS*/")) html = html.Replace("/*ORB_JS*/", File.Exists(Paths.Ui("orb.js")) ? File.ReadAllText(Paths.Ui("orb.js")) : "");
         if (html.Contains("/*MINDMAP_JS*/")) html = html.Replace("/*MINDMAP_JS*/", File.Exists(Paths.Ui("mindmap.js")) ? File.ReadAllText(Paths.Ui("mindmap.js")) : "");
         if (html.Contains("/*AGENT_TOWN_JS*/")) html = html.Replace("/*AGENT_TOWN_JS*/", File.Exists(Paths.Ui("agent_town.js")) ? File.ReadAllText(Paths.Ui("agent_town.js")) : "");
-        v.CoreWebView2.NavigateToString(html);
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"/\*INCLUDE:([\w.\-]+)\*/", m => File.Exists(Paths.Ui(m.Groups[1].Value)) ? File.ReadAllText(Paths.Ui(m.Groups[1].Value)) : "");
+        // Served from https://oma.ui/ (a secure context) instead of NavigateToString's about:blank: the camera and screen
+        // share (Media Link, Gesture) only exist in a secure context, and there is no 2 MB page limit.
+        try
+        {
+            var built = Path.Combine(Path.GetDirectoryName(Paths.Ui(page))!, "_" + page);
+            File.WriteAllText(built, html);
+            v.CoreWebView2.Navigate("https://oma.ui/_" + page);
+        }
+        catch (Exception ex) { Program.Err("Web.Load: " + ex.Message + "; falling back to NavigateToString"); v.CoreWebView2.NavigateToString(html); }
         return v;
     }
 
