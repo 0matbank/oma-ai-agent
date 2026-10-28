@@ -50,7 +50,7 @@ def normalize_mode(mode: str) -> str:
 
 def _settings() -> Dict[str, Any]:
     try:
-        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+        with open(SETTINGS_FILE, 'r', encoding='utf-8-sig') as f:
             return json.load(f)
     except Exception:
         return {}

@@ -115,6 +115,18 @@ class RunFallbackTests(unittest.TestCase):
         f.assert_not_called()   # a half-done action is never "completed" by another model
         self.assertFalse(atticus.run.ok)
 
+    def test_a_dont_allow_is_final_and_said_plainly(self):
+        rows = [{'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'id': 't1', 'name': 'Bash', 'input': {'command': 'atticus --trash ~/Desktop/x.txt'}}]}},
+                {'type': 'user', 'message': {'content': [{'type': 'tool_result', 'tool_use_id': 't1', 'is_error': True,
+                                                          'content': 'PreToolUse:Bash hook error: The user said no. Do not try another way; say it was not done.'}]}},
+                {'type': 'result', 'result': 'I could not delete it.'}]
+        with patch.object(atticus, 'text_only') as f:
+            reply, _, _ = atticus.run('q', self.proc(rows))
+        f.assert_not_called()
+        self.assertTrue(atticus.run.denied)
+        self.assertFalse(atticus.run.ok)
+        self.assertIn("Don't Allow", reply)
+
     def test_error_kinds(self):
         self.assertEqual(atticus.claude_error_type("You've hit your limit · resets 5pm"), 'quota_exhausted')
         self.assertEqual(atticus.claude_error_type('API Error: 429 rate limit'), 'rate_limited')
@@ -127,6 +139,15 @@ class RunFallbackTests(unittest.TestCase):
         self.assertTrue(atticus.ACTION_WORDS.search('ক্যালকুলেটর খোলো'))
         self.assertTrue(atticus.ACTION_WORDS.search('chrome kholo'))
         self.assertFalse(atticus.ACTION_WORDS.search('Bangladesh er rajdhani ki?'))
+
+
+class SettingsReadTests(unittest.TestCase):
+    def test_bom_does_not_drop_settings(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'settings.json')
+            open(p, 'w', encoding='utf-8-sig').write('{"model": "sonnet", "aiMode": "local"}')   # what PowerShell 5.1 writes
+            with patch.object(atticus, 'PREFS', p):
+                self.assertEqual(atticus.pref('model', 'haiku'), 'sonnet')
 
 
 class RouterTests(unittest.TestCase):
@@ -171,6 +192,17 @@ class BanglishTests(unittest.TestCase):
                 self.assertEqual(sh.call_args.args[0], app)
             sh.reset_mock()
             self.assertIsNone(atticus.fast('Chrome kholo and search youtube for lofi'))   # two steps: the AI does it
+            sh.assert_not_called()
+
+    def test_english_model_mishearing_of_kholo(self):
+        """base.en transcribed real Bangla audio "ক্যালকুলেটর খোলো" as "calculator color." (Atticus.exe --transcribe)."""
+        with patch.object(atticus, 'show', side_effect=lambda a: 'opened ' + a) as sh, patch.object(atticus, 'pref', side_effect=lambda k, d: d), \
+             patch.object(atticus, 'skills', return_value={}):
+            self.assertTrue(atticus.fast('calculator color.'))
+            self.assertEqual(sh.call_args.args[0], 'calc')
+            sh.reset_mock()
+            for t in ('change chrome color', 'what color is the sky'):
+                self.assertIsNone(atticus.fast(t))
             sh.assert_not_called()
 
 

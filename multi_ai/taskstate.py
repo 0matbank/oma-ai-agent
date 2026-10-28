@@ -63,8 +63,8 @@ def worker_for(tool_name, inp):
         return 'alice'
     if c.startswith(f'{_ME} --show') and _URL.search(c):
         return 'bob'
-    if re.match(r'^(start|open)\b.*https?://', c, re.I):
-        return 'bob'
+    if _URL.search(c) and re.search(r'^(start|open)\b|start-process|\bexplorer(\.exe)?\s|' + _BROWSERS.pattern, c, re.I):
+        return 'bob'   # anything that opens a web address in a browser, however it is started
     if c.startswith(f'{_ME} --keys') and _BROWSERS.search(c):
         return 'bob'
     return 'carol'

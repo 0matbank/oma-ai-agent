@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oma Face Preview</title>
+<style>
+  :root { --bg:#05070b; --panel:#0b1428; --line:rgba(94,242,240,.22); --cyan:#5ff2f0; --txt:#dfe9f5; --mut:#7c8aa3; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:13px/1.45 system-ui, Segoe UI, sans-serif; }
+  header { padding:12px 18px; border-bottom:1px solid var(--line); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header b { letter-spacing:.08em; color:var(--cyan); }
+  header span { color:var(--mut); }
+  main { display:grid; grid-template-columns: minmax(320px, 1fr) 300px; gap:16px; padding:16px; max-width:1400px; margin:0 auto; }
+  .card { background:linear-gradient(180deg,#0c1830,#081022); border:1px solid var(--line); border-radius:14px; position:relative; overflow:hidden; }
+  .face { aspect-ratio: 16/10; min-height:320px; }
+  .face canvas { position:absolute; inset:0; width:100%; height:100%; }
+  .grid { position:absolute; inset:0; background-image:linear-gradient(rgba(94,242,240,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(94,242,240,.05) 1px,transparent 1px); background-size:28px 28px; pointer-events:none; }
+  .badge { position:absolute; left:14px; top:12px; padding:4px 10px; border-radius:999px; border:1px solid var(--line); background:rgba(0,0,0,.35); font-weight:700; font-size:11px; letter-spacing:.08em; color:var(--cyan); z-index:2; }
+  .stats { position:absolute; right:12px; top:12px; font:11px ui-monospace,Consolas,monospace; color:var(--mut); z-index:2; text-align:right; }
+  aside { display:flex; flex-direction:column; gap:12px; }
+  aside .card { padding:12px; }
+  h3 { margin:0 0 8px; font-size:12px; letter-spacing:.08em; color:var(--mut); text-transform:uppercase; }
+  .btns { display:flex; flex-wrap:wrap; gap:6px; }
+  button { background:#0f1d38; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:5px 9px; cursor:pointer; font:inherit; }
+  button.on { background:rgba(95,242,240,.18); color:var(--cyan); border-color:var(--cyan); }
+  .log { font:11px ui-monospace,Consolas,monospace; color:var(--mut); max-height:180px; overflow:auto; white-space:pre-wrap; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; padding:12px; } }
+</style>
+</head>
+<body>
+<header><b>OMA AI · FACE PREVIEW</b><span>Not installed. For your approval only. Rendering code below is the drop-in replacement for ui/orb.js.</span></header>
+<main>
+  <section class="card face" id="faceCard">
+    <div class="grid"></div>
+    <div class="badge" id="badge">SYSTEM ACTIVE</div>
+    <div class="stats" id="stats">measuring…</div>
+    <canvas id="orb-canvas"></canvas>
+  </section>
+  <aside>
+    <div class="card"><h3>State</h3><div class="btns" id="states"></div></div>
+    <div class="card"><h3>Speed</h3><div class="btns" id="speeds"></div>
+      <label style="display:block;margin-top:8px;color:var(--mut)"><input type="checkbox" id="reduce"> Reduce motion</label></div>
+    <div class="card"><h3>Replay a recorded real task</h3><div class="btns" id="tasks"></div><div class="log" id="log"></div></div>
+    <div class="card"><h3>Speaking test</h3><div class="btns"><button id="talk">Simulate voice level</button></div>
+      <div style="color:var(--mut);margin-top:6px">In the app the level comes from the microphone / speech output.</div></div>
+  </aside>
+</main>
+<script>
+/* ============================================================================================
+   OmaHoloFace — friendly holographic human bust made of particles (Canvas 2D, no assets).
+   Geometry: a signed-distance model of head, face, hair, neck and shoulders; ~18k surface points
+   are sampled once, lit (soft key + rim), then projected each frame. Motion is slow and frame-rate
+   independent; it pauses when hidden and idles at a low frame rate. Same API as ui/orb.js.
+   ============================================================================================ */
+(function () {
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const mix = (a, b, t) => a + (b - a) * t;
+  const smin = (a, b, k) => { const h = clamp(0.5 + 0.5 * (b - a) / k, 0, 1); return mix(b, a, h) - k * h * (1 - h); };
+  const smax = (a, b, k) => -smin(-a, -b, k);
+  function ell(p, c, r) {   // approximate ellipsoid SDF
+    const x = (p[0] - c[0]) / r[0], y = (p[1] - c[1]) / r[1], z = (p[2] - c[2]) / r[2];
+    const k0 = Math.hypot(x, y, z), k1 = Math.hypot(x / r[0], y / r[1], z / r[2]);
+    return k1 === 0 ? -Math.min(...r) : k0 * (k0 - 1) / k1;
+  }
+  function cap(p, a, b, r) {
+    const pa = [p[0] - a[0], p[1] - a[1], p[2] - a[2]], ba = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const h = clamp((pa[0] * ba[0] + pa[1] * ba[1] + pa[2] * ba[2]) / (ba[0] * ba[0] + ba[1] * ba[1] + ba[2] * ba[2]), 0, 1);
+    return Math.hypot(pa[0] - ba[0] * h, pa[1] - ba[1] * h, pa[2] - ba[2] * h) - r;
+  }
+  // y up, z toward the viewer, head height ~2 units
+  function body(p) {
+    let d = ell(p, [0, 0.38, -0.04], [0.74, 0.86, 0.84]);                 // cranium
+    d = smin(d, ell(p, [0, -0.2, 0.12], [0.6, 0.66, 0.7]), 0.28);        // face / jaw
+    d = smin(d, ell(p, [0, -0.7, 0.33], [0.26, 0.17, 0.24]), 0.18);       // chin
+    for (const s of [-1, 1]) {
+      d = smin(d, ell(p, [s * 0.36, -0.12, 0.42], [0.24, 0.2, 0.24]), 0.16); // cheeks
+      d = smin(d, ell(p, [s * 0.76, 0.06, -0.02], [0.08, 0.2, 0.12]), 0.06); // ears
+      d = smax(d, -ell(p, [s * 0.27, 0.16, 0.86], [0.15, 0.09, 0.12]), 0.07); // soft eye hollows
+    }
+    d = smin(d, ell(p, [0, 0.3, 0.62], [0.52, 0.09, 0.16]), 0.12);        // brow
+    d = smin(d, cap(p, [0, 0.12, 0.76], [0, -0.2, 0.9], 0.075), 0.1);     // nose bridge
+    d = smin(d, ell(p, [0, -0.24, 0.87], [0.12, 0.09, 0.1]), 0.07);       // nose tip
+    d = smin(d, ell(p, [0, -0.43, 0.75], [0.14, 0.04, 0.07]), 0.05);      // upper lip
+    d = smin(d, ell(p, [0, -0.52, 0.74], [0.13, 0.045, 0.07]), 0.05);     // lower lip
+    d = smin(d, cap(p, [0, -0.66, -0.06], [0, -1.55, -0.08], 0.34), 0.22); // neck
+    d = smin(d, ell(p, [0, -1.95, -0.12], [1.5, 0.52, 0.58]), 0.35);      // shoulders
+    d = Math.max(d, -(p[1] + 2.25));                                         // cut below the chest
+    return d;
+  }
+  function hair(p) {   // a soft cap over top, back and sides, a natural hairline, locks framing the face to the shoulders
+    let d = ell(p, [0, 0.5, -0.08], [0.83, 0.95, 0.93]);
+    for (const s of [-1, 1]) d = smin(d, ell(p, [s * 0.68, -0.35, 0.02], [0.2, 0.85, 0.36]), 0.22);
+    d = smin(d, ell(p, [0, -0.5, -0.4], [0.84, 0.95, 0.42]), 0.3);
+    const ax = Math.abs(p[0]);
+    const hairline = 0.66 - 0.16 * ax + 0.5 * ax * ax + 0.025 * Math.sin(p[0] * 23);   // natural, slightly uneven hairline
+    const faceOpen = Math.min(p[2] - 0.12 + 0.25 * Math.max(0, ax - 0.5), hairline - p[1]);   // >0 inside the face opening
+    d = smax(d, faceOpen, 0.06);
+    d = Math.max(d, -(p[1] + 1.55));
+    return d;
+  }
+  function project(sdf, p) {
+    for (let i = 0; i < 12; i++) {
+      const d = sdf(p), e = 0.002;
+      const g = [sdf([p[0] + e, p[1], p[2]]) - d, sdf([p[0], p[1] + e, p[2]]) - d, sdf([p[0], p[1], p[2] + e]) - d];
+      const l = Math.hypot(...g) || 1;
+      p = [p[0] - d * g[0] / l, p[1] - d * g[1] / l, p[2] - d * g[2] / l];
+      if (Math.abs(d) < 0.0015) return [p, [g[0] / l, g[1] / l, g[2] / l]];
+    }
+    return null;
+  }
+  function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+  function buildCloud(n) {
+    const R = rng(20261028), pts = [];
+    const add = (sdf, count, kind, box) => {
+      let made = 0, tries = 0;
+      while (made < count && tries < count * 30) {
+        tries++;
+        const q = [mix(box[0], box[1], R()), mix(box[2], box[3], R()), mix(box[4], box[5], R())];
+        const r = project(sdf, q);
+        if (!r) continue;
+        const [p, nrm] = r;
+        if (kind === 'skin' && hair(p) < -0.01) continue;  // hidden under the hair
+        pts.push({ x: p[0], y: p[1], z: p[2], nx: nrm[0], ny: nrm[1], nz: nrm[2], kind, j: R(), k: R() });
+        made++;
+      }
+    };
+    add(body, Math.round(n * 0.42), 'skin', [-1.6, 1.6, -2.3, 1.3, -0.8, 1.05]);
+    add(body, Math.round(n * 0.3), 'skin', [-0.66, 0.66, -0.92, 0.72, 0.18, 1.05]);   // denser on the face, like the reference
+    add(hair, Math.round(n * 0.25), 'hair', [-1.0, 1.0, -1.4, 1.5, -0.9, 0.8]);
+    // the eyes: soft iris rings and a bright catch-light, drawn as their own points so they can blink and look
+    for (const s of [-1, 1]) {
+      const ex = s * 0.27, ey = 0.155;
+      for (let i = 0; i < Math.round(n * 0.012); i++) {   // eye: almond white, iris, pupil
+        const u = R() * 2 - 1, v = R() * 2 - 1;
+        const half = 0.055 * (1 - u * u);                     // almond: tall in the middle, pointed at the corners
+        const x = ex + u * 0.115, y = ey + v * half, rr = Math.hypot(x - ex, (y - ey) * 1.0) / 0.045;
+        pts.push({ x, y, z: 0.8 - u * u * 0.06, nx: 0, ny: 0, nz: 1, kind: 'eye', side: s, r: rr, j: R(), k: R() });
+      }
+      for (let i = 0; i < Math.round(n * 0.004); i++) {   // upper lid line
+        const u = R() * 2 - 1;
+        pts.push({ x: ex + u * 0.12, y: ey + 0.058 * (1 - u * u) + 0.004, z: 0.81 - u * u * 0.06, nx: 0, ny: 0.3, nz: 1, kind: 'lid', j: R(), k: R() });
+      }
+      for (let i = 0; i < Math.round(n * 0.006); i++) {   // soft, slightly raised brows: friendly
+        const u = R() * 2 - 1;
+        pts.push({ x: ex + u * 0.15 + s * 0.01, y: ey + 0.15 + 0.035 * (1 - u * u) - s * u * 0.012 + (R() - 0.5) * 0.02, z: 0.78 - u * u * 0.08, nx: 0, ny: 0.4, nz: 0.9, kind: 'brow', j: R(), k: R() });
+      }
+    }
+    for (let i = 0; i < Math.round(n * 0.006); i++) {        // lips: a gentle smile curve, upper and lower
+      const u = R() * 2 - 1, up = R() < 0.5;
+      const smile = 0.022 * u * u;                              // corners lift a little
+      const y = (up ? -0.445 : -0.505) + smile + (up ? 0.022 : -0.03) * (1 - u * u) * R();
+      pts.push({ x: u * 0.13, y, z: 0.8 - u * u * 0.07, nx: 0, ny: up ? 0.3 : -0.2, nz: 1, kind: 'lip', up, j: R(), k: R() });
+    }
+    // light: soft key from upper left front, cool fill, rim from behind
+    const L = [-0.45, 0.55, 0.7], ll = Math.hypot(...L);
+    for (const p of pts) {
+      const lam = Math.max(0, (p.nx * L[0] + p.ny * L[1] + p.nz * L[2]) / ll);
+      const rim = Math.pow(1 - Math.abs(p.nz), 2.2);
+      p.lit = 0.22 + 0.62 * lam + 0.35 * rim;
+      p.gold = p.kind !== 'eye' && lam > 0.82 && p.j < 0.22;   // subtle golden highlights on the lit planes
+      p.face = p.kind === 'skin' && p.z > 0.35 && p.y > -0.85;
+      if (p.kind === 'skin' && Math.abs(p.x) < 0.05 && p.y > -0.28 && p.y < 0.15 && p.z > 0.74) p.lit *= 1.35;   // nose bridge catches the light
+      if (p.kind === 'eye') p.catch = p.x * p.side > 0.27 * p.side + 0.005 && p.y > 0.165 && p.r < 0.6 && p.j < 0.25;   // a tiny catch-light
+    }
+    return pts;
+  }
+
+  const PALETTE = {   // per state: [r,g,b] main tint, rim tint, glow strength
+    active:    { c: [95, 225, 255], rim: [60, 140, 255], glow: 0.9 },
+    listening: { c: [110, 240, 255], rim: [80, 200, 255], glow: 1.1 },
+    transcribing: { c: [120, 235, 255], rim: [255, 205, 120], glow: 1.0 },
+    thinking:  { c: [120, 205, 255], rim: [150, 120, 255], glow: 1.0 },
+    planning:  { c: [110, 215, 255], rim: [120, 160, 255], glow: 1.0 },
+    executing: { c: [90, 235, 235], rim: [60, 255, 210], glow: 1.05 },
+    verifying: { c: [110, 230, 245], rim: [90, 255, 190], glow: 1.0 },
+    speaking:  { c: [130, 240, 255], rim: [90, 190, 255], glow: 1.15 },
+    waiting:   { c: [140, 215, 250], rim: [255, 190, 90], glow: 0.95 },
+    partial:   { c: [150, 215, 245], rim: [255, 190, 90], glow: 0.9 },
+    completed: { c: [120, 245, 225], rim: [90, 255, 160], glow: 1.05 },
+    error:     { c: [190, 190, 235], rim: [255, 95, 120], glow: 0.85 },
+  };
+  const LABEL = { active: 'SYSTEM ACTIVE', listening: 'LISTENING …', transcribing: 'TRANSCRIBING …', thinking: 'THINKING …', planning: 'PLANNING …',
+                  executing: 'EXECUTING …', verifying: 'VERIFYING …', speaking: 'SPEAKING …', waiting: 'WAITING FOR YOU', partial: 'PARTIAL RESULT',
+                  completed: 'COMPLETED', error: 'ERROR' };
+
+  class OmaHoloFace {
+    constructor(canvasId, opts = {}) {
+      this.canvas = typeof canvasId === 'string' ? document.getElementById(canvasId) : canvasId;
+      this.ctx = this.canvas.getContext('2d');
+      this.buf = document.createElement('canvas');
+      this.bctx = this.buf.getContext('2d', { willReadFrequently: false });
+      this.pts = buildCloud(opts.particles || 26000);
+      this.state = 'active'; this.prevState = 'active'; this.blend = 1;
+      this.speedMode = 'slow'; this.reduce = false;
+      this.audio = 0; this.targetAudio = 0;
+      this.t = 0; this.form = 0;            // 0 → 1: particles gather into the face on start
+      this.blinkT = 3 + Math.random() * 3; this.blink = 0;
+      this.look = [0, 0]; this.lookTarget = [0, 0]; this.lookTimer = 2;
+      this.targetRotX = 0; this.targetRotY = 0; this.targetZoomScale = 1;
+      this.frameMs = 0; this.fps = 0; this._fpsN = 0; this._fpsT = 0;
+      this.onstats = opts.onstats || null;
+      this.resize();
+      this._ro = new ResizeObserver(() => this.resize()); this._ro.observe(this.canvas);
+      this._vis = () => { if (!document.hidden) this._kick(); };
+      document.addEventListener('visibilitychange', this._vis);
+      this.last = performance.now();
+      this._kick();
+    }
+    _kick() { if (!this._raf) this._raf = requestAnimationFrame(ts => this._frame(ts)); }
+    resize() {
+      const r = this.canvas.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+      this.w = Math.max(1, Math.round(r.width * dpr)); this.h = Math.max(1, Math.round(r.height * dpr));
+      this.canvas.width = this.w; this.canvas.height = this.h;
+      this.buf.width = Math.round(this.w / 1.5); this.buf.height = Math.round(this.h / 1.5);   // particles drawn at 2/3 res, glow from it
+      this.img = this.bctx.createImageData(this.buf.width, this.buf.height);
+      this.acc = new Float32Array(this.buf.width * this.buf.height * 3);
+    }
+    setState(s) {
+      if (!PALETTE[s]) s = s === 'working' ? 'executing' : 'active';
+      if (s === this.state) return;
+      this.prevState = this.state; this.state = s; this.blend = 0;
+      const b = document.getElementById('sphere-status-text') || document.getElementById('badge');
+      if (b) b.textContent = LABEL[s];
+      const badge = document.getElementById('sphere-status-badge'); if (badge) badge.className = 'status-badge ' + s;
+    }
+    setAudioLevel(v) { this.targetAudio = clamp(+v || 0, 0, 1); }
+    setSpeedMode(m) { this.speedMode = ['slow', 'normal', 'fast'].includes(m) ? m : 'slow'; }
+    setReduceMotion(on) { this.reduce = !!on; }
+    destroy() { cancelAnimationFrame(this._raf); this._ro.disconnect(); document.removeEventListener('visibilitychange', this._vis); }
+
+    _frame(ts) {
+      this._raf = 0;
+      if (document.hidden) return;   // nothing runs while the window is hidden or minimized
+      const busy = !['active', 'completed', 'partial', 'error'].includes(this.state) || this.blend < 1 || this.form < 1 || this.audio > 0.02;
+      const cap = this.reduce ? 20 : busy ? 50 : 30;   // never the monitor's full 144-240 Hz
+      if (ts - this.last < 1000 / cap - 2) { this._kick(); return; }
+      const dt = Math.min(0.1, (ts - this.last) / 1000); this.last = ts;
+      const t0 = performance.now();
+      this._update(dt); this._draw();
+      const ms = performance.now() - t0;
+      this.frameMs = this.frameMs * 0.9 + ms * 0.1;
+      this._fpsN++; this._fpsT += dt;
+      if (this._fpsT >= 1) { this.fps = this._fpsN / this._fpsT; this._fpsN = 0; this._fpsT = 0; this.onstats && this.onstats(this); }
+      // calm states render at ~30 fps, busy ones at the display rate
+      this._kick();
+    }
+    _update(dt) {
+      const sp = { slow: 0.55, normal: 0.8, fast: 1.1 }[this.speedMode] * (this.reduce ? 0.35 : 1);
+      this.t += dt * sp;
+      this.form = Math.min(1, this.form + dt * 0.55);
+      this.blend = Math.min(1, this.blend + dt * 1.4);
+      this.audio += (this.targetAudio - this.audio) * Math.min(1, dt * 10);
+      // natural blink every 3-7 s, 160 ms
+      this.blinkT -= dt;
+      if (this.blinkT <= 0) { this.blink = 0.16; this.blinkT = 3 + Math.random() * 4; }
+      this.blink = Math.max(0, this.blink - dt);
+      // gaze: small, slow saccades; thinking looks up-left
+      this.lookTimer -= dt;
+      if (this.lookTimer <= 0) {
+        this.lookTimer = 1.8 + Math.random() * 2.6;
+        this.lookTarget = this.state === 'thinking' ? [-0.25, 0.25] : this.state === 'listening' ? [0, 0] : [(Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.15];
+      }
+      for (const i of [0, 1]) this.look[i] += (this.lookTarget[i] - this.look[i]) * Math.min(1, dt * 3);
+    }
+    _draw() {
+      const W = this.buf.width, H = this.buf.height, acc = this.acc; acc.fill(0);
+      const st = PALETTE[this.state], pv = PALETTE[this.prevState], b = this.blend;
+      const tint = [0, 1, 2].map(i => mix(pv.c[i], st.c[i], b)), rimT = [0, 1, 2].map(i => mix(pv.rim[i], st.rim[i], b));
+      const glow = mix(pv.glow, st.glow, b);
+      const t = this.t, still = this.reduce;
+      const yaw = (still ? 0 : Math.sin(t * 0.35) * 0.16 + Math.sin(t * 0.13) * 0.06) + this.targetRotY * 0.002 + this.look[0] * 0.25;
+      const pitch = (still ? 0 : Math.sin(t * 0.27) * 0.04) + (this.state === 'error' ? 0.08 : 0) + (this.state === 'listening' ? -0.03 : 0) + this.look[1] * 0.12;
+      const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), spp = Math.sin(pitch);
+      const breathe = still ? 0 : Math.sin(t * 1.3) * 0.012;
+      const scale = Math.min(W / 3.0, H / 3.85) * (this.targetZoomScale || 1);
+      const ox = W / 2, oy = H * 0.4;
+      const mouth = this.state === 'speaking' || this.audio > 0.02 ? this.audio : 0;
+      const blinkK = this.blink > 0 ? Math.sin((this.blink / 0.16) * Math.PI) : 0;
+      const shimmer = this.state === 'thinking' || this.state === 'planning';
+      const scanY = this.state === 'planning' ? ((t * 0.35) % 1) * 4 - 2.2 : 99;
+      const f = this.form, ff = f * f * (3 - 2 * f);
+      const pts = this.pts, n = pts.length;
+      for (let i = 0; i < n; i++) {
+        const p = pts[i];
+        let x = p.x, y = p.y, z = p.z;
+        if (p.kind === 'eye' || p.kind === 'lid') {
+          x += this.look[0] * 0.035; y += this.look[1] * 0.025;
+          y = mix(y, 0.16, blinkK * 0.92);   // eyelids close toward the centre line
+        }
+        if (mouth && (p.kind === 'lip' && !p.up || p.kind === 'skin' && p.z > 0.4 && p.y < -0.5 && p.y > -0.85 && Math.abs(p.x) < 0.35)) y -= mouth * 0.06 * (1 - Math.min(1, Math.abs(p.x) / 0.35));
+        if (p.y < -0.6) y += breathe * (p.y + 0.6) * -2.5;   // shoulders rise and fall slightly
+        if (p.kind === 'hair' && !still) x += Math.sin(t * 0.9 + p.y * 3 + p.j * 6) * 0.006;
+        if (shimmer && !still) y += Math.sin(t * 2 + p.j * 40) * 0.004;
+        // gather from a soft cloud on start
+        if (ff < 1) { const a = p.j * 6.283, r = 2.2 * (1 - ff); x += Math.cos(a) * r * p.k; y += Math.sin(a * 1.7) * r * 0.6; z += (p.k - 0.5) * r; }
+        // rotate (yaw, then pitch) and project
+        const x1 = x * cy + z * sy, z1 = -x * sy + z * cy;
+        const y2 = y * cp - z1 * spp, z2 = y * spp + z1 * cp;
+        const persp = 3.6 / (3.6 - z2);
+        const sx = ox + x1 * scale * persp, syy = oy - y2 * scale * persp;
+        const ix = sx | 0, iy = syy | 0;
+        if (ix < 0 || iy < 0 || ix >= W || iy >= H) continue;
+        // brightness: lighting, depth, front of face a little brighter, eyes brightest, back side dim
+        const nz = p.nx * sy + p.nz * cy;
+        let v = p.lit * (0.55 + 0.45 * clamp((z2 + 1) / 2, 0, 1)) * (nz < -0.2 ? 0.35 : 1);
+        if (p.face) v *= 1.55;
+        if (p.kind === 'hair') v *= 0.5 + 0.45 * (0.5 + 0.5 * Math.sin(p.x * 55 + Math.sin(p.y * 3) * 4)) * (0.7 + 0.3 * p.k);   // strands
+        if (p.kind === 'eye') v = p.catch ? 1.8 : p.r < 0.42 ? 0.18 : p.r < 1 ? 1.05 : 0.55;   // pupil, iris, soft white
+        else if (p.kind === 'lid') v = 0.9;
+        else if (p.kind === 'brow') v = 0.75;
+        else if (p.kind === 'lip') v = p.up ? 0.5 : 0.6;
+        if (Math.abs(y - scanY) < 0.05) v *= 1.6;
+        v *= 0.38 * glow;
+        let r = tint[0], g = tint[1], bl = tint[2];
+        const rimK = Math.pow(1 - Math.abs(nz), 3);
+        r = mix(r, rimT[0], rimK); g = mix(g, rimT[1], rimK); bl = mix(bl, rimT[2], rimK);
+        if (p.gold) { r = mix(r, 255, 0.7); g = mix(g, 214, 0.7); bl = mix(bl, 140, 0.7); }
+        if (p.face && v > 0.35) { const wk = Math.min(0.55, (v - 0.35) * 1.2); r = mix(r, 235, wk); g = mix(g, 250, wk); bl = mix(bl, 255, wk); }   // whiter core like the reference
+        if (p.kind === 'hair') { r = r * 0.75 + 30; g *= 0.85; bl = Math.min(255, bl * 1.05 + 10); }
+        const o = (iy * W + ix) * 3;
+        acc[o] += r * v; acc[o + 1] += g * v; acc[o + 2] += bl * v;
+      }
+      const d = this.img.data;
+      for (let i = 0, j = 0; i < acc.length; i += 3, j += 4) {
+        const r = acc[i] > 255 ? 255 : acc[i], g = acc[i + 1] > 255 ? 255 : acc[i + 1], b2 = acc[i + 2] > 255 ? 255 : acc[i + 2];
+        const a = r > g ? (r > b2 ? r : b2) : (g > b2 ? g : b2);   // light as alpha: transparent where there are no particles
+        if (a < 1) { d[j + 3] = 0; continue; }
+        const k = 255 / a;   // un-premultiply so the drawn light equals the accumulated light
+        d[j] = r * k; d[j + 1] = g * k; d[j + 2] = b2 * k; d[j + 3] = a;
+      }
+      this.bctx.putImageData(this.img, 0, 0);
+      const c = this.ctx;
+      c.globalCompositeOperation = 'source-over';
+      c.clearRect(0, 0, this.w, this.h);
+      // soft halo behind the bust
+      const halo = c.createRadialGradient(this.w / 2, this.h * 0.42, 0, this.w / 2, this.h * 0.42, this.h * 0.55);
+      halo.addColorStop(0, `rgba(${tint.map(Math.round).join(',')},${0.10 * glow})`); halo.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = halo; c.fillRect(0, 0, this.w, this.h);
+      c.globalCompositeOperation = 'lighter';
+      c.imageSmoothingEnabled = true;
+      c.filter = `blur(${Math.round(this.h / 120)}px)`; c.globalAlpha = 0.55 * glow;
+      c.drawImage(this.buf, 0, 0, this.w, this.h);
+      c.filter = 'none'; c.globalAlpha = 1;
+      c.drawImage(this.buf, 0, 0, this.w, this.h);
+      c.globalCompositeOperation = 'source-over';
+    }
+  }
+  window.OmaHoloFace = OmaHoloFace;
+  window.OmaHoloOrb = OmaHoloFace;   // the name the app uses today
+})();
+</script>
+<script>
+/* ---------------- preview page wiring (not part of the app) ---------------- */
+window.onerror = (m, f, l) => { document.getElementById('stats').textContent = 'JS error: ' + m + ' @' + l; };
+const __t0 = performance.now();
+const face = new OmaHoloFace('orb-canvas', { onstats: f => {
+  document.getElementById('stats').textContent = `${f.pts.length} particles · ${f.fps.toFixed(0)} fps · draw ${f.frameMs.toFixed(1)} ms`;
+}});
+window.face = face;
+document.body.dataset.build = (performance.now() - __t0).toFixed(0) + 'ms';
+const S = ['active', 'listening', 'transcribing', 'thinking', 'planning', 'executing', 'verifying', 'speaking', 'waiting', 'partial', 'completed', 'error'];
+const sb = document.getElementById('states');
+S.forEach(s => { const b = document.createElement('button'); b.textContent = s; b.onclick = () => pick(s); sb.appendChild(b); });
+function pick(s) { face.setState(s); sb.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.textContent === s)); }
+pick('active');
+const spd = document.getElementById('speeds');
+['slow', 'normal', 'fast'].forEach(m => { const b = document.createElement('button'); b.textContent = m; b.onclick = () => { face.setSpeedMode(m); spd.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); }; if (m === 'slow') b.classList.add('on'); spd.appendChild(b); });
+document.getElementById('reduce').onchange = e => face.setReduceMotion(e.target.checked);
+let talking = 0;
+document.getElementById('talk').onclick = () => {
+  clearInterval(talking); pick('speaking'); let n = 0;
+  talking = setInterval(() => { face.setAudioLevel(Math.abs(Math.sin(n * 0.7)) * (0.4 + 0.6 * Math.random())); if (++n > 60) { clearInterval(talking); face.setAudioLevel(0); pick('active'); } }, 80);
+};
+// recorded real events -> the same state mapping the app uses (OmaTask.orbFor)
+const EVENTS = /*EVENTS*/[{"task_id": "T-F80953", "ts": 1793156639.947, "kind": "task", "status": "RECEIVED", "stage": "received", "detail": "এআই প্রযুক্তির নতুন খবর রিসার্চ করো"}, {"task_id": "T-F80953", "ts": 1793156639.955, "kind": "stage", "status": "RUNNING", "stage": "analyzing", "detail": "Checking instant commands and learned shortcuts"}, {"task_id": "T-F80953", "ts": 1793156639.963, "kind": "stage", "status": "RUNNING", "stage": "planning", "detail": "Not an instant command: preparing the Atticus engine with your memory and context"}, {"task_id": "T-F80953", "ts": 1793156640.742, "kind": "model", "status": "RUNNING", "stage": "planning", "detail": "claude_code · claude-haiku-5-5"}, {"task_id": "T-F80953", "ts": 1793156643.558, "kind": "step", "status": "RUNNING", "stage": "executing", "detail": "Searching the web: latest AI technology news October 2026"}, {"task_id": "T-F80953", "ts": 1793156656.405, "kind": "step", "status": "RUNNING", "stage": "executing", "detail": "Searching the web: latest AI technology news October 2026"}, {"task_id": "T-F80953", "ts": 1793156658.037, "kind": "step", "status": "RUNNING", "stage": "executing", "detail": "Searching the web: latest AI technology news this week"}, {"task_id": "T-F80953", "ts": 1793156662.449, "kind": "step", "status": "RUNNING", "stage": "executing", "detail": "Searching the web: latest AI technology news this week"}, {"task_id": "T-F80953", "ts": 1793156667.265, "kind": "model", "status": "RUNNING", "stage": "executing", "detail": "claude_code · claude-haiku-5-5"}, {"task_id": "T-F80953", "ts": 1793156667.27, "kind": "worker", "status": "RUNNING", "stage": "verifying", "detail": "Verifying the result"}, {"task_id": "T-F80953", "ts": 1793156667.271, "kind": "evidence", "status": "RUNNING", "stage": "verifying", "detail": "Sources retrieved: 1 of 2 research steps returned content"}, {"task_id": "T-F80953", "ts": 1793156667.272, "kind": "evidence", "status": "RUNNING", "stage": "verifying", "detail": "Tool errors: 1 step(s) failed: Searching the web: latest AI technology news October 2026"}, {"task_id": "T-F80953", "ts": 1793156667.274, "kind": "note", "status": "RUNNING", "stage": "verifying", "detail": "Tip: For next time, say \"remember how to এআই প্রযুক্তির নতুন খবর রিসার্চ করো\"."}, {"task_id": "T-F80953", "ts": 1793156667.275, "kind": "result", "status": "PARTIAL", "stage": "partial", "detail": "1 step(s) failed: Searching the web: latest AI technology news October 2026"}, {"task_id": "T-346858", "ts": 1793156667.561, "kind": "task", "status": "RECEIVED", "stage": "received", "detail": "YouTube e lofi study music er top 3 video khujo"}, {"task_id": "T-346858", "ts": 1793156667.568, "kind": "stage", "status": "RUNNING", "stage": "analyzing", "detail": "Checking instant commands and learned shortcuts"}, {"task_id": "T-346858", "ts": 1793156667.592, "kind": "stage", "status": "RUNNING", "stage": "planning", "detail": "Not an instant command: preparing the Atticus engine with your memory and context"}, {"task_id": "T-346858", "ts": 1793156668.198, "kind": "model", "status": "RUNNING", "stage": "planning", "detail": "claude_code · claude-haiku-5-5"}, {"task_id": "T-346858", "ts": 1793156671.5, "kind": "step", "status": "RUNNING", "stage": "executing", "detail": "Searching YouTube (Eve)"}, {"task_id": "T-346858", "ts": 1793156674.876, "kind": "step", "status": "RUNNING", "stage": "executing", "detail": "Searching YouTube (Eve)"}, {"task_id": "T-346858", "ts": 1793156679.198, "kind": "model", "status": "RUNNING", "stage": "executing", "detail": "claude_code · claude-haiku-5-5"}, {"task_id": "T-346858", "ts": 1793156679.203, "kind": "worker", "status": "RUNNING", "stage": "verifying", "detail": "Verifying the result"}, {"task_id": "T-346858", "ts": 1793156679.204, "kind": "evidence", "status": "RUNNING", "stage": "verifying", "detail": "YouTube data: 1 of 1 YouTube steps returned data"}, {"task_id": "T-346858", "ts": 1793156679.206, "kind": "result", "status": "COMPLETED", "stage": "completed", "detail": "Respect! Views onujayi top 3 holo: 1 A.M Study Session (Lofi Girl, 137.6M views, https://www.youtube.com/watch?v=lTRiuFIWV54), Less talk.... Lo-fi for study with Rain sounds (chill chill journal, 14.2M, https://www.youtube.com/watch?v=9kzE8isXlQY), ar 4 HOURS STUDY GIRL (Althea Gianera, 4.0M, https://www.youtube.com/watch?v=l-2hOKIrIyI). View count search result theke neya, live check kora hoyni."}, {"task_id": "T-892DC1", "ts": 1793156679.506, "kind": "task", "status": "RECEIVED", "stage": "received", "detail": "notepad kholo"}, {"task_id": "T-892DC1", "ts": 1793156679.513, "kind": "stage", "status": "RUNNING", "stage": "analyzing", "detail": "Checking instant commands and learned shortcuts"}, {"task_id": "T-892DC1", "ts": 1793156679.595, "kind": "model", "status": "RUNNING", "stage": "analyzing", "detail": "fast_engine · instant command (no AI)"}, {"task_id": "T-892DC1", "ts": 1793156679.597, "kind": "step", "status": "RUNNING", "stage": "executing", "detail": "Opening notepad"}, {"task_id": "T-892DC1", "ts": 1793156679.598, "kind": "step", "status": "RUNNING", "stage": "executing", "detail": "Opening notepad"}, {"task_id": "T-892DC1", "ts": 1793156679.599, "kind": "worker", "status": "RUNNING", "stage": "verifying", "detail": "Verifying the result"}, {"task_id": "T-892DC1", "ts": 1793156679.602, "kind": "evidence", "status": "RUNNING", "stage": "verifying", "detail": "Notepad opened: window was already open: Notepad - Untitled - Notepad"}, {"task_id": "T-892DC1", "ts": 1793156679.605, "kind": "result", "status": "COMPLETED", "stage": "completed", "detail": "Opened notepad."}, {"task_id": "T-62F068", "ts": 1793156680.013, "kind": "task", "status": "RECEIVED", "stage": "received", "detail": "Open YouTube in Chrome and play the top lofi study video"}, {"task_id": "T-62F068", "ts": 1793156680.022, "kind": "stage", "status": "RUNNING", "stage": "analyzing", "detail": "Checking instant commands and learned shortcuts"}, {"task_id": "T-62F068", "ts": 1793156680.044, "kind": "stage", "status": "RUNNING", "stage": "planning", "detail": "Not an instant command: preparing the Atticus engine with your memory and context"}, {"task_id": "T-62F068", "ts": 1793156680.678, "kind": "model", "status": "RUNNING", "stage": "planning", "detail": "claude_code · claude-haiku-5-5"}, {"task_id": "T-62F068", "ts": 1793156684.758, "kind": "step", "status": "RUNNING", "stage": "executing", "detail": "Working in Windows"}, {"task_id": "T-62F068", "ts": 1793156686.273, "kind": "step", "status": "RUNNING", "stage": "executing", "detail": "Working in Windows"}, {"task_id": "T-62F068", "ts": 1793156688.916, "kind": "model", "status": "RUNNING", "stage": "executing", "detail": "claude_code · claude-haiku-5-5"}, {"task_id": "T-62F068", "ts": 1793156688.921, "kind": "worker", "status": "RUNNING", "stage": "verifying", "detail": "Verifying the result"}, {"task_id": "T-62F068", "ts": 1793156688.96, "kind": "evidence", "status": "RUNNING", "stage": "verifying", "detail": "Browser page: Google Chrome shows: 1 A.M Study Session 📚 [lofi hip hop] - YouTube - Google Chrome"}, {"task_id": "T-62F068", "ts": 1793156688.962, "kind": "result", "status": "COMPLETED", "stage": "completed", "detail": "Respect! I opened \"A.M Study Session\" by Lofi Girl in Chrome, the top result from the earlier search, and the launch command ran without error. I did not check that the video is actually playing on screen."}];
+const orbFor = ev => ev.status === 'WAITING' ? 'waiting' : ev.status === 'COMPLETED' ? 'completed' : ev.status === 'FAILED' ? 'error' : ev.status === 'PARTIAL' ? 'partial'
+  : ({ analyzing: 'thinking', planning: 'planning', executing: 'executing', verifying: 'verifying', fallback: 'thinking', retry: 'planning', permission: 'waiting' })[ev.stage] || 'thinking';
+const byTask = {}; EVENTS.forEach(e => (byTask[e.task_id] = byTask[e.task_id] || []).push(e));
+const tb = document.getElementById('tasks'), log = document.getElementById('log');
+Object.entries(byTask).forEach(([id, evs]) => {
+  const b = document.createElement('button'); b.textContent = `${id} · ${evs[evs.length - 1].status}`;
+  b.title = evs[0].detail; b.onclick = () => replay(evs); tb.appendChild(b);
+});
+let timers = [];
+function replay(evs) {
+  timers.forEach(clearTimeout); timers = []; log.textContent = '';
+  const t0 = evs[0].ts;
+  evs.forEach(e => timers.push(setTimeout(() => {
+    const s = orbFor(e); pick(s);
+    log.textContent += `+${(e.ts - t0).toFixed(1)}s  ${e.kind.padEnd(8)} ${e.status.padEnd(9)} -> ${s}   ${(e.detail || '').slice(0, 60)}\n`;
+    log.scrollTop = log.scrollHeight;
+  }, (e.ts - t0) * 1000)));
+  timers.push(setTimeout(() => pick('active'), (evs[evs.length - 1].ts - t0) * 1000 + 3500));
+}
+// screenshots: ?state=<name>&t=<seconds of animation>
+const q = new URLSearchParams(location.search);
+if (q.get('state')) pick(q.get('state'));
+if (q.get('demo')) {   // preview-only tour of the states for the recording
+  const seq = [['active', 2500], ['listening', 2500], ['thinking', 2500], ['executing', 2500], ['speaking', 3000], ['completed', 2500], ['waiting', 2000], ['error', 2000], ['active', 2000]];
+  let at = 600;
+  seq.forEach(([st, ms]) => { setTimeout(() => { pick(st); if (st === 'speaking') document.getElementById('talk').click(); }, at); at += ms; });
+}
+if (q.get('t')) { face.form = 1; face.blend = 1; face.t = +q.get('t'); face._draw(); }
+</script>
+</body>
+</html>

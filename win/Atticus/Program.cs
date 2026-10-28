@@ -30,6 +30,7 @@ static class Program
         if (args.Length >= 2 && args[0] == "--text") Environment.Exit(WindowText.Run(args[1], args.Length > 2 ? args[2] : ""));
         if (args.Length == 2 && args[0] == "--transcribe")   // diagnostics: a 16 kHz mono WAV through the same speech path
         {
+            Console.OutputEncoding = new UTF8Encoding(false);   // Bangla transcripts must not print as "?"
             Speech.Load().Wait();
             if (!Speech.Ready) { Console.Error.WriteLine("no speech model: " + Paths.Model + " " + Speech.Error); Environment.Exit(1); }
             using var r = new NAudio.Wave.AudioFileReader(args[1]);

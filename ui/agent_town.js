@@ -244,7 +244,7 @@ class AgentTown {
 
     Object.values(this.agents).forEach(agent => {
       const chip = document.createElement('div');
-      const isBusy = agent.state === 'WORKING' || agent.state === 'ASSIGNED' || agent.state === 'VERIFYING';
+      const isBusy = ['WORKING', 'ASSIGNED', 'VERIFYING', 'WAITING'].includes(agent.state);
       chip.className = `agent-chip ${isBusy ? 'working' : ''}`;
       chip.id = `chip-${agent.id}`;
       chip.style.setProperty('--chip-color', agent.color);
@@ -254,7 +254,7 @@ class AgentTown {
         <div>
           <div class="chip-name">${agent.icon} ${agent.name}</div>
           <div class="chip-role" style="color:${isBusy ? 'var(--neon-green)' : 'var(--text-muted)'};">
-            ${isBusy ? '● ' + agent.state : 'Idle'}
+            ${agent.state === 'IDLE' ? 'Idle' : '● ' + agent.state}
           </div>
         </div>
       `;

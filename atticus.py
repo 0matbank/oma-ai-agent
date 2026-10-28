@@ -107,7 +107,7 @@ def me_line():
 
 def pref(key, default):
     try:
-        return json.load(open(PREFS)).get(key, default)
+        return json.load(open(PREFS, encoding='utf-8-sig')).get(key, default)   # utf-8-sig: a BOM must not silently drop every setting
     except (OSError, ValueError):
         return default   # recent: Atticus.app deletes it on ✕
 SHOT = 'atticus-screen-'   # temp file prefix, one per display
@@ -831,6 +831,11 @@ def fast(text):
     raw_str = text.strip()
     verbs = r'(?:খোলো|খুলুন|খুলো|চালু করো|চালু করুন|ওপেন করো|অন করো|kholo|kolo|khulo|khulun|open koro|chalu koro|on koro)'
     bn_open = re.search(verbs + r'\s+(.+)', raw_str, re.I) or re.fullmatch(r'(.+?)[\s,]*' + verbs + r'[\s.!?।]*', raw_str, re.I)
+    # The English-only speech model (base.en) hears "খোলো" as "color"/"colo": accepted only right after an exact known app name
+    misheard = not bn_open and re.fullmatch(r'(.+?)[\s,]*\b(?:colou?r|colo|khola|kola|open)[\s.!?।]*', raw_str, re.I)   # also "Calculator, open." (multilingual Whisper translating)
+    if misheard and ' '.join(re.sub(r'[,.!?।]', ' ', misheard.group(1)).lower().split()) in (
+            'notepad', 'calculator', 'calc', 'chrome', 'chrome browser', 'browser', 'terminal', 'file explorer', 'explorer', 'paint', 'vs code', 'spotify', 'settings'):
+        bn_open = misheard
     if bn_open:
         bn_mapping = {
             'নোটপ্যাড': 'notepad', 'notepad': 'notepad',
@@ -1468,6 +1473,7 @@ def run(task, p=None, shots=()):
     run.text_only = False
     run.model = ''
     run.fallback = None
+    run.denied = False   # the user answered Don't Allow on the safety gate
     alias = getattr(p, 'model', '') or pref('model', 'haiku')
     if pref('aiMode', 'auto') == 'local_only':
         if p:
@@ -1519,6 +1525,7 @@ def run(task, p=None, shots=()):
             results = [b for b in j.get('message', {}).get('content', []) if isinstance(b, dict) and b.get('type') == 'tool_result']
             if results:
                 last_failed = any(b.get('is_error') for b in results)
+                run.denied = run.denied or any(b.get('is_error') and 'The user said no' in str(b.get('content')) for b in results)
                 bad |= {ids.get(b.get('tool_use_id')) for b in results if b.get('is_error')}
                 if TRACK is not None:
                     for b in results:
@@ -1557,7 +1564,9 @@ def run(task, p=None, shots=()):
     # a step that failed and was then done another way is dropped, so the way that worked can still be learned
     run.cmds = [] if last_failed or result_error or p.returncode or not completed or not reply else [c for i, c in enumerate(cmds) if i not in bad]
     run.ok = bool(completed and reply and not result_error and not p.returncode and not last_failed)
-    if last_failed and not result_error and not p.returncode:
+    if run.denied:
+        reply = "Not done: you chose Don't Allow, so nothing was changed."
+    elif last_failed and not result_error and not p.returncode:
         reply = 'The last tool failed, so I could not verify that the request was completed. Please try again.'
     return reply or 'No answer came back. Please try again.', cost, steps
 
@@ -1949,7 +1958,11 @@ def main():
     if args == ['--check']:   # the setup window asks this
         return print(json.dumps(plan()))
     if args[:1] == ['--search']:
-        return print(search(' '.join(args[1:])))
+        try:
+            return print(search(' '.join(args[1:])))
+        except Exception as e:   # a network hiccup is a plain, honest tool error, not a Python traceback
+            print(f'search failed ({type(e).__name__}: {str(e)[:120]}). Try again or use WebSearch.')
+            sys.exit(1)
     if args[:1] == ['--read']:
         try:
             return print(text_of(get(args[1]))[:5000])   # ~1.2K tokens: enough for an answer, cheap to read
@@ -1985,6 +1998,10 @@ def main():
     return serve(task, warm, snap)
 
 
+SHELL_NAMES = {'calc': 'Calculator', 'mspaint': 'Paint', 'cmd': 'Command Prompt', 'wt': 'Terminal', 'code': 'Visual Studio Code',
+               'explorer': 'File Explorer', 'notepad': 'Notepad', 'chrome': 'Google Chrome', 'msedge': 'Microsoft Edge'}   # shell names -> window app names
+
+
 def _app_of(cmd):
     """The app a `atticus --show <app>` command opened ('' for a website or anything else)."""
     if not cmd.startswith(SHOW):
@@ -1995,7 +2012,7 @@ def _app_of(cmd):
         return ''
     if '://' in target or target.endswith(':'):
         return ''
-    return app_named(target) or target
+    return app_named(target) or SHELL_NAMES.get(target.lower(), target)
 
 
 def _window_check(app, before=frozenset()):
@@ -2011,6 +2028,23 @@ def _window_check(app, before=frozenset()):
                 return True, f"{how}: {w['app']} - {w['title'][:60]}"
             time.sleep(0.2)
         return None, f'no visible window of {app} detected within 4 s'
+    return check
+
+
+def _browser_check(cmds):
+    """Dave: does a browser tab title show the site the engine opened? (host name words, e.g. 'youtube')"""
+    hosts = [re.sub(r'^www\.', '', h).split('.')[0].lower() for c in cmds for h in re.findall(r'https?://([^/\s"\']+)', c)]
+    def check():
+        ws = []
+        for _ in range(25):
+            ws = [w for b in winctl.BROWSERS for w in winctl.find(b)]
+            hit = [w for w in ws if any(h and h in w['title'].lower() for h in hosts)]
+            if hit:
+                return True, f"{hit[0]['app']} shows: {hit[0]['title'][:70]}"
+            time.sleep(0.2)
+        if not ws:
+            return None, 'no browser window detected'
+        return None, f"a browser is open but no window title mentions {', '.join(dict.fromkeys(hosts)) or 'the site'}"
     return check
 
 
@@ -2031,6 +2065,8 @@ def verification_checks(task, reply, cmds, tracker, before=frozenset()):
         if research:
             done = [s for s in research if s['status'] == 'DONE']
             checks.append(('Sources retrieved', lambda done=done, n=len(research): (bool(done), f'{len(done)} of {n} research steps returned content')))
+        if any(s['worker'] == 'bob' and s['status'] == 'DONE' for s in tracker.steps):
+            checks.append(('Browser page', _browser_check(cmds)))
         yt = [s for s in tracker.steps if s['worker'] == 'eve']
         if yt:
             ok = [s for s in yt if s['status'] == 'DONE' and not s.get('output', '').startswith('Error')]
@@ -2081,6 +2117,13 @@ def serve(task, warm=None, snap=None):
     helping = threading.Thread(target=lambda: helps.append(tool_help(task)), daemon=True)
     helping.start()   # beside the screen reads: a cold --help can take up to 2 s
     mem = relevant_rules(task)
+    try:   # Oma notes the user marked "Include in AI Context" (kept short: they ride on every request)
+        from multi_ai.orchestrator import get_all_notes
+        notes = '\n'.join(f"- {n.get('title', '')}: {n.get('content', '')}"[:300] for n in get_all_notes() if n.get('use_as_context'))[:1200]
+    except Exception:
+        notes = ''
+    if notes:
+        mem = (mem + '\n' if mem else '') + 'User notes:\n' + notes
     procedure = workflows(task) if pref('learn', True) else ''
     int_hints = integrations.hints(task, INT)
     servers = integrations.mcp_for(task)
@@ -2105,7 +2148,7 @@ def serve(task, warm=None, snap=None):
         return 'CANCELLED', ''
     if not run.ok:   # Try again (same model) or Try Sonnet, from a card in the box
         is_quota = any(q in (reply or '').lower() for q in ('weekly limit', 'rate limit', 'hit your limit', 'quota'))
-        if getattr(run, 'text_only', False) is not True and not is_quota:
+        if getattr(run, 'text_only', False) is not True and not is_quota and getattr(run, 'denied', False) is not True:   # a No is final: no retry card
             model = pref('model', 'haiku')
             sonnet = pref('escalate', True) and model == 'haiku'
             answer = 'y' if sonnet and pref('escalateAuto', False) else retry_offer(sonnet)
@@ -2148,7 +2191,8 @@ def serve(task, warm=None, snap=None):
             status = 'PARTIAL' if ACTION_WORDS.search(task) else 'COMPLETED'
         else:
             verdict = TRACK.verify(verification_checks(task, reply, run.ran, TRACK, before))
-            status = 'COMPLETED' if verdict == 'ok' else 'PARTIAL'
+            said_no = any(e['check'] == 'Answer' and e['ok'] is False for e in TRACK.evidence)
+            status = 'COMPLETED' if verdict == 'ok' else 'FAILED' if said_no else 'PARTIAL'
     say('✓' if run.ok else '!', reply)
     learned = [r for c in run.ran for r in re.findall(r'--remember\s+["\']([^"\']+)', c)]   # it taught itself: say so, so the user sees it improve
     # "When I say focus mode, …" saved: a green Learned pill, like a remembered rule

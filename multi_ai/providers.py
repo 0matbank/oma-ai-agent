@@ -62,7 +62,7 @@ def save_custom_providers(providers: List[Dict[str, Any]]):
 
 def _setting(key, default):
     try:
-        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+        with open(SETTINGS_FILE, "r", encoding="utf-8-sig") as f:
             return json.load(f).get(key, default)
     except Exception:
         return default
@@ -388,7 +388,7 @@ class ProviderManager:
         settings = {}
         if os.path.exists(SETTINGS_FILE):
             try:
-                with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                with open(SETTINGS_FILE, "r", encoding="utf-8-sig") as f:
                     settings = json.load(f)
             except Exception:
                 pass
