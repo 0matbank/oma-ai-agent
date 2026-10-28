@@ -5,7 +5,7 @@
 <title>Oma AI - Futuristic Cybernetic Command Center</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@600;700;800;900&family=Rajdhani:wght@500;600;700&family=Hind+Siliguri:wght@400;500;600;700&display=swap');
 
 :root {
   --bg-deep: #07090e;
@@ -1599,6 +1599,7 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
 </style>
 
 <style>/*INCLUDE:office_town.css*/</style>
+<style>/*INCLUDE:oma_ux.css*/</style>
 </head>
 <body>
 
@@ -1615,16 +1616,6 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
   </div>
 
   <div class="telem-group" style="display:flex; align-items:center; gap:10px;">
-    <div class="telem-chip" id="lang-switcher" style="cursor:pointer; background:rgba(var(--accent-rgb),0.12); padding:3px 10px; border-radius:5px; border:1px solid rgba(var(--accent-rgb),0.3);" title="ক্লিক করে ভাষা পরিবর্তন করুন (বাংলা / English)">
-      <span style="color:var(--neon-cyan);">🌐 ভয়েস:</span> <b id="current-lang-label" style="color:#fff;">বাংলা</b>
-    </div>
-    <div class="telem-chip">
-      <div class="status-pulse"></div>
-      <span>ENGINE: <b id="telemCore" style="color:var(--text-muted);" title="Claude Code sign-in state (atticus.py --check)">checking…</b></span>
-    </div>
-    <div class="telem-chip">
-      <span>MODEL: <b id="telemActiveModel" class="model-tag" title="The model that answered the last request">none yet</b></span>
-    </div>
   </div>
 
   <div class="telem-group" style="display:flex; align-items:center; gap:10px;">
@@ -1633,8 +1624,11 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
       <span style="color:var(--neon-green);">⚡ PC HEALTH:</span> <b id="header-pchealth-val" style="color:#fff;">Measuring...</b>
     </div>
     <div class="telem-chip"><span>HOTKEY: <b id="telemHotkey">Ctrl+Alt+Space</b></span></div>
+    <div class="hdr-seg" id="layoutSeg" title="Layout"><button data-l="focus" title="Big chat, small orb">Focus</button><button data-l="center" title="Everything">Center</button><button data-l="mini" title="Only the small floating orb">Mini</button></div>
+    <button id="btn-palette" class="btn-settings-pill" title="Search actions and settings (Ctrl+K)">⌘ Ctrl+K</button>
     <div style="position:relative;"><button id="btn-theme" class="btn-settings-pill" title="Interface theme">🎨 THEME</button>
       <div class="theme-menu" id="themeMenu">
+        <button data-theme="oma"><i style="background:linear-gradient(135deg,#2dd4bf,#f5a524)"></i>Oma Signature</button>
         <button data-theme="stonic"><i style="background:#00e5ff"></i>Stonic Default</button>
         <button data-theme="hacker"><i style="background:#39ff6a"></i>Hacker</button>
         <button data-theme="cyberpunk"><i style="background:#ff2bd6"></i>Cyberpunk</button>
@@ -1704,12 +1698,23 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
             <span class="status-pulse"></span>
             <span id="sphere-status-text">SYSTEM ACTIVE</span>
           </div>
-          <span style="font-size:10px; color:var(--text-muted); font-family:monospace; letter-spacing:1px;">OMA CORE</span>
+          <div class="core-chips">
+    <div class="telem-chip" id="lang-switcher" style="cursor:pointer; background:rgba(var(--accent-rgb),0.12); padding:3px 10px; border-radius:5px; border:1px solid rgba(var(--accent-rgb),0.3);" title="ক্লিক করে ভাষা পরিবর্তন করুন (বাংলা / English)">
+      <span style="color:var(--neon-cyan);">🌐 ভয়েস:</span> <b id="current-lang-label" style="color:#fff;">বাংলা</b>
+    </div>
+    <div class="telem-chip">
+      <div class="status-pulse"></div>
+      <span>ENGINE: <b id="telemCore" style="color:var(--text-muted);" title="Claude Code sign-in state (atticus.py --check)">checking…</b></span>
+    </div>
+    <div class="telem-chip">
+      <span>MODEL: <b id="telemActiveModel" class="model-tag" title="The model that answered the last request">none yet</b></span>
+    </div>
+        </div>
         </div>
 
         <!-- 3D Particle Face Canvas -->
         <div class="sphere-viewport" style="flex:1; position:relative; display:grid; place-items:center; min-height:0;">
-          <canvas id="orb-canvas" style="width:100%; height:100%;"></canvas>
+          <canvas id="orb-canvas" style="position:absolute; inset:0; width:100%; height:100%;"></canvas>
         </div>
 
         <!-- Footer with glowing SYSTEM ACTIVE, Animation Speed Controls (M2), TERMINATE button, and sparkle icon -->
@@ -1843,8 +1848,11 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
 
       <!-- Input Dock -->
       <div class="feed-input-dock" style="padding:10px; border-top:1px solid var(--line); background:rgba(0,0,0,0.25); flex:none;">
+        <div id="attachTray"></div>
         <div class="input-bar-wrapper" style="display:flex; gap:6px;">
-          <input type="text" id="homeChatInput" class="field" placeholder="Type to Assistant (English / বাংলা)..." autocomplete="off" style="flex:1;">
+          <button class="btn" id="btnAttach" title="Attach files or pictures (or paste / drop them here)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l9-9a3.7 3.7 0 0 1 5.2 5.2l-9 9a1.8 1.8 0 0 1-2.6-2.6l8.3-8.3"/></svg></button>
+          <input type="file" id="attachInput" multiple hidden>
+          <input type="text" id="homeChatInput" class="field" placeholder="Type to Oma (English / বাংলা)…" autocomplete="off" style="flex:1;">
           <button class="btn" id="btnHomeMic" title="Voice Listening (Hold or Click)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
           <button class="btn blue" id="btnHomeSend" title="Send Directive"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
         </div>
@@ -1987,6 +1995,10 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
       <span style="font-family:'Orbitron', sans-serif; font-size:13px; font-weight:700; color:#fff; letter-spacing:1px;">OMA AI // SYSTEM CONFIGURATION</span>
       <span class="pill ok" style="font-size:10px;">All Settings &amp; Multi-AI</span>
     </div>
+    <div class="drawer-tools">
+      <input id="setSearch" class="field" placeholder="Search settings… (e.g. voice, ভাষা, browser)" spellcheck="false" autocomplete="off">
+      <div class="seg" id="setMode" title="Simple hides technical settings"><button data-m="simple">Simple</button><button data-m="advanced">Advanced</button></div>
+    </div>
     <button id="btn-close-settings" class="btn-close-drawer">✕</button>
   </div>
 
@@ -2020,9 +2032,17 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
         <i class="ni" style="background:#ff9f0a"><svg viewBox="0 0 24 24"><path d="M6 4h12v16l-6-4-6 4z"/></svg></i>
         Memory
       </button>
+      <button class="nav-btn" data-s="history">
+        <i class="ni" style="background:#30b0c7"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></i>
+        History
+      </button>
       <button class="nav-btn" data-s="integrations">
         <i class="ni" style="background:#bf5af2"><svg viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z"/></svg></i>
         Integrations
+      </button>
+      <button class="nav-btn" data-s="browser">
+        <i class="ni" style="background:#0a84ff"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 2.5 14.4 0 17M12 3.5c-2.5 2.6-2.5 14.4 0 17"/></svg></i>
+        Oma's Browser
       </button>
       <button class="nav-btn" data-s="usage">
         <i class="ni" style="background:#30d158"><svg viewBox="0 0 24 24"><path d="M5 19V11M12 19V5M19 19v-6"/></svg></i>
@@ -2044,6 +2064,7 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
 
     <!-- Right Settings Sections Display -->
     <div class="settings-content" style="flex:1; overflow-y:auto; padding:20px 28px;">
+      <div class="search-empty">No setting matches that. Try another word, in English or Bangla.</div>
       <!-- ==================== TAB: AI PROVIDERS & MODELS ==================== -->
   <section id="providers" class="tab-section on">
     <div class="settings-container" style="max-width:760px;">
@@ -2192,6 +2213,13 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
         <div class="row"><div class="t"><b>Ask me when unsure</b><span>When more than one thing fits, Oma shows you the choices instead of guessing.</span></div><label class="sw"><input type="checkbox" data-k="askMe"></label></div>
       </div>
 
+      <h3>Look &amp; Feel</h3>
+      <div class="group">
+        <div class="row"><div class="t"><b>Text size</b><span>Makes everything in the Oma window bigger or smaller.</span><em class="bn-hint">Oma-র সব লেখা বড় বা ছোট করুন।</em></div><input type="range" min="80" max="130" step="5" data-k="uiScale"><span class="val" id="scalev">100%</span></div>
+        <div class="row"><div class="t"><b>English status labels</b><span>Off: the orb says what Oma is doing in Bangla (শুনছি…, কাজ করছি…).</span></div><label class="sw"><input type="checkbox" data-k="uiEnglishLabels"></label></div>
+        <div class="row"><div class="t"><b>Theme</b><span>Oma Signature, Stonic, Solar and more: the 🎨 THEME button at the top.</span></div></div>
+      </div>
+
       <h3>Compact answer box (classic Atticus overlay)</h3>
       <div class="group">
         <div class="row"><div class="t"><b>Position</b><span>Where the classic compact box appears. The Oma window shows answers in its own chat.</span></div><div class="seg" data-k="corner"><button data-v="top-left">Top left</button><button data-v="top-right">Top right</button></div></div>
@@ -2257,7 +2285,7 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
       <h3>Oma's browser</h3>
       <div class="group">
         <div class="row"><div class="t"><b>Your sites, signed in once</b><span>A separate Chrome window just for Oma. Sign in to Gmail, ChatGPT, Gemini, DeepSeek or any site there once; Oma then opens, reads, types and clicks in it for you. Send / Buy / Delete clicks always ask first.</span></div>
-          <span style="display:flex; gap:6px;"><button class="btn blue" id="omaBrowserOpen">Open Oma's browser</button></span></div>
+          <span style="display:flex; gap:6px;"><button class="btn" id="omaBrowserManage">Manage sign-ins</button><button class="btn blue" id="omaBrowserOpen">Open Oma's browser</button></span></div>
       </div>
       <h3>Phone remote: chat with Oma</h3>
       <div class="group">
@@ -2316,6 +2344,44 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
   </section>
 
   <!-- ==================== TAB: ABOUT & UPDATES ==================== -->
+  <!-- ==================== TAB: OMA'S BROWSER ==================== -->
+  <section id="browser" class="tab-section">
+    <div class="settings-container">
+      <h1>Oma's Browser</h1>
+      <p class="lede">A separate Chrome window only for Oma. Sign in to your sites there once, by yourself: Oma never sees a password and never reads cookies. Then you can say "ChatGPT ke jiggesh koro…", "Gemini diye bolo…" and Oma uses your signed-in account. Your normal Chrome is not touched.</p>
+      <h3>Your sites</h3>
+      <div class="group">
+        <div class="row"><div class="t"><b>Sign-in status</b><span id="brResult">Press Check again to see which sites are signed in.</span></div>
+          <button class="btn blue" id="brCheck">Check again</button></div>
+        <div id="brSites"><div class="empty">Loading sites…</div></div>
+      </div>
+      <h3>Add a site</h3>
+      <div class="group">
+        <div class="row"><div class="t" style="flex:none;width:120px"><b>Name</b></div><input class="field" id="brAddName" placeholder="e.g. Claude, Notion, Canva" spellcheck="false"></div>
+        <div class="row"><div class="t" style="flex:none;width:120px"><b>Address</b></div><input class="field" id="brAddUrl" placeholder="https://…" spellcheck="false"><button class="btn blue" id="brAdd">Add</button></div>
+      </div>
+      <h3>The browser window</h3>
+      <div class="group">
+        <div class="row"><div class="t"><b>Open or close Oma's browser</b><span>Opening it shows the window; closing it keeps every sign-in.</span></div>
+          <button class="btn" id="brOpen">Open</button><button class="btn" id="brClose">Close</button></div>
+        <div class="row"><div class="t"><b>Sign out from all sites</b><span>Deletes Oma's browser data (its sign-ins). Asks first. Your normal Chrome is not touched.</span></div>
+          <button class="btn red" id="brSignOut">Sign out from all</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB: HISTORY ==================== -->
+  <section id="history" class="tab-section">
+    <div class="settings-container">
+      <h1>History</h1>
+      <p class="lede">Your past requests and Oma's answers, newest first. Search them, copy an answer, or ask again.</p>
+      <div class="group">
+        <div class="row"><input class="field" id="histSearch" placeholder="Search past requests… (e.g. volume, Gemini, ক্যালকুলেটর)" spellcheck="false"><span id="histCount" style="color:var(--fg2);font-size:12px;white-space:nowrap"></span><button class="btn" id="histReload">Refresh</button></div>
+        <div id="histList"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+  </section>
+
   <section id="about" class="tab-section">
     <div class="settings-container">
       <div style="text-align:center; padding:16px 0;">
@@ -2636,7 +2702,7 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
   // 6. Feed: a click opens or folds a card of an earlier request
   const feedEl = $('homeFeedStream');
   if (feedEl) feedEl.addEventListener('click', e => {
-    if (e.target.closest('button, a, input')) return;
+    if (e.target.closest('button, a, input') || String(window.getSelection?.() || '')) return;
     const c = e.target.closest('.feed-card.old');
     if (c) c.classList.toggle('open');
   });
@@ -3007,7 +3073,7 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
       if ($('upstatus') && d.update) $('upstatus').textContent = d.update;
       if (d.version) if ($('aboutver')) $('aboutver').textContent = 'Oma AI • Version ' + d.version; if ($('ver')) $('ver').textContent = 'Oma AI • Version ' + d.version;
       paint();
-      window.omaApplyTheme?.(P.theme || 'stonic');
+      window.omaApplyTheme?.(P.theme || 'oma');
       paintMute();
       if (d.state) state(d.state);
       post({ do: 'providers' });
@@ -3260,12 +3326,12 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
   // Wire UI Controls
   window.addEventListener('DOMContentLoaded', () => {
     try {
-      holoOrb = new window.OmaHoloOrb('orb-canvas', { theme: (P && P.theme) || 'stonic', count: 2000 });
+      holoOrb = new window.OmaHoloOrb('orb-canvas', { theme: (P && P.theme) || 'oma', count: 2000 });
       holoOrb.onLabel = (label, s) => {   // the orb's real state names the footer and the button
         const l = $('orb-state-label'), c = holoOrb.colorsFor(s).a;
         if (l) { l.textContent = label + (P && P.muted ? ' · MUTED' : ''); l.parentElement.style.color = `rgb(${c})`; }
         const b = $('btn-terminate'); if (b) b.textContent = s === 'idle' ? 'START AI' : 'TERMINATE';
-        post({ do: 'orbState', s, theme: P.theme || 'stonic' });   // the floating orb mirrors it while Oma is minimized
+        post({ do: 'orbState', s, theme: P.theme || 'oma' });   // the floating orb mirrors it while Oma is minimized
       };
       holoOrb.onLabel('STANDBY', 'idle');
       agentTown = new window.AgentTown('town-canvas');
@@ -3410,7 +3476,7 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
       document.querySelectorAll('#themeMenu button').forEach(b => b.classList.toggle('on', b.dataset.theme === t));
     };
     window.omaApplyTheme = applyTheme;
-    applyTheme(P.theme || 'stonic');
+    applyTheme(P.theme || 'oma');
     if ($('btn-theme')) $('btn-theme').onclick = e => { e.stopPropagation(); $('themeMenu').classList.toggle('open'); };
     document.addEventListener('click', () => $('themeMenu')?.classList.remove('open'));
     document.querySelectorAll('#themeMenu button').forEach(b => b.onclick = () => { applyTheme(b.dataset.theme); set('theme', b.dataset.theme); });
@@ -3424,5 +3490,6 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
     }
   });
 </script>
+<script>/*INCLUDE:oma_ux.js*/</script>
 </body>
 </html>

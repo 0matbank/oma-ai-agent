@@ -426,6 +426,8 @@ def typing_save(part):
 
 
 CLICKED = re.compile(r'\b(send|delete|remove|discard|buy|purchase|pay|checkout|place order|order|post|publish|submit|sign out|uninstall|erase|reset|format|empty)\b', re.I)
+BROWSER_ASK = {'account': 'Change the Google account a site uses in Oma\'s browser?', 'add-site': 'Add a site to Oma\'s browser?',
+               'remove-site': 'Remove a site from Oma\'s browser?'}
 
 
 def risky(cmd):
@@ -454,6 +456,10 @@ def risky(cmd):
                 return 'Click "' + target.strip('"\' ')[:60] + '" in Oma\'s browser?'
             if verb == ['type'] and '--enter' in part and re.search(r'message|chat|comment|reply|post|tweet|compose|mail', part, re.I):
                 return 'Send this?'
+            if verb == ['signout-all']:   # deletes Oma's browser profile: every sign-in in it is gone
+                return 'Sign out of every site in Oma\'s browser?'
+            if verb and verb[0] in BROWSER_ASK:
+                return BROWSER_ASK[verb[0]]
             continue
         if re.match(re.escape(KEYS) + r'\b', part) and re.search(r'\b(delete|del)\b', part, re.I):
             return 'Delete something?'
@@ -1315,7 +1321,10 @@ def label(name, inp):
         a = c[len(ME + ' --browser'):].strip().split(None, 1) or ['open']
         return {'open': 'Opening in Oma\'s browser', 'read': 'Reading the page in Oma\'s browser', 'click': 'Clicking in Oma\'s browser',
                 'type': 'Typing in Oma\'s browser', 'key': 'Pressing a key in Oma\'s browser', 'shot': 'Looking at Oma\'s browser',
-                'tabs': 'Checking Oma\'s browser tabs', 'ask': 'Asking in Oma\'s browser', 'close': 'Closing Oma\'s browser'}.get(a[0], 'Using Oma\'s browser') + (f": {a[1].split('&&')[0].strip().strip(chr(34))[:60]}" if len(a) > 1 and a[0] in ('open', 'click') else '')
+                'tabs': 'Checking Oma\'s browser tabs', 'ask': 'Asking in Oma\'s browser', 'close': 'Closing Oma\'s browser',
+                'sites': 'Listing Oma\'s browser sites', 'status': 'Checking sign-ins in Oma\'s browser', 'login': 'Opening a sign-in page in Oma\'s browser',
+                'account': 'Choosing the Google account for a site', 'add-site': 'Adding a site to Oma\'s browser',
+                'remove-site': 'Removing a site from Oma\'s browser', 'signout-all': 'Signing out of every site in Oma\'s browser'}.get(a[0], 'Using Oma\'s browser') + (f": {a[1].split('&&')[0].strip().strip(chr(34))[:60]}" if len(a) > 1 and a[0] in ('open', 'click') else '')
     if c.startswith(ME + ' --player-stop'):
         return 'Stopping the Oma player'
     if c.startswith(ME + ' --player'):
@@ -1511,6 +1520,46 @@ def history(words):
     hits = [r for score, _, r in hits if score or not want][:6]
     return '\n'.join(f"{r.get('at', '')[:16]} asked: {r['task'][:200]} -> {str(r['reply'])[:300]}" +
                      (f" [ran: {'; '.join(r['ran'])[:200]}]" if r.get('ran') else '') for r in hits) or 'Nothing matches.'
+
+
+def history_list(rows, n=200):
+    """log.jsonl rows -> the newest n requests for Settings > History: {at, task, reply (cut), secs, ok}."""
+    out = []
+    for r in reversed(rows):
+        if not isinstance(r.get('task'), str) or not r['task'].strip():
+            continue
+        reply = str(r.get('reply') or '')
+        secs = r.get('secs', 0)
+        out.append({'at': str(r.get('at', '')), 'task': r['task'][:600], 'reply': reply[:600], 'secs': secs if isinstance(secs, (int, float)) else 0,
+                    'ok': bool(reply.strip()) and not FAILED.search(reply) and not re.match(r'(?i)\s*error\b', reply) and not re.search(r'(?i)hit your .*limit', reply)})
+        if len(out) >= n:
+            break
+    return out
+
+
+CLI_LOGIN = {'codex_cli': ['login'],          # "Sign in with ChatGPT" in the browser
+             'antigravity_cli': [],            # agy asks for the Google account on its first start
+             'deepseek_cli': ['web']}          # dsh's web app: Settings > Account
+
+
+def cli_login_line(pid, path):
+    """The console line that starts a CLI's own sign-in: cmd /k keeps the window open so the user sees how it went."""
+    return f'cmd.exe /k "title Oma sign-in & {subprocess.list2cmdline([path, *CLI_LOGIN[pid]])}"'
+
+
+def cli_login(pid):
+    """Starts the CLI's own sign-in in a new visible console window and returns at once."""
+    from multi_ai.adapters import cli_agents
+    if pid not in CLI_LOGIN:
+        return f'Error: unknown CLI "{pid}" ({", ".join(CLI_LOGIN)})'
+    path = cli_agents.exe(pid)
+    if not path:
+        return f'Error: {cli_agents.CLI[pid]["name"]} is not installed'
+    try:
+        subprocess.Popen(cli_login_line(pid, path), creationflags=subprocess.CREATE_NEW_CONSOLE, close_fds=True)
+    except OSError as e:
+        return f'Error: could not open the sign-in window: {e}'
+    return f'opened the {cli_agents.CLI[pid]["name"]} sign-in window: finish signing in there'
 
 
 TIPS = ['Say "remember …" and Atticus keeps it as a rule.',
@@ -2336,6 +2385,11 @@ def main():
     if args[:1] == ['--browser']:   # Oma's own Chrome profile, driven like a person (multi_ai/browser_worker.py)
         from multi_ai import browser_worker
         return browser_worker.main(args[1:])
+    if args[:1] == ['--history-list']:   # Settings > History: past requests, newest first
+        n = int(args[1]) if len(args) > 1 and args[1].isdigit() else 200
+        return print(json.dumps(history_list(read_rows(os.path.join(DIR, 'log.jsonl')), n), ensure_ascii=False))
+    if args[:1] == ['--cli-login'] and len(args) > 1:   # the CLI's own sign-in in its own console window (the user never types a command)
+        return print(cli_login(args[1]))
     if args[:1] == ['--player-stop']:
         return print(player_stop())
     if args[:1] == ['--player'] and len(args) > 1:

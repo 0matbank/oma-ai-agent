@@ -1,11 +1,21 @@
-.ot-panel{position:absolute;top:12px;right:12px;width:min(370px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;background:rgba(22,25,35,.97);border:1px solid #3a4158;border-radius:8px;padding:12px 14px 14px;display:none;box-shadow:0 8px 30px rgba(0,0,0,.5);font-size:12.5px;z-index:5}
-.ot-panel h3{margin:0 0 2px;font-size:16px}
-.ot-panel .sub{color:#8d95a9;margin-bottom:8px}
-.ot-panel .x{position:absolute;top:8px;right:10px;background:none;border:0;color:#8d95a9;font-size:18px;cursor:pointer;padding:0 4px}
-.ot-panel dl{display:grid;grid-template-columns:104px 1fr;gap:4px 8px;margin:0}
+.ot-panel{position:absolute;top:12px;left:12px;width:min(300px,calc(100% - 16px));max-height:calc(100% - 16px);overflow:auto;background:rgba(20,23,33,.97);border:1px solid #4a5270;border-radius:8px;padding:10px 12px 11px;display:none;box-shadow:0 8px 30px rgba(0,0,0,.55);font-size:12px;line-height:1.35;color:#e2e7f2;z-index:5}
+.ot-panel h3{margin:0 18px 3px 0;font-size:14.5px}
+.ot-panel h3 .role{color:#8d95a9;font-weight:500;font-size:12.5px}
+.ot-panel .sub{color:#aab2c5;margin-bottom:7px;word-break:break-word}
+.ot-panel .x{position:absolute;top:6px;right:8px;background:none;border:0;color:#8d95a9;font-size:18px;cursor:pointer;padding:0 4px;line-height:1}
+.ot-panel .x:hover{color:#e2e7f2}
+.ot-panel .lbl{color:#8d95a9;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;margin:6px 0 3px}
+.ot-panel dl{display:grid;grid-template-columns:70px 1fr;gap:3px 8px;margin:0}
 .ot-panel dt{color:#8d95a9}
 .ot-panel dd{margin:0;word-break:break-word}
-.ot-panel .st{display:inline-block;padding:0 6px;border-radius:3px;color:#151821;font-weight:700;font-size:11.5px}
-.ot-panel ul{margin:2px 0 0;padding-left:16px}
-.ot-panel pre{margin:2px 0 0;white-space:pre-wrap;word-break:break-word;background:#11141c;border:1px solid #2b3040;border-radius:4px;padding:6px;font:11.5px/1.35 Consolas,monospace;max-height:160px;overflow:auto}
-.ot-panel .note{color:#8d95a9;font-size:11.5px;margin-top:8px}
+.ot-panel .st{display:inline-block;padding:0 5px;border-radius:3px;color:#151821;font-weight:700;font-size:10.5px;vertical-align:1px}
+.ot-panel ol.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.ot-panel ol.steps li{display:grid;grid-template-columns:auto auto 1fr;gap:6px;align-items:baseline;padding:3px 0;border-top:1px solid #2b3040}
+.ot-panel ol.steps li:first-child{border-top:0}
+.ot-panel ol.steps time{color:#8d95a9;font:11px Consolas,monospace}
+.ot-panel ol.steps .tx{word-break:break-word}
+.ot-panel ul.ev{margin:0;padding-left:0;list-style:none}
+.ot-panel ul.ev li{margin:2px 0;word-break:break-word}
+.ot-panel ul.ev b.ok{color:#7ee08a}
+.ot-panel ul.ev b.bad{color:#ff6b6b}
+.ot-panel .note{color:#8d95a9;font-size:11.5px;margin-top:4px}

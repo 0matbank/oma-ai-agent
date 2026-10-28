@@ -23,6 +23,7 @@ class OmaParticleOrb {
     this.build(opts.count || 3000);
     this.resize();
     window.addEventListener('resize', () => this.resize());
+    if (window.ResizeObserver && this.canvas.parentElement) new ResizeObserver(() => this.resize()).observe(this.canvas.parentElement);   // layout switches resize the panel, not the window
     document.addEventListener('visibilitychange', () => { this.hidden = document.hidden; if (!this.hidden) this.kick(); });
     this.wireDrag();
     this.kick();
@@ -35,6 +36,7 @@ class OmaParticleOrb {
     danger:    { a: [255, 51, 68],  b: [255, 138, 138], core: [255, 236, 236] },
     aurora:    { a: [167, 139, 250], b: [94, 234, 212], core: [240, 236, 255] },
     solar:     { a: [255, 181, 71], b: [255, 225, 150], core: [255, 248, 230] },
+    oma:       { a: [45, 212, 191], b: [245, 165, 36], core: [236, 255, 250] },
   };
   static STATE = {   // colour override, energy, swirl, label
     idle:      { energy: 0.22, swirl: 0,    label: 'STANDBY' },

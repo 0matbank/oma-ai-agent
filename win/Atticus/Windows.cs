@@ -327,7 +327,7 @@ sealed class SettingsWindow : PageWindow
         Program.Err("SettingsWindow.Loaded() entered");
         Visible = true;
         BringToFront();
-        Push(); Refresh2(); Send("st.perms", OnboardingWindow.Perms()); if (tab != "") { Js($"st.tab('{tab}')"); tab = ""; }
+        Zoom(); Push(); Refresh2(); Send("st.perms", OnboardingWindow.Perms()); if (tab != "") { Js($"st.tab('{tab}')"); tab = ""; }
         StartTelemetryTimer();
         Task.Run(() => {
             try {
@@ -388,6 +388,16 @@ sealed class SettingsWindow : PageWindow
         if (k is "speechEngine" or "speechLanguage") Program.Speech.Reload();
         if (k == "login") Startup(v is true);
         if (k is "aiMode" or "activeModel" or "aiFallback" or "aiFallbackOrder" or "healthInterval") ProviderHealth.Refresh("settings");
+        if (k == "uiScale") Zoom();
+    }
+
+    // the page zoom from Settings (uiScale, 80-130 %, default 100)
+    void Zoom()
+    {
+        if (web == null) return;
+        var s = Prefs.Num("uiScale");
+        if (s <= 0 && double.TryParse(Prefs.Str("uiScale"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var p)) s = p;
+        try { web.ZoomFactor = Math.Clamp(s > 0 ? s : 100, 80, 130) / 100.0; } catch (Exception e) { Program.Err("zoom: " + e.Message); }
     }
 
     public static void Startup(bool on)
@@ -524,9 +534,25 @@ sealed class SettingsWindow : PageWindow
                 }
                 break;
             case "ask":
-                if (S("text") is { } askText)
-                    _ = ExecuteDirective(askText, isVoice: false, image: SaveImage(S("image")));
+                var attached = SaveFiles(b);   // files the user dropped in: the engine gets their paths
+                if (S("text") != null || attached != "")
+                    _ = ExecuteDirective((S("text") ?? "") + attached, isVoice: false, image: SaveImage(S("image")));
                 break;
+            case "minimize": WindowState = FormWindowState.Minimized; break;   // the floating orb opens by itself (OnResize)
+            case "history": Task.Run(() => { var j = Py.Run(new[] { "--history-list" }); Program.Post(() => Js($"st.history({(j.TrimStart().StartsWith("[") ? j : Web.Json(new { error = "Could not read the history." }))})")); }); break;
+            case "browserSites": BrowserSites(); break;
+            case "browserStatus":   // opens each site in a background tab of Oma's browser; can take a while
+                var bids = b.TryGetProperty("ids", out var bi) && bi.ValueKind == JsonValueKind.Array ? bi.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()) : Enumerable.Empty<string>();
+                var bargs = new[] { "--browser", "status" }.Concat(bids).ToArray();
+                Task.Run(() => { var j = Py.Run(bargs, 90); Program.Post(() => Js($"st.browserStatus({(j.TrimStart().StartsWith("[") ? j : Web.Json(new { error = "The sign-in check did not answer (timed out or failed)." }))})")); });
+                break;
+            case "browserLogin": if (S("site") is { } bl) BrowserRun(new[] { "--browser", "login", bl }, false); break;
+            case "browserAccount": if (S("site") is { } ba) BrowserRun(new[] { "--browser", "account", ba, S("email") ?? "" }, true); break;
+            case "browserAddSite": if (S("name") is { } bn && S("url") is { } bu) BrowserRun(new[] { "--browser", "add-site", bn, bu }, true); break;
+            case "browserRemoveSite": if (S("site") is { } br) BrowserRun(new[] { "--browser", "remove-site", br }, true); break;
+            case "browserClose": BrowserRun(new[] { "--browser", "close" }, false); break;
+            case "browserSignOutAll": BrowserRun(new[] { "--browser", "signout-all" }, true, 60); break;
+            case "cliLogin": if (S("id") is { } cl) BrowserRun(new[] { "--cli-login", cl }, false); break;   // the CLI's own sign-in window
             case "headlines":
                 var refresh = b.TryGetProperty("refresh", out var rf) && rf.ValueKind == JsonValueKind.True;
                 Task.Run(() => { var j = Py.Run(refresh ? new[] { "--headlines", "refresh" } : new[] { "--headlines" }, 40); if (j.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.headlines({j})")); });
@@ -613,6 +639,48 @@ sealed class SettingsWindow : PageWindow
         }
         catch { return ""; }
     }
+
+    // Files dropped in the Oma window ("files": [{name, data URL}]): saved to %TEMP%\oma-attach\<unique>\, one line each for the engine
+    static string SaveFiles(JsonElement b)
+    {
+        if (!b.TryGetProperty("files", out var fs) || fs.ValueKind != JsonValueKind.Array) return "";
+        var lines = "";
+        string dir = null;
+        foreach (var f in fs.EnumerateArray().Take(5))
+        {
+            try
+            {
+                if (f.ValueKind != JsonValueKind.Object || !f.TryGetProperty("data", out var dv) || dv.ValueKind != JsonValueKind.String) continue;
+                var data = dv.GetString() ?? "";
+                var comma = data.IndexOf(',');
+                if (!data.StartsWith("data:") || comma < 0 || !data[..comma].EndsWith(";base64")) continue;
+                if ((data.Length - comma - 1) / 4L * 3 > 20L * 1024 * 1024) { Program.Err("attachment over 20 MB skipped"); continue; }
+                var name = f.TryGetProperty("name", out var nv) && nv.ValueKind == JsonValueKind.String ? Path.GetFileName(nv.GetString() ?? "") : "";
+                name = string.Concat(name.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch)).Trim().TrimEnd('.');
+                if (name == "") name = "file";
+                if (name.Length > 100) name = name[..60] + name[^40..];
+                dir ??= Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "oma-attach", Guid.NewGuid().ToString("N")[..10])).FullName;
+                var path = Path.Combine(dir, name);
+                for (var n = 2; File.Exists(path); n++) path = Path.Combine(dir, Path.GetFileNameWithoutExtension(name) + $" ({n})" + Path.GetExtension(name));
+                File.WriteAllBytes(path, Convert.FromBase64String(data[(comma + 1)..]));
+                lines += $"\n[Attached file: {path}]";
+            }
+            catch (Exception e) { Program.Err("attachment: " + e.Message); }
+        }
+        return lines;
+    }
+
+    // Settings > Integrations > Oma's browser: sign-in sites and their state (atticus.py --browser ...)
+    void BrowserSites() => Task.Run(() => { var j = Py.Run(new[] { "--browser", "sites" }); Program.Post(() => Js($"st.browserSites({(j.TrimStart().StartsWith("[") ? j : Web.Json(new { error = "Could not list the sites." }))})")); });
+
+    // one browser or sign-in action -> st.browserResult({ok, message, action}); refresh: redraw the site list after it
+    void BrowserRun(string[] args, bool refresh, int secs = 30) => Task.Run(() =>
+    {
+        var r = Py.Run(args, secs).Trim();
+        var ok = r != "" && !r.StartsWith("Error");
+        Program.Post(() => Js($"st.browserResult({Web.Json(new { ok, message = r == "" ? "No answer (timed out or failed)." : r, action = args[0] == "--cli-login" ? "cli-login" : args[1] })})"));
+        if (refresh) BrowserSites();
+    });
 
     Action<string> remoteDone;   // a request from the phone (Telegram): its result goes back there too
     public void RemoteAsk(string text, Action<string> done)

@@ -51,6 +51,7 @@ class AgentTown {
     document.querySelectorAll('.town-tab').forEach(b => b.classList.toggle('active', (b.dataset.tab || '').toLowerCase().trim() === tab));
     document.querySelectorAll('.town-pane').forEach(p => { p.style.display = p.dataset.pane === tab ? 'flex' : 'none'; });
     if (tab !== 'gesture') window.omaGesture?.stop();
+    this.office?.setVisible?.(tab === 'agents');   // no office frames while another tab covers it
     if (tab === 'agents') this.office?.resize();
   }
 
@@ -68,7 +69,7 @@ class AgentTown {
     }).join('');
     box.querySelectorAll('.agent-chip').forEach(ch => ch.onclick = () => {   // the same detail panel as clicking the worker
       const o = this.office; if (!o) return;
-      this.showTab('agents'); o.selected = o.chars[ch.dataset.agent] || null; o._renderPanel();
+      this.showTab('agents'); o.select(ch.dataset.agent);
     });
     const busy = Object.values(this.agents).filter(a => ['WORKING', 'VERIFYING', 'WAITING'].includes(a.state)).length;
     const el = document.getElementById('town-busy-stat');
