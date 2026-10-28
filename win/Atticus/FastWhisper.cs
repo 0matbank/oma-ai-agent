@@ -14,7 +14,7 @@ sealed class FastWhisper
     public bool Ready { get; private set; }
     public string Info = "", Error = "";
 
-    public static bool Wanted => Prefs.Str("speechEngine") is "" or "faster-whisper";
+    public static bool Wanted => Prefs.Str("speechEngine") == "faster-whisper";   // opt-in until measured better on this PC
 
     static string Langs()
     {

@@ -1,5 +1,7 @@
 """Offline regressions for the October 2026 runtime repair: honest task states, worker lanes from real tool calls,
 bounded text-only fallback, live model handling. No real model, network or desktop calls."""
+import os as _os, tempfile as _tf
+_os.environ['ATTICUS_DIR'] = _os.environ.get('OMA_TEST_DIR') or _os.environ.setdefault('OMA_TEST_DIR', _tf.mkdtemp(prefix='oma-test-'))   # never the user's config
 import io
 import json
 import os

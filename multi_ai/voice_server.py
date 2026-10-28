@@ -58,7 +58,10 @@ def load(name='large-v3-turbo', device='auto'):
     free = vram_free_mb() if cuda else None
     compute = ('float16' if free is None or free > 2500 else 'int8_float16') if cuda else 'int8'
     os.makedirs(MODELS, exist_ok=True)
-    model = WhisperModel(name, device='cuda' if cuda else 'cpu', compute_type=compute, download_root=MODELS,
+    local = os.path.join(MODELS, name)   # a complete local copy (model.bin + json files) needs no network at all
+    if os.path.exists(os.path.join(local, 'model.bin')):
+        name = local
+    model = WhisperModel(name,device='cuda' if cuda else 'cpu', compute_type=compute, download_root=MODELS,
                          cpu_threads=max(2, (os.cpu_count() or 4) - 2))
     import numpy as np
     list(model.transcribe(np.zeros(16000, dtype=np.float32), language='en', beam_size=1)[0])   # warm the kernels once

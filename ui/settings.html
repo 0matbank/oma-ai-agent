@@ -2262,7 +2262,7 @@ body {
   const phTime = t => t ? new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
   const phEff = (r, now) => (r.retry_at && r.retry_at <= now && !['READY', 'DEGRADED', 'UNKNOWN'].includes(r.state)) ? 'UNKNOWN' : r.state;
   const phPill = st => `<span class="pill" style="background:${PH_COL[st] || '#8a93a6'}22;color:${PH_COL[st] || '#8a93a6'}">${escapeHtml(st)}</span>`;
-  st.providerHealth = d => {
+  function providerHealth(d) {   // st.providerHealth (st is defined further down)
     if (!d || !d.providers) return;
     const now = Date.now() / 1000;
     const sel = d.selected ? ` Your pick ${escapeHtml(d.selected.id)}: ${escapeHtml(d.selected.state)}.` : '';
@@ -2281,7 +2281,7 @@ body {
       return `<div class="row" style="display:block"><div style="display:flex;gap:10px;align-items:center"><b style="min-width:96px">${escapeHtml(p.id)}</b>${phPill(ps)}` +
              `<span style="opacity:.75;font-size:12px">${escapeHtml((p.reason || '').slice(0, 110))}${p.retry_at > now ? ` · next retry ${phTime(p.retry_at)}` : ''}</span></div>${models}</div>`;
     }).join('');
-  };
+  }
   post({ do: 'providerHealth' });
   $('btnToProviders').onclick = () => document.querySelector('nav button[data-s=providers]').click();
 
@@ -2563,6 +2563,7 @@ body {
       }
     },
     providers: renderProviders,
+    providerHealth,
     providerTestResult(res) {
       const card = document.querySelector(`.provider-card[data-pid="${res.id || ''}"]`);
       if (card) {

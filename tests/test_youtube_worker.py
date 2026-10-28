@@ -1,4 +1,6 @@
 """Offline tests for Eve, the YouTube worker: no network (yt-dlp and the transcript API are never called here)."""
+import os as _os, tempfile as _tf
+_os.environ['ATTICUS_DIR'] = _os.environ.get('OMA_TEST_DIR') or _os.environ.setdefault('OMA_TEST_DIR', _tf.mkdtemp(prefix='oma-test-'))   # never the user's config
 import os
 import sys
 import tempfile

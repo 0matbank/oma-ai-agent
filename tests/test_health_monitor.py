@@ -1,3 +1,5 @@
+import os as _os, tempfile as _tf
+_os.environ['ATTICUS_DIR'] = _os.environ.get('OMA_TEST_DIR') or _os.environ.setdefault('OMA_TEST_DIR', _tf.mkdtemp(prefix='oma-test-'))   # never the user's config
 import os
 import shutil
 import sys
@@ -97,3 +99,13 @@ class Agent(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class Routing(unittest.TestCase):
+    def test_local_only_and_manual_keep_claude_off(self):
+        import atticus
+        from unittest.mock import patch
+        for prefs, off in (({'aiMode': 'local'}, True), ({'aiMode': 'local_only'}, True), ({'aiMode': 'auto'}, False),
+                           ({'aiMode': 'manual', 'activeModel': 'gemini/x'}, True), ({'aiMode': 'manual', 'activeModel': 'claude/haiku'}, False)):
+            with patch.object(atticus, 'pref', side_effect=lambda k, d, p=prefs: p.get(k, d)):
+                self.assertEqual(bool(atticus.claude_off()), off, prefs)

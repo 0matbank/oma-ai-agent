@@ -1,4 +1,6 @@
 """Offline regressions: no Claude calls, Mac actions, or user settings."""
+import os as _os, tempfile as _tf
+_os.environ['ATTICUS_DIR'] = _os.environ.get('OMA_TEST_DIR') or _os.environ.setdefault('OMA_TEST_DIR', _tf.mkdtemp(prefix='oma-test-'))   # never the user's config
 import io
 import json
 import os

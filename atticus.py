@@ -1458,6 +1458,18 @@ def quota_until(text):
     return t if t > time.time() else t + 86400
 
 
+def claude_off():
+    """The user's routing settings keep Claude out: Local Only (the UI saves 'local', older builds 'local_only'),
+    or Manual mode with a non-Claude model picked. -> why, or ''."""
+    mode = str(pref('aiMode', 'auto')).lower()
+    if mode in ('local', 'local_only'):
+        return 'Local Only mode is on'
+    active = str(pref('activeModel', '') or '')
+    if mode == 'manual' and '/' in active and active.split('/', 1)[0] not in ('claude', 'claude_code'):
+        return f'Manual mode uses {active}'
+    return ''
+
+
 def claude_blocked():
     """While Claude's plan limit is known to be used up, say until when (and skip starting Claude: saves time and tokens)."""
     try:
@@ -1534,9 +1546,9 @@ def text_only(task, why):
         run.ok = False
         run.ran = []
         if TRACK is not None:
-            TRACK.set_stage('fallback', f'Atticus engine unavailable ({why}); PC actions need it, so nothing was done.')
-        return (f"Not done: {why}. Opening apps and other PC actions run only on the Atticus engine (Claude Code). "
-                "Ask again when it is available, or switch the Claude model in Settings > Intelligence."), 0, []
+            TRACK.set_stage('fallback', f'Atticus engine unavailable ({why}); no tools-capable model could act, so nothing was done.')
+        return (f"Not done: {why}, and no other healthy model that can use Oma's tools could do it. "
+                "Check Settings > AI Providers > Live Provider Health, or ask again later."), 0, []
     if TRACK is not None:
         TRACK.set_stage('fallback', f'Atticus engine unavailable ({why}). Short text-only answer from the Multi-AI router; no PC actions will run.')
     try:
@@ -1567,10 +1579,11 @@ def run(task, p=None, shots=()):
     run.denied = False   # the user answered Don't Allow on the safety gate
     run.t0 = time.time()
     alias = getattr(p, 'model', '') or pref('model', 'haiku')
-    if pref('aiMode', 'auto') == 'local_only':
+    off = claude_off()
+    if off:   # Local Only (privacy) or a manual non-Claude pick: Claude is never started
         if p:
             stop_claude(p)
-        return text_only(task, 'Local Only mode is on')
+        return text_only(task, off)
     blocked = claude_blocked()
     if blocked:   # known limit: do not start Claude again until it resets
         if p:
@@ -2089,7 +2102,7 @@ def main():
         return print(__doc__.strip() if args[0] in ('--help', '-h') else f'unknown option {args[0]}. ' + __doc__.strip())   # never an AI ask: the AI's own `atticus --help` must not start another one
     if os.environ.get('ATTICUS_ASK') and args != ['--wait']:   # inside an AI run (its helpers carry ATTICUS_ASK): never start another one
         return print('Atticus helpers only here; a request cannot start another request. Run one of: ' + ', '.join(sorted({c.split()[1] for c in QUIET if c.startswith(ME + ' ')})))
-    warm = start_claude() if (args == ['--wait'] and pref('aiMode', 'auto') != 'local_only') else None   # Atticus.app: started at key-down, request comes on stdin at release
+    warm = start_claude() if (args == ['--wait'] and not claude_off() and not claude_blocked()) else None   # Atticus.app: started at key-down, request comes on stdin at release
     shots = []
     snap = threading.Thread(target=lambda: shots.extend(look()), daemon=True)   # the screen as the user pressed the keys; sent only if the words are about it
     snap.shots = shots
