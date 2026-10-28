@@ -79,6 +79,7 @@ class TaskTracker:
         self.id = 'T-' + uuid.uuid4().hex[:6].upper()
         self.text = text
         self.source = source
+        self.req_id = os.environ.get('OMA_REQ_ID', '')   # the Oma window's request id, for tracing app.err <-> events
         self.seq = 0
         self.started = _now()
         self.status = 'RECEIVED'
@@ -112,7 +113,7 @@ class TaskTracker:
 
     def snapshot(self):
         return {
-            'task_id': self.id, 'text': self.text, 'source': self.source, 'status': self.status, 'stage': self.stage,
+            'task_id': self.id, 'req_id': self.req_id, 'text': self.text, 'source': self.source, 'status': self.status, 'stage': self.stage,
             'started': self.started, 'elapsed_s': round(time.time() - self.started, 1), 'model': self.model,
             'models_tried': self.models_tried, 'steps': self.steps[-40:], 'evidence': self.evidence, 'error': self.error,
             'reply': self.reply[:1200], 'text_only': self.text_only,
@@ -132,7 +133,7 @@ class TaskTracker:
 
     # ---- lifecycle ----
     def start(self):
-        self._emit('task', detail=self.text, source=self.source)
+        self._emit('task', detail=self.text, source=self.source, req_id=self.req_id)
 
     def set_stage(self, stage, detail=''):
         self.stage = stage

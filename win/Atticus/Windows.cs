@@ -547,7 +547,7 @@ sealed class SettingsWindow : PageWindow
         try
         {
             string status = null, replyText = null;
-            p = Py.Start(new[] { "--oma-ask", askText }, new() { ["ATTICUS_UI"] = "1", ["ATTICUS_FRONT"] = Hooks.Mine ?? "", ["OMA_SOURCE"] = isVoice ? "voice" : "typed" });
+            p = Py.Start(new[] { "--oma-ask", askText }, new() { ["ATTICUS_UI"] = "1", ["ATTICUS_FRONT"] = Hooks.Mine ?? "", ["OMA_SOURCE"] = isVoice ? "voice" : "typed", ["OMA_REQ_ID"] = reqId });
             currentProc = p;
             var errTask = p.StandardError.ReadToEndAsync();
             var lineTask = Task.Run(async () =>
@@ -562,6 +562,7 @@ sealed class SettingsWindow : PageWindow
                             var rep = JsonDocument.Parse(l[7..]).RootElement;
                             status = rep.TryGetProperty("status", out var st) ? st.GetString() : null;
                             replyText = rep.TryGetProperty("reply", out var rv) ? rv.GetString() : null;
+                            Program.Err($"Ask {reqId} ({(isVoice ? "voice" : "typed")}): task {(rep.TryGetProperty("task_id", out var tid) ? tid.GetString() : "?")} {status} via {(rep.TryGetProperty("provider_used", out var pu) ? pu.GetString() : "?")}/{(rep.TryGetProperty("model_used", out var mu) ? mu.GetString() : "?")}");
                         }
                         catch { }
                     }

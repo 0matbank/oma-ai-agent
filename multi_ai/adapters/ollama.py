@@ -41,7 +41,8 @@ class OllamaAdapter:
         if images:
             msg['images'] = images
         messages.append(msg)
-        payload = {'model': model_id, 'messages': messages, 'stream': False, 'think': False, 'keep_alive': '10m'}
+        payload = {'model': model_id, 'messages': messages, 'stream': False, 'think': False, 'keep_alive': '10m',
+                   'options': {'num_predict': 400}}   # a fallback answer stays short: was unbounded (207 s answers)
         t0 = time.time()
         try:
             req = urllib.request.Request(f"{self.base_url}/api/chat", data=json.dumps(payload).encode('utf-8'),

@@ -123,6 +123,12 @@ class ModelRouter:
         if order and mode != 'manual':
             rank = {p: i for i, p in enumerate(order)}
             cands = sorted(cands, key=lambda c: rank.get(c[0], len(order)))   # stable: keeps each provider's own best-first order
+        active = str(s.get('activeModel') or '')
+        if mode != 'manual' and '/' in active and mode != 'local':   # the model picked in the dropdown is tried first in Auto too
+            pid, mid = active.split('/', 1)
+            pid = 'claude_code' if pid == 'claude' else pid
+            if pid not in excluded and (pid in self.adapters or get_secret(f'ai_key_{pid}')):
+                cands = [(pid, mid)] + [c for c in cands if c != (pid, mid)]
         return list(dict.fromkeys(cands))[:MAX_ATTEMPTS]
 
     def get_status_overview(self) -> Dict[str, Any]:

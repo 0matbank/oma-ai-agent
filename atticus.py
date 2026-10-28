@@ -1417,7 +1417,7 @@ def relay(p):
 
 ACTION_WORDS = re.compile(r'\b(open|launch|start|close|quit|click|type|press|play|pause|search|google|find|move|snap|send|delete|download|upload|install|go to|navigate|browse|write|save|record)\b|'
                           r'খোল|খুল|চালু|বন্ধ|সার্চ|খুঁজ|খোঁজ|চালাও|টাইপ|ক্লিক|পাঠাও|ডাউনলোড|লেখো|সেভ|\b(kholo|kolo|khulo|chalu|bondho|khojo|khujo)\b', re.I)
-CLAUDE_ERRORS = (('quota_exhausted', ('weekly limit', 'hit your limit', 'usage limit', 'quota')),
+CLAUDE_ERRORS = (('quota_exhausted', ('weekly limit', 'hit your limit', 'usage limit', 'quota', 'session limit')),
                  ('rate_limited', ('rate limit', 'too many requests', '429', 'overloaded')),
                  ('model_unavailable', ('issue with the selected model', 'may not exist', 'not have access to it', 'model not found', 'retired')),
                  ('auth_error', ('not logged in', 'please run /login', 'invalid api key', 'authentication', 'oauth')),
@@ -1441,17 +1441,51 @@ def _resume_when_answered(path):
         TRACK.resumed()
 
 
+def quota_until(text):
+    """'... resets 1pm (Asia/Dhaka)' -> unix time of that local time (next occurrence); else 30 minutes from now."""
+    m = re.search(r'resets\s+(\d{1,2})(?::(\d\d))?\s*(am|pm)', text or '', re.I)
+    if not m:
+        return time.time() + 1800
+    h = int(m[1]) % 12 + (12 if m[3].lower() == 'pm' else 0)
+    lt = time.localtime()
+    t = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, h, int(m[2] or 0), 0, 0, 0, -1))
+    return t if t > time.time() else t + 86400
+
+
+def claude_blocked():
+    """While Claude's plan limit is known to be used up, say until when (and skip starting Claude: saves time and tokens)."""
+    try:
+        from multi_ai.model_catalog import _load
+        rec = _load().get('claude_code', {}).get('_quota') or {}
+    except Exception:
+        return ''
+    if rec.get('until', 0) > time.time():
+        return f"Claude plan limit reached; it resets at {time.strftime('%I:%M %p', time.localtime(rec['until'])).lstrip('0')}"
+    return ''
+
+
 def text_only(task, why):
     """Claude Code (the Atticus engine) could not run and nothing was executed: answer with the Multi-AI router as text.
     The router never runs PC actions, so permissions and the safety gate are never bypassed by switching providers.
     -> (reply, cost, steps); sets run.ok / run.text_only / run.model."""
     from multi_ai.router import clean_user_prompt, router
     run.text_only = True
+    request = clean_user_prompt(task)
     if TRACK is not None:
         TRACK.text_only = True
-        TRACK.set_stage('fallback', f'Atticus engine unavailable ({why}). Text-only answer from the Multi-AI router; no PC actions will run.')
+    if ACTION_WORDS.search(request):   # another model cannot act on the PC: say so at once instead of a slow, useless essay
+        run.ok = False
+        run.ran = []
+        if TRACK is not None:
+            TRACK.set_stage('fallback', f'Atticus engine unavailable ({why}); PC actions need it, so nothing was done.')
+        return (f"Not done: {why}. Opening apps and other PC actions run only on the Atticus engine (Claude Code). "
+                "Ask again when it is available, or switch the Claude model in Settings > Intelligence."), 0, []
+    if TRACK is not None:
+        TRACK.set_stage('fallback', f'Atticus engine unavailable ({why}). Short text-only answer from the Multi-AI router; no PC actions will run.')
     try:
-        res = router.execute(clean_user_prompt(task), exclude_providers=['claude_code'], tracker=TRACK)
+        res = router.execute(request, exclude_providers=['claude_code'], tracker=TRACK,
+                             system_prompt="Answer in at most 4 short sentences, in the user's language (Bangla, Banglish or English). "
+                                           "You cannot open apps or act on the PC; if asked to, say so in one sentence.")
     except Exception as e:
         res = {'success': False, 'reply': f'Fallback failed: {e}', 'error': str(e)}
     run.fallback = res
@@ -1479,6 +1513,13 @@ def run(task, p=None, shots=()):
         if p:
             stop_claude(p)
         return text_only(task, 'Local Only mode is on')
+    blocked = claude_blocked()
+    if blocked:   # known limit: do not start Claude again until it resets
+        if p:
+            stop_claude(p)
+        if TRACK is not None:
+            TRACK.model_attempt('claude_code', alias, False, 'quota_exhausted', blocked)
+        return text_only(task, blocked) if pref('aiFallback', True) else (f'Not done: {blocked}.', 0, [])
     p = p or start_claude()
     if not p:
         c = plan()
@@ -1547,6 +1588,12 @@ def run(task, p=None, shots=()):
         kind = claude_error_type(f'{reply} {err_msg}', p.returncode)
         if TRACK is not None:
             TRACK.model_attempt('claude_code', alias, False, kind, (reply or err_msg)[:300], resolved)
+        if kind == 'quota_exhausted':   # remember until the reset so the next requests skip Claude at once
+            try:
+                from multi_ai.model_catalog import _load, _save
+                d = _load(); d.setdefault('claude_code', {})['_quota'] = {'until': quota_until(f'{reply} {err_msg}'), 'at': time.time()}; _save(d)
+            except Exception:
+                pass
         if not cmds and pref('aiFallback', True):   # nothing ran yet: another model may answer, as text only
             r = text_only(task, kind)
             if run.ok:
@@ -2019,13 +2066,15 @@ def _window_check(app, before=frozenset()):
     """Dave: is a window of <app> really on screen now? before: window handles that existed before the request, so an
     already-open window is reported as such instead of as proof that something new opened."""
     def check():
-        for _ in range(20):
+        old = None
+        for i in range(20):
             ws = winctl.find(app)
-            if ws:
-                new = [w for w in ws if w['hwnd'] not in before]
-                w = (new or ws)[0]
-                how = 'new window' if new else 'window was already open'
-                return True, f"{how}: {w['app']} - {w['title'][:60]}"
+            new = [w for w in ws if w['hwnd'] not in before]
+            if new:
+                return True, f"new window: {new[0]['app']} - {new[0]['title'][:60]}"
+            old = old or (ws[0] if ws else None)
+            if old and i >= 10:   # an existing window: give a new one 2 s to appear before saying so
+                return True, f"window was already open: {old['app']} - {old['title'][:60]}"
             time.sleep(0.2)
         return None, f'no visible window of {app} detected within 4 s'
     return check

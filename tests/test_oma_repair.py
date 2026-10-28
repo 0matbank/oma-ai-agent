@@ -208,3 +208,14 @@ class BanglishTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class QuotaTests(unittest.TestCase):
+    def test_session_limit_is_quota_and_skips_claude_until_reset(self):
+        self.assertEqual(atticus.claude_error_type("You've hit your session limit · resets 1pm (Asia/Dhaka)", 1), 'quota_exhausted')
+        with patch('multi_ai.model_catalog._load', return_value={'claude_code': {'_quota': {'until': __import__('time').time() + 3600}}}), \
+             patch.object(atticus, 'pref', side_effect=lambda k, d: d), patch.object(atticus, 'start_claude') as start:
+            reply, _, _ = atticus.run('Request: open whatsapp in chrome')
+        start.assert_not_called()   # no wasted Claude start while the limit is known
+        self.assertFalse(atticus.run.ok)
+        self.assertIn('Not done', reply)   # an action gets an instant honest answer, not a slow text essay
