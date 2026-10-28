@@ -14,6 +14,7 @@ It never reads the profile's cookies or passwords; it only acts in the visible w
 """
 import base64
 import json
+import re
 import os
 import subprocess
 import tempfile
@@ -128,6 +129,8 @@ def _wait_loaded(c, timeout=20):
 def open_url(url):
     if not url.startswith(('http://', 'https://', 'about:', 'file:')):
         url = 'https://' + url
+    if re.match(r'https://gemini\.google\.com(/app)?/?$', url) and site_account('gemini'):   # the user's Gemini account, not Google's first one
+        url = site_url('gemini')
     def go(c):
         c('Page.navigate', url=url)
         time.sleep(0.4)
@@ -192,10 +195,12 @@ KEYS = {'Enter': 13, 'Tab': 9, 'Escape': 27, 'Backspace': 8, 'ArrowDown': 40, 'A
 
 
 def key(c, name):
+    """A real key press as Chrome makes it (rawKeyDown, char, keyUp): chat apps built on React ignore a bare keyDown."""
     code = KEYS.get(name, 0)
-    for kind in ('keyDown', 'keyUp'):
-        c('Input.dispatchKeyEvent', type=kind, key=name, code=name, windowsVirtualKeyCode=code, nativeVirtualKeyCode=code,
-          **({'text': '\r'} if name == 'Enter' and kind == 'keyDown' else {}))
+    c('Input.dispatchKeyEvent', type='rawKeyDown', key=name, code=name, windowsVirtualKeyCode=code, nativeVirtualKeyCode=code)
+    if name == 'Enter':
+        c('Input.dispatchKeyEvent', type='char', key=name, code=name, text='\r', unmodifiedText='\r', windowsVirtualKeyCode=code, nativeVirtualKeyCode=code)
+    c('Input.dispatchKeyEvent', type='keyUp', key=name, code=name, windowsVirtualKeyCode=code, nativeVirtualKeyCode=code)
 
 
 def press(name):
@@ -260,14 +265,55 @@ def site_url(site):
     return cfg['url'] + (f'?authuser={acct}' if acct and site == 'gemini' else '')
 
 
+_BOX_TEXT = "(() => { const e = document.activeElement; return e ? (e.value || e.innerText || '') : ''; })()"
+# the right-most visible button next to the chat box is its send button (no site-specific class needed)
+_SEND_XY = """(() => { const t = document.activeElement && /TEXTAREA|DIV|P/.test(document.activeElement.tagName) ? document.activeElement : document.querySelector('textarea');
+  if (!t) return null; const tr = t.getBoundingClientRect(); let p = t, best = null;
+  for (let i = 0; i < 8 && p && !best; i++) { p = p.parentElement;
+    const bs = [...p.querySelectorAll('button,[role=button]')].map(e => [e, e.getBoundingClientRect()])
+      .filter(([e, r]) => r.width > 0 && r.height > 0 && r.top >= tr.top - 20 && r.bottom <= tr.bottom + 80);
+    if (bs.length) best = bs.sort((a, b) => b[1].right - a[1].right)[0]; }
+  if (!best) return null; const r = best[1]; return [r.x + r.width / 2, r.y + r.height / 2]; })()"""
+# what the page shows after the last copy of the question, without the chat box and its buttons
+_AFTER = r"""(q => { const all = document.body.innerText; const i = all.lastIndexOf(q); if (i < 0) return '';
+  let t = all.slice(i + q.length); const box = document.querySelector('textarea, [contenteditable=true]');
+  const ph = box && (box.getAttribute('placeholder') || box.getAttribute('aria-label')); if (ph && t.includes(ph)) t = t.slice(0, t.lastIndexOf(ph));
+  return t.replace(/\n{2,}/g, '\n').trim(); })(%s)"""
+
+
+def _site_tab(url):
+    """The site's own tab in Oma's window (an open one on the same host, else a new one): never a tab the user is using
+    for something else."""
+    import urllib.parse
+    host = urllib.parse.urlparse(url).netloc
+    for t in _pages():
+        if urllib.parse.urlparse(t.get('url', '')).netloc == host:
+            try:   # answers plain text ("Target activated"), not JSON
+                urllib.request.urlopen(f"http://127.0.0.1:{PORT}/json/activate/{t['id']}", timeout=3).read()
+            except Exception:
+                pass
+            return t
+    return _http('/json/new?' + urllib.parse.quote(url, safe=':/?=&@'), method='PUT')
+
+
 def ask_site(site, question, wait=50):
     """Asks the user's chat site in Oma's window and returns the answer text it shows (or why it could not)."""
     cfg = SITES.get(site.lower())
     if not cfg:
         return f'Error: unknown site "{site}" (deepseek, chatgpt, gemini)'
     site = site.lower()
-    def run(c):
+    ensure()
+    c = _Cdp(_site_tab(site_url(site)))
+    try:
+        return _ask_in(c, site, cfg, question, wait)
+    finally:
+        c.close()
+
+
+def _ask_in(c, site, cfg, question, wait):
+    if True:
         import re
+        c('Emulation.setFocusEmulationEnabled', enabled=True)   # keys and clicks count even when the window is behind another
         c('Page.navigate', url=site_url(site))
         time.sleep(1)
         _wait_loaded(c)
@@ -279,24 +325,52 @@ def ask_site(site, question, wait=50):
                 break
             time.sleep(0.5)
         if not box:
+            here = c.js('location.href') or ''
+            if 'google.com/sorry' in here:   # Google's "unusual traffic" check: a person must answer it; Oma never solves CAPTCHAs
+                return ("Error: Google is asking to confirm you are not a robot. Open Oma's browser (Settings > Integrations), "
+                        "answer it once yourself, then ask again.")
             return (f"Error: {site} needs you to sign in in Oma's browser first (Settings > Integrations > Open Oma's browser), "
-                    f"then ask again. Page: {c.js('location.href')}")
+                    f"then ask again. Page: {here}")
         count = c.js(f"document.querySelectorAll({json.dumps(cfg['answer'])}).length") or 0
-        c('Input.insertText', text=question)
-        time.sleep(0.3)
+        for ch in question:   # typed key by key like a person: chat apps ignore text pasted in without key events
+            c('Input.dispatchKeyEvent', type='keyDown', text=ch, key=ch, unmodifiedText=ch)
+            c('Input.dispatchKeyEvent', type='keyUp', key=ch)
+        time.sleep(0.4)
         key(c, 'Enter')
+        time.sleep(1.5)
+        if question[:30] in (c.js(_BOX_TEXT) or ''):   # Enter did not send: the send button, by its name, else the right-most one
+            named = c.js("(() => { const s = [...document.querySelectorAll('button,[role=button]')].find(x => /^(send|submit|send message|send prompt)$/i"
+                         ".test((x.getAttribute('aria-label') || '').trim()) || x.dataset.testid === 'send-button'); if (!s || s.disabled) return false; s.click(); return true; })()")
+            time.sleep(1.5) if named else None
+            xy = None if named else c.js(_SEND_XY)
+            if xy:
+                for t in ('mouseMoved', 'mousePressed', 'mouseReleased'):
+                    c('Input.dispatchMouseEvent', type=t, x=xy[0], y=xy[1], button='left', clickCount=1)
+                time.sleep(1.5)
+            if question[:30] in (c.js(_BOX_TEXT) or ''):
+                return f'Error: {site} did not accept the question (the send button did not work)'
         last, same, end = '', 0, time.time() + wait
         while time.time() < end:   # done when a new answer exists and stops changing for ~3 s
             time.sleep(1)
             n, txt = c.js(f"(() => {{ const a = document.querySelectorAll({json.dumps(cfg['answer'])}); "
                           "return [a.length, a.length ? a[a.length - 1].innerText : '']; })()") or [0, '']
-            if n > count and txt.strip():
+            if not (n > count and txt.strip()):   # the site renamed its answer element: the text after the question
+                txt = c.js(_AFTER % json.dumps(question)) or ''
+            if txt.strip():
                 same = same + 1 if txt == last else 0
                 last = txt
                 if same >= 3:
-                    return f'{site} answered:\n{txt.strip()[:6000]}'
-        return f'{site} answered (may still be writing):\n{last.strip()[:6000]}' if last else f'Error: no answer from {site} in {wait} s'
-    return _with_tab(run)
+                    return f'{site} answered:\n{_clean(txt)[:6000]}'
+        return f'{site} answered (may still be writing):\n{_clean(last)[:6000]}' if last else f'Error: no answer from {site} in {wait} s'
+
+
+# the chat sites' own labels around an answer, not part of it
+_NOISE = re.compile(r'^(chatgpt said:?|you said:?|chatgpt can make mistakes.*|latest response|thinking effort|low|medium|high|response complete|'
+                    r'deepthink|search|ai-generated, for reference only|copy|share|gemini (said|can make mistakes).*|show thinking|regenerate)$', re.I)
+
+
+def _clean(text):
+    return '\n'.join(l for l in (x.strip() for x in str(text).splitlines()) if l and not _NOISE.match(l))
 
 
 def login_note(url):

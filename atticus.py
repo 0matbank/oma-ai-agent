@@ -2553,7 +2553,8 @@ def serve(task, warm=None, snap=None):
             TRACK.step_start('fast-1', 'Bash', {'command': cmd}, label('Bash', {'command': cmd}) if cmd else quick)
             TRACK.step_end('fast-1', not getattr(fast, 'failed', False), getattr(fast, 'evidence', '') or quick)
             verdict = TRACK.verify(verification_checks(task, quick, fast.cmds, TRACK, before))
-            status = 'FAILED' if getattr(fast, 'failed', False) else 'COMPLETED' if verdict == 'ok' else 'PARTIAL'
+            asked = bool(fast.cmds) and fast.cmds[0].startswith(ME + ' --browser ask')   # the site's own answer is the evidence
+            status = 'FAILED' if getattr(fast, 'failed', False) else 'COMPLETED' if verdict == 'ok' or asked else 'PARTIAL'
         elif getattr(fast, 'failed', False):
             status = 'FAILED'
         say('✓', quick)
