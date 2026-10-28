@@ -110,7 +110,7 @@ class ProviderManager:
             "local": False,
             "default_models": ["default"],
             "doc_url": "https://github.com/deepseek-ai/deepseek-harness",
-            "description": "DeepSeek's own harness (dsh), developer preview: used only after a real test passes."
+            "description": "Your DeepSeek account through DeepSeek Harness (dsh, developer preview). Sign in once: run `dsh web`, then Settings > Account."
         },
         {
             "id": "ollama",

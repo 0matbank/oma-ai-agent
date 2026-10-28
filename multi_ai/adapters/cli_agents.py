@@ -19,10 +19,46 @@ CLI = {
     'codex_cli': {'name': 'ChatGPT (Codex CLI)', 'exe': ('codex',), 'login': 'codex login', 'models': ['default']},
     'antigravity_cli': {'name': 'Gemini (Antigravity CLI)', 'exe': ('agy', 'antigravity'), 'login': 'agy',
                         'models': ['gemini-3.8-flash-low', 'gemini-3.8-flash-medium']},
-    # dsh's headless profile runs its own bash tool (it would skip Oma's gate) and signs in through `dsh web`:
-    # listed, but used only once a gate-respecting mode passes a real test
-    'deepseek_cli': {'name': 'DeepSeek (DeepSeek Harness)', 'exe': ('dsh',), 'login': 'dsh web', 'models': ['default'], 'experimental': True},
+    # dsh's shipped headless profile runs its own bash tool and ignores saved sign-ins: Oma uses its own `oma` profile
+    # (DSH_PATCH) with the DeepSeek account route on and every dsh tool off, so commands only run through Oma's gate
+    'deepseek_cli': {'name': 'DeepSeek (DeepSeek Harness)', 'exe': ('dsh',), 'login': 'dsh web, then Settings > Account', 'models': ['deepseek-flash']},
 }
+DSH_HOME = os.environ.get('DSH_HOME') or os.path.join(os.path.expanduser('~'), '.dsh')
+DSH_PATCH = """# Oma AI uses this profile as a planner only: DeepSeek account sign-in, and none of dsh's own tools
+# (Oma runs every command itself, through its own safety gate).
+- id: credentials
+  disabled: false
+- id: authorization
+  disabled: false
+- id: deepseek-account
+  disabled: false
+- id: agent-default-model
+  config:
+    provider: deepseek-account
+    model: deepseek-flash
+""" + ''.join(f'- id: {t}\n  disabled: true\n' for t in (
+    'tool-bash', 'tool-pwsh', 'tool-fs', 'tool-fs-search', 'tool-web', 'tool-jobs', 'tool-skill', 'tool-workflow', 'tool-subagent',
+    'tool-subagent-fork', 'tool-subagent-control', 'tool-subagent-list-agents', 'tool-todo', 'tool-goal'))
+
+
+def dsh_profile(path):
+    """Creates (once) and keeps dsh's `oma` profile: account route on, all dsh tools off."""
+    prof = os.path.join(DSH_HOME, 'profiles', 'oma')
+    if not os.path.exists(os.path.join(prof, 'package.json')):
+        _run([path, '--profile', 'oma', '--from-default-profile', 'headless', '--help'], timeout=60)
+    patch = os.path.join(prof, 'cordis.patch.yml')
+    if os.path.isdir(prof) and (not os.path.exists(patch) or open(patch, encoding='utf-8').read() != DSH_PATCH):
+        with open(patch, 'w', encoding='utf-8') as f:
+            f.write(DSH_PATCH)
+
+
+def dsh_signed_in():
+    """A DeepSeek account record in dsh's credential file (only its record names are read, never values)."""
+    try:
+        t = open(os.path.join(DSH_HOME, '.credentials.yaml'), encoding='utf-8').read()
+    except OSError:
+        return False
+    return bool(re.search(r'^\s{2}[^\s:]*deepseek[^\s:]*:', t, re.I | re.M))
 ORDER = ('codex_cli', 'antigravity_cli', 'deepseek_cli')   # after Claude Code, before API-key clouds and local models
 STEP_SCHEMA = {'type': 'object', 'properties': {'command': {'type': 'string'}, 'reply': {'type': 'string'}, 'final': {'type': 'string'}}}
 
@@ -131,8 +167,29 @@ def ask(pid, prompt, model='', schema=None, timeout=120):
             msg = (err or out or f'exit {code}').strip()[-400:]
             raise CliError(classify(msg), msg)
         return text, _json_in(text)
-    if pid == 'deepseek_cli':
-        raise CliError('not_available', 'DeepSeek Harness has no verified non-interactive mode yet')
+    if pid == 'deepseek_cli':   # no schema option: the prompt asks for the JSON, the last {...} in the answer is used
+        dsh_profile(path)
+        code, out, err = _run([path, '--profile', 'oma', '--json', '-'], stdin=prompt, timeout=timeout)
+        final, problem, tools = '', '', 0
+        for line in out.splitlines():
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if e.get('type') == 'final':
+                final = e.get('text') or ''
+            elif e.get('type') == 'tool_call':
+                tools += 1   # must never happen with the oma profile; treated as a failure, not trusted
+            elif e.get('type') == 'error' or (e.get('type') == 'status' and (e.get('reason') or {}).get('kind') == 'error'):
+                er = e.get('error') or (e.get('reason') or {}).get('error') or {}
+                problem = f"{er.get('code', '')}: {er.get('message', '')}".strip(': ') or str(e)[:300]
+        if tools:
+            raise CliError('error', 'DeepSeek tried to use its own tools; Oma does not allow that')
+        if code != 0 or not final.strip():
+            msg = (problem or err or out or f'exit {code}').strip()[-400:]
+            kind = 'auth_error' if 'SIGN_IN' in msg or 'TOKEN_INVALID' in msg else 'quota_exhausted' if 'QUOTA' in msg else classify(msg)
+            raise CliError(kind, msg)
+        return final.strip(), _json_in(final)
     raise CliError('not_available', f'unknown CLI {pid}')
 
 
@@ -149,6 +206,9 @@ def signed_in(pid):
         if pid == 'antigravity_cli':
             code, out, err = _run([path, 'models'], timeout=40)
             return (code == 0 and '\t' in out), ('signed in' if code == 0 else (err or out)[:160])
+        if pid == 'deepseek_cli':
+            ok = dsh_signed_in()
+            return ok, 'signed in' if ok else 'not signed in to a DeepSeek account in dsh'
     except CliError as e:
         return None, e.msg
     return None, 'no sign-in check for this CLI'
