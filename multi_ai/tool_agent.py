@@ -108,15 +108,35 @@ def _chat_cli(provider, model, messages):
             lines.append(f'You answered: {c}')
         elif role == 'tool':
             lines.append(f'Oma ran it. Output:\n{c[-3000:]}')
-    text, j = cli_agents.ask(provider, '\n\n'.join(lines), model, schema=cli_agents.STEP_SCHEMA)
+    s = cli_agents.SESSIONS.get(id(messages)) if provider == 'antigravity_cli' else None
+    if provider == 'antigravity_cli' and pref_persistent():   # one agy process for the whole task: only new output is sent
+        if s is None:
+            try:
+                s = cli_agents.SESSIONS[id(messages)] = cli_agents.AgySession(model if model not in ('', 'auto', 'default') else '', cli_agents.STEP_SCHEMA)
+                s.sent = 0
+            except OSError as e:
+                raise cli_agents.CliError('not_available', str(e))
+        new = lines if s.sent == 0 else [l for l in lines[s.sent:] if not l.startswith('You answered:')]
+        s.sent = len(lines)
+        text, j = s.turn('\n\n'.join(new))
+    else:
+        text, j = cli_agents.ask(provider, '\n\n'.join(lines), model, schema=cli_agents.STEP_SCHEMA)
     j = j or {}
     cmd, reply = (j.get('command') or '').strip(), (j.get('reply') or '').strip()
+    if reply.startswith('{') and not cmd:   # a model that put the whole JSON inside "reply"
+        inner = cli_agents._json_in(reply) or {}
+        cmd, reply = (inner.get('command') or '').strip(), (inner.get('reply') or reply).strip()
     if not cmd and not reply:
         reply = text.strip()
     raw = {'content': json.dumps({'command': cmd} if cmd else {'reply': reply}, ensure_ascii=False), 'tool_calls': None}
     if cmd and reply and str(j.get('final', '')).lower() in ('yes', 'true'):
         raw['final_reply'] = reply   # used only if the command exits 0 (run_agent), else the planner is asked again
     return ('' if cmd else reply), ([(f'cli{len(messages)}', cmd)] if cmd else []), raw
+
+
+def pref_persistent():
+    """Keep one CLI process per task (default on); OMA_CLI_PERSIST=0 switches it off for a before/after measurement."""
+    return os.environ.get('OMA_CLI_PERSIST', '1') != '0'
 
 
 def _cli_error():
@@ -184,6 +204,10 @@ def run_agent(task, provider, model, base_url, key, system, eng, tracker=None):
             out.update(error_type='step_limit', error=f'stopped after {MAX_STEPS} steps')
     finally:
         live.done = True
+        from multi_ai.adapters import cli_agents
+        s = cli_agents.SESSIONS.pop(id(messages), None)   # the task is over: its CLI process ends with it
+        if s is not None:
+            s.close()
         os.environ.pop('ATTICUS_ASK', None)
         shutil.rmtree(ask, True)
     out['ok'] = bool(cmds) and bool(out['reply']) and not out['denied'] and not out['error_type']

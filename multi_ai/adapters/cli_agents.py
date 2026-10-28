@@ -16,13 +16,18 @@ import tempfile
 import time
 
 CLI = {
-    'codex_cli': {'name': 'ChatGPT (Codex CLI)', 'exe': ('codex',), 'login': 'codex login', 'models': ['default']},
-    'antigravity_cli': {'name': 'Gemini (Antigravity CLI)', 'exe': ('agy', 'antigravity'), 'login': 'agy',
-                        'models': ['gemini-3.8-flash-low', 'gemini-3.8-flash-medium']},
+    # 'auto': the model is chosen per request from the CLI's live model list (pick()), never a hard-coded id
+    'codex_cli': {'name': 'ChatGPT (Codex CLI)', 'exe': ('codex',), 'login': 'codex login', 'models': ['auto']},
+    'antigravity_cli': {'name': 'Gemini (Antigravity CLI)', 'exe': ('agy', 'antigravity'), 'login': 'agy', 'models': ['auto']},
     # dsh's shipped headless profile runs its own bash tool and ignores saved sign-ins: Oma uses its own `oma` profile
     # (DSH_PATCH) with the DeepSeek account route on and every dsh tool off, so commands only run through Oma's gate
-    'deepseek_cli': {'name': 'DeepSeek (DeepSeek Harness)', 'exe': ('dsh',), 'login': 'dsh web, then Settings > Account', 'models': ['deepseek-flash']},
+    # off until the DeepSeek platform balance allows requests (the account route bills it: "Insufficient Balance")
+    'deepseek_cli': {'name': 'DeepSeek (DeepSeek Harness)', 'exe': ('dsh',), 'login': 'dsh web, then Settings > Account', 'models': ['auto'],
+                     'off': 'BILLING_REQUIRED: the DeepSeek account route bills the platform balance, which is empty'},
 }
+TIER = 'fast'      # set per request by the engine: 'fast' for simple steps, 'power' for coding and complex work
+LAST = {}          # pid -> the model a request really used
+_MODELS = {}       # pid -> (time, [ids]) from the CLI's own model list
 DSH_HOME = os.environ.get('DSH_HOME') or os.path.join(os.path.expanduser('~'), '.dsh')
 DSH_PATCH = """# Oma AI uses this profile as a planner only: DeepSeek account sign-in, and none of dsh's own tools
 # (Oma runs every command itself, through its own safety gate).
@@ -78,8 +83,35 @@ def exe(pid):
 
 
 def installed():
-    """Installed CLIs that Oma may use (an experimental one only after it is verified)."""
-    return [pid for pid in ORDER if exe(pid) and not CLI[pid].get('experimental')]
+    """Installed CLIs that Oma may use (one that is switched off, e.g. billing required, is skipped)."""
+    return [pid for pid in ORDER if exe(pid) and not CLI[pid].get('off')]
+
+
+def models(pid, refresh=False, max_age=6 * 3600):
+    """The models this CLI offers to the signed-in account, from the CLI itself (agy models), cached for a few hours."""
+    at, ids = _MODELS.get(pid, (0, []))
+    if ids and not refresh and time.time() - at < max_age:
+        return ids
+    if pid == 'antigravity_cli' and exe(pid):
+        code, out, _ = _run([exe(pid), 'models'], timeout=45)
+        ids = [l.split('	', 1)[0].strip() for l in out.splitlines() if '	' in l] if code == 0 else []
+    _MODELS[pid] = (time.time(), ids)
+    return ids
+
+
+def pick(pid, tier='fast'):
+    """A model for this tier from the live list: fast = the lightest Flash, power = the strongest available.
+    '' = the CLI's own default (Codex, DeepSeek: their account picks it)."""
+    ids = models(pid)
+    if not ids:
+        return ''
+    prefs = ([r'flash.*low', r'flash.*medium', r'flash', r'.'] if tier == 'fast' else
+             [r'flash.*high', r'opus', r'sonnet', r'pro', r'flash.*medium', r'.'])
+    for rx in prefs:
+        hit = next((i for i in ids if re.search(rx, i, re.I)), '')
+        if hit:
+            return hit
+    return ids[0]
 
 
 def classify(text):
@@ -87,13 +119,15 @@ def classify(text):
     t = (text or '').lower()
     if re.search(r'not (?:logged|signed) in|login required|please (?:log|sign) ?in|unauthori[sz]ed|authenticat', t):
         return 'auth_error'
-    if re.search(r'usage limit|quota|limit reached|hit your limit|insufficient|exceeded your', t):
+    if re.search(r'insufficient balance|billing|payment required|\b402\b', t):
+        return 'billing_required'
+    if re.search(r'usage limit|quota|limit reached|hit your limit|exceeded your', t):
         return 'quota_exhausted'
     if re.search(r'rate.?limit|429|too many requests|overloaded|capacity', t):
         return 'rate_limited'
     if re.search(r'timed? ?out|deadline', t):
         return 'timeout'
-    if re.search(r'model .*(not found|unavailable|not supported)|unknown model', t):
+    if re.search(r'model .*(not found|unavailable|not supported|not recognized|retired|deprecated)|unknown model|invalid model', t):
         return 'model_unavailable'
     if re.search(r'network|connection|resolve host|offline', t):
         return 'network_error'
@@ -127,12 +161,98 @@ def _run(argv, stdin=None, timeout=120):
     return r.returncode, r.stdout or '', r.stderr or ''
 
 
+class AgySession:
+    """One Antigravity process kept for a whole task (agy --input-format stream-json): the first turn pays the ~7 s start,
+    later steps only the model time (measured 16 s -> 2.8 s per step). One task = one session; closed (killed) at the end,
+    on a crash or a timeout, so no agy process is ever left behind."""
+    def __init__(self, model, schema, timeout=120):
+        import queue
+        import threading
+        self.timeout, self.q, self.model = timeout, queue.Queue(), model or pick('antigravity_cli', TIER)
+        LAST['antigravity_cli'] = self.model or 'default'
+        argv = [exe('antigravity_cli'), '--input-format', 'stream-json', '--output-format', 'stream-json', '--disable-slash-commands', '--sandbox'] + \
+               (['--json-schema', json.dumps(schema)] if schema else []) + (['--model', self.model] if self.model else []) + ['-p=']
+        self.p = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8',
+                                  errors='replace', cwd=_workdir(), creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        threading.Thread(target=self._read, daemon=True).start()
+
+    def _read(self):
+        for line in self.p.stdout:
+            self.q.put(line)
+        self.q.put(None)   # the process ended
+
+    def turn(self, text):
+        import queue
+        msg = {'event': 'user', 'message': {'role': 'user', 'content': [{'type': 'text', 'text': text[-24000:]}]}}
+        try:
+            self.p.stdin.write(json.dumps(msg) + '\n')
+            self.p.stdin.flush()
+        except OSError as e:
+            self.close()
+            raise CliError('error', f'agy stopped: {e}')
+        end, noise = time.time() + self.timeout, []
+        while True:
+            try:
+                line = self.q.get(timeout=max(0.1, end - time.time()))
+            except queue.Empty:
+                self.close()
+                raise CliError('timeout', f'no answer in {self.timeout} s')
+            if line is None:
+                self.close()
+                raise CliError(classify(' '.join(noise)), ('agy exited: ' + ' '.join(noise))[-400:])
+            try:
+                e = json.loads(line)
+            except ValueError:
+                noise.append(line.strip())
+                continue
+            if e.get('event') == 'result':
+                r = e.get('result') or {}
+                if str(r.get('status', '')).upper() != 'SUCCESS':
+                    msg = (r.get('error') or r.get('response') or 'agy failed')[:400]
+                    raise CliError(classify(msg), msg)
+                text = (r.get('response') or '').strip()
+                j = r.get('structured_output') if isinstance(r.get('structured_output'), dict) else _json_in(text)
+                return text, j
+
+    def close(self):
+        try:
+            self.p.stdin.close()
+        except OSError:
+            pass
+        try:
+            self.p.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            self.p.kill()
+
+
+SESSIONS = {}   # task key -> AgySession, closed by close_sessions() when the task ends
+
+
+def close_sessions():
+    for s in list(SESSIONS.values()):
+        s.close()
+    SESSIONS.clear()
+
+
 def ask(pid, prompt, model='', schema=None, timeout=120):
+    """One turn; a model the CLI no longer offers (retired) refreshes the live list and retries once with another."""
+    try:
+        return _ask(pid, prompt, model, schema, timeout)
+    except CliError as e:
+        if e.kind != 'model_unavailable' or pid != 'antigravity_cli':
+            raise
+        models(pid, refresh=True)
+        return _ask(pid, prompt, 'auto', schema, timeout)
+
+
+def _ask(pid, prompt, model='', schema=None, timeout=120):
     """One non-interactive turn. -> (text, structured dict or None). Raises CliError(kind, msg)."""
     path = exe(pid)
     if not path:
         raise CliError('not_available', f"{CLI[pid]['name']} is not installed")
-    model = '' if model in ('', 'default') else model
+    if model in ('', 'default', 'auto'):
+        model = pick(pid, TIER)
+    LAST[pid] = model or 'default'
     if pid == 'antigravity_cli':
         argv = [path, '-p', prompt[-24000:], '--output-format', 'json', '--disable-slash-commands', '--sandbox',
                 '--print-timeout', f'{timeout}s'] + (['--json-schema', json.dumps(schema)] if schema else []) + (['--model', model] if model else [])
@@ -187,7 +307,7 @@ def ask(pid, prompt, model='', schema=None, timeout=120):
             raise CliError('error', 'DeepSeek tried to use its own tools; Oma does not allow that')
         if code != 0 or not final.strip():
             msg = (problem or err or out or f'exit {code}').strip()[-400:]
-            kind = 'auth_error' if 'SIGN_IN' in msg or 'TOKEN_INVALID' in msg else 'quota_exhausted' if 'QUOTA' in msg else classify(msg)
+            kind = 'auth_error' if 'SIGN_IN' in msg or 'TOKEN_INVALID' in msg else classify(msg)
             raise CliError(kind, msg)
         return final.strip(), _json_in(final)
     raise CliError('not_available', f'unknown CLI {pid}')
@@ -203,9 +323,9 @@ def signed_in(pid):
             code, out, err = _run([path, 'login', 'status'], timeout=20)
             t = (out + err).strip()
             return (code == 0 and 'not' not in t.lower()), t[:160] or f'exit {code}'
-        if pid == 'antigravity_cli':
-            code, out, err = _run([path, 'models'], timeout=40)
-            return (code == 0 and '\t' in out), ('signed in' if code == 0 else (err or out)[:160])
+        if pid == 'antigravity_cli':   # the live model list doubles as the sign-in check (no inference request)
+            ids = models(pid, refresh=True)
+            return bool(ids), (f'signed in, {len(ids)} models' if ids else 'agy models failed (not signed in?)')
         if pid == 'deepseek_cli':
             ok = dsh_signed_in()
             return ok, 'signed in' if ok else 'not signed in to a DeepSeek account in dsh'

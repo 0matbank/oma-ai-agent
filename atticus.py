@@ -164,6 +164,26 @@ def player(what):
     return 'Error: the Oma player did not answer'
 
 
+_SITE = r'(deepseek|deep seek|ডিপসিক|chatgpt|chat gpt|চ্যাটজিপিটি|gemini|জেমিনি)'
+_ASKW = r'(?:ke |k |-ke |কে )?(?:jiggesh|jigges|jiggasa|jigesh|jiggash|ask|proshno|জিজ্ঞেস|জিজ্ঞাসা)(?: koro| kor| করো| korte)?'
+
+
+def site_ask_request(text):
+    """"DeepSeek-ke jiggesh koro <q>", "ask ChatGPT <q>", "<q> gemini ke jiggesh koro" -> (site, question) or None."""
+    t = ' '.join(text.split())
+    m = re.match(r'(?i)^(?:ask\s+)?' + _SITE + r'\s*' + _ASKW + r'\s*[:,\-]?\s*(.{2,})$', t) or \
+        re.match(r'(?i)^ask\s+' + _SITE + r'\s*[:,\-]?\s*(.{2,})$', t)
+    if m:
+        site, q = m.group(1), m.group(2)
+    else:
+        m = re.match(r'(?i)^(.{2,}?)\s*[,\-]?\s*' + _SITE + r'\s*' + _ASKW + r'\s*$', t)
+        if not m:
+            return None
+        q, site = m.group(1), m.group(2)
+    site = {'deep seek': 'deepseek', 'ডিপসিক': 'deepseek', 'chat gpt': 'chatgpt', 'চ্যাটজিপিটি': 'chatgpt', 'জেমিনি': 'gemini'}.get(site.lower(), site.lower())
+    return site, q.strip(' :,-')
+
+
 def player_channel():
     """The Oma window's player outside a Claude run (instant commands, the tool fallback of other models): a folder this
     engine watches itself, used for play/stop hand-offs only (never the safety gate). Set in os.environ, so commands
@@ -993,8 +1013,25 @@ def failed_move(out):
 def fast(text):
     """Simple commands with no AI: learned shortcuts, open <app/site>, snap/move <it/app> left/right/full/center, to laptop/monitor.
     Returns a reply, or None to hand the request to Haiku. fast.cmds: the commands that did it, so "When I say X, …" can save them."""
-    fast.cmds = []
+    fast.cmds, fast.failed, fast.evidence = [], False, ''
     raw_str = text.strip()
+    from multi_ai import instant   # volume, mute, media keys, screenshot, brightness, show desktop: read back from Windows
+    hit = instant.match(raw_str) if os.environ.get('ATTICUS_LIVE') != '1' else None
+    if hit:
+        try:
+            ok, reply, fast.evidence = instant.run(hit[0], hit[1], winctl)
+        except Exception as e:
+            ok, reply, fast.evidence = False, f'কাজটা হয়নি: {e}', str(e)[:200]
+        fast.failed = not ok
+        fast.cmds = [f'{ME} --instant {hit[0]}' + (f' {hit[1]}' if hit[1] is not None else '')]
+        return reply
+    sa = site_ask_request(raw_str)
+    if sa and os.environ.get('ATTICUS_LIVE') != '1':   # "DeepSeek-ke jiggesh koro ...": the user's own site, visibly in Oma's browser
+        from multi_ai import browser_worker
+        r = browser_worker.ask_site(*sa)
+        fast.cmds = [f'{ME} --browser ask {sa[0]} {shlex.quote(sa[1])}']
+        fast.failed = r.startswith('Error')
+        return r.replace('Error: ', '', 1)
     yt = media_request(raw_str)
     if yt is not None and os.environ.get('ATTICUS_LIVE') != '1' and player_channel():   # songs and videos play in Oma's own player, never a browser tab
         if yt == '<stop>':
@@ -1257,11 +1294,16 @@ def label(name, inp):
         return 'Asking you which one'
     if c.startswith(SET):
         return 'Changing a setting'
+    if c.startswith(ME + ' --instant'):
+        a = (c.split() + ['', '', ''])[2]
+        return {'volume_up': 'Turning the volume up', 'volume_down': 'Turning the volume down', 'volume_set': 'Setting the volume',
+                'mute': 'Muting the sound', 'unmute': 'Unmuting the sound', 'screenshot': 'Taking a screenshot', 'media': 'Pressing a media key',
+                'brightness_set': 'Setting the brightness', 'brightness_step': 'Changing the brightness', 'desktop': 'Showing the desktop'}.get(a, 'Working on it')
     if c.startswith(ME + ' --browser'):
         a = c[len(ME + ' --browser'):].strip().split(None, 1) or ['open']
         return {'open': 'Opening in Oma\'s browser', 'read': 'Reading the page in Oma\'s browser', 'click': 'Clicking in Oma\'s browser',
                 'type': 'Typing in Oma\'s browser', 'key': 'Pressing a key in Oma\'s browser', 'shot': 'Looking at Oma\'s browser',
-                'tabs': 'Checking Oma\'s browser tabs'}.get(a[0], 'Using Oma\'s browser') + (f": {a[1].split('&&')[0].strip().strip(chr(34))[:60]}" if len(a) > 1 and a[0] in ('open', 'click') else '')
+                'tabs': 'Checking Oma\'s browser tabs', 'ask': 'Asking in Oma\'s browser', 'close': 'Closing Oma\'s browser'}.get(a[0], 'Using Oma\'s browser') + (f": {a[1].split('&&')[0].strip().strip(chr(34))[:60]}" if len(a) > 1 and a[0] in ('open', 'click') else '')
     if c.startswith(ME + ' --player-stop'):
         return 'Stopping the Oma player'
     if c.startswith(ME + ' --player'):
@@ -1671,6 +1713,49 @@ def claude_blocked():
     return ''
 
 
+ROUTE = {'kind': 'agent', 'tier': 'fast'}   # this request's route (multi_ai.intent): chat | coding | agent, and fast | power models
+COMPLEX = re.compile(r'\b(research|analy[sz]e|analysis|compare|comparison|plan|strategy|step by step|in detail|detailed|report|essay|'
+                     r'bishleshon|tulona|bistarito)\b|বিশ্লেষণ|তুলনা|বিস্তারিত|গবেষণা', re.I)
+
+
+def manual_claude():
+    """The user picked a Claude model by hand: every request goes to Claude, as chosen."""
+    a = str(pref('activeModel', '') or '')
+    return str(pref('aiMode', 'auto')).lower() == 'manual' and a.split('/', 1)[0] in ('claude', 'claude_code')
+
+
+def fast_chat(task):
+    """A conversation or question from what the user typed: a fast conversational cloud model (API clouds, then Claude,
+    then the sign-in CLIs; Ollama last). No coding CLI is started for it, and nothing runs on the PC.
+    -> the reply, or None when the model hands it back ([[AGENT]]) or no model answered (the normal engine then runs)."""
+    from multi_ai import intent
+    from multi_ai.router import clean_user_prompt, router
+    m = me()
+    try:
+        first = (router.plan(purpose='chat')[0] or [('', '')])[0][0]
+    except Exception:
+        first = ''
+    if first in ('', 'claude_code'):   # no fast API model is healthy: Claude through the engine, already started ahead, is quicker
+        return None
+    if TRACK is not None:
+        TRACK.set_stage('analyzing', 'A conversation: answering with a fast chat model (no PC action needed)')
+    try:
+        res = router.execute(clean_user_prompt(task), tracker=TRACK, purpose='chat',
+                             system_prompt=intent.chat_system(m.get('name', ''), m.get('facts', []), recent()))
+    except Exception as e:
+        say('!', f'fast chat failed: {e}')
+        return None
+    reply = (res.get('reply') or '').strip()
+    if not res.get('success') or not reply:
+        return None
+    if intent.AGENT_TOKEN in reply:
+        if TRACK is not None:
+            TRACK.set_stage('planning', 'The chat model says this needs the PC or current information: handing it to the Atticus engine')
+        return None
+    run.model = f"{res.get('provider_used')}/{res.get('model_used')}"
+    return reply
+
+
 def tool_fallback(task, request, why):
     """Claude Code is unavailable: the next healthy tools-capable model runs the request through the same gated `bash`
     tool (multi_ai.tool_agent). Tries models in health order; stops at the first one that acted, or at a Don't Allow.
@@ -1688,12 +1773,14 @@ def tool_fallback(task, request, why):
     if browser:   # small models ignore a general hint: say it for this request
         system += f'\nThe user asked for {browser}: open pages with {SHOW} "{browser.lower()} <url>", never the default browser.'
     first = True
+    from multi_ai.adapters import cli_agents
     from multi_ai.adapters.cli_agents import CLI
+    cli_agents.TIER = ROUTE.get('tier', 'fast')   # coding / complex work gets the strongest model the CLI offers now
     for pid, mid in cands[:3]:   # bounded: at most three models act on one request (login CLIs, then API clouds, Ollama last)
         if TRACK is not None:
             TRACK.set_stage('fallback', f'Atticus engine unavailable ({why}). {pid} · {mid} runs the request through the same safety-gated tools.')
         cli = pid in CLI   # ChatGPT / Gemini / DeepSeek by account sign-in: no URL, no key
-        base = 'http://localhost:11434' if pid == 'ollama' else '' if cli else (provider_mgr.definition(pid) or {}).get('base_url', '')
+        base = 'http://127.0.0.1:11434' if pid == 'ollama' else '' if cli else (provider_mgr.definition(pid) or {}).get('base_url', '')
         key = '' if pid == 'ollama' or cli else get_secret(f'ai_key_{pid}')
         if not cli and (not base or (pid != 'ollama' and not key)):
             continue
@@ -1701,9 +1788,10 @@ def tool_fallback(task, request, why):
             hm.note_switch(prev, f'{pid}/{mid}', f'{prev} could not act: {res.get("error_type") or "no command ran"}')
         t0 = time.time()
         res = tool_agent.run_agent(f'{task}', pid, mid, base, key, system, sys.modules[__name__], TRACK)
-        hm.record(pid, mid, res['ok'] or bool(res['cmds']), res.get('error_type', ''), res.get('error', ''), time.time() - t0)
+        used = cli_agents.LAST.get(pid, '') if pid in CLI else ''   # the live model the CLI really ran
+        hm.record(pid, used or mid, res['ok'] or bool(res['cmds']), res.get('error_type', ''), res.get('error', ''), time.time() - t0)
         if TRACK is not None:
-            TRACK.model_attempt(pid, mid, res['ok'], res.get('error_type', ''), res.get('error', ''))
+            TRACK.model_attempt(pid, mid, res['ok'], res.get('error_type', ''), res.get('error', ''), used)
         prev, first = f'{pid}/{mid}', False
         if res['denied']:
             run.ok, run.denied, run.ran, run.cmds = False, True, res['cmds'], []
@@ -1711,7 +1799,7 @@ def tool_fallback(task, request, why):
         if res['cmds']:   # something ran: never hand the same request to another model (no duplicate real-world actions)
             run.ok, run.ran, run.text_only = res['ok'], res['cmds'], False
             run.cmds = res['cmds'] if res['ok'] else []
-            run.model = f'{pid}/{mid}'
+            run.model = f'{pid}/{used or mid}'
             if TRACK is not None:
                 TRACK.text_only = False
             return res['reply'] or 'The commands ran, but the model gave no final answer, so the result is not confirmed.', 0, res['steps']
@@ -1741,7 +1829,7 @@ def text_only(task, why):
     if TRACK is not None:
         TRACK.set_stage('fallback', f'Atticus engine unavailable ({why}). Short text-only answer from the Multi-AI router; no PC actions will run.')
     try:
-        res = router.execute(request, exclude_providers=['claude_code'], tracker=TRACK,
+        res = router.execute(request, exclude_providers=['claude_code'], tracker=TRACK, purpose='chat',
                              system_prompt="Answer in at most 4 short sentences, in the user's language (Bangla, Banglish or English). "
                                            "You cannot open apps or act on the PC; if asked to, say so in one sentence.")
     except Exception as e:
@@ -2463,11 +2551,26 @@ def serve(task, warm=None, snap=None):
             TRACK.model_active('fast_engine', 'instant command (no AI)')
             cmd = fast.cmds[0] if fast.cmds else ''
             TRACK.step_start('fast-1', 'Bash', {'command': cmd}, label('Bash', {'command': cmd}) if cmd else quick)
-            TRACK.step_end('fast-1', True, quick)
+            TRACK.step_end('fast-1', not getattr(fast, 'failed', False), getattr(fast, 'evidence', '') or quick)
             verdict = TRACK.verify(verification_checks(task, quick, fast.cmds, TRACK, before))
-            status = 'COMPLETED' if verdict == 'ok' else 'PARTIAL'
+            status = 'FAILED' if getattr(fast, 'failed', False) else 'COMPLETED' if verdict == 'ok' else 'PARTIAL'
+        elif getattr(fast, 'failed', False):
+            status = 'FAILED'
         say('✓', quick)
         return status, quick
+    global ROUTE
+    from multi_ai import intent
+    kind = intent.classify(task, bool(os.environ.get('OMA_IMAGE')))
+    ROUTE = {'kind': kind, 'tier': 'power' if kind == 'coding' or len(task.split()) > 25 or COMPLEX.search(task) else 'fast'}
+    if kind == 'chat' and pref('fastChat', True) and not manual_claude():
+        r = fast_chat(task)
+        if r:
+            if warm:
+                stop_claude(warm)
+            remember_turn(task, r)
+            log_turn(task, r, t)
+            say('✓', r)
+            return 'COMPLETED', r
     if TRACK is not None:
         TRACK.set_stage('planning', 'Not an instant command: preparing the Atticus engine with your memory and context')
     app, win = front()   # before anything else takes focus, so "this window" still means the user's window

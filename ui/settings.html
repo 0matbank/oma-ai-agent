@@ -617,6 +617,12 @@ body {
 .wbtn { all:unset; cursor:pointer; padding:1px 6px; margin-left:2px; border:1px solid var(--border-subtle); border-radius:4px; font-size:11px; color:var(--text-secondary); }
 .wbtn:hover { border-color:var(--neon-cyan); color:var(--neon-cyan); }
 /* ---- one layout from big monitors down to laptops, tablets and phone-width windows (inline sizes need !important) */
+#top-header .telem-chip, #top-header .btn-settings-pill { white-space:nowrap; }
+#top-header .model-tag { display:inline-block; max-width:220px; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom; }
+@media (max-width: 1400px) {
+  #top-header .telem-chip:has(#telemHotkey) { display:none; }
+  #top-header .model-tag { max-width:140px; }
+}
 @media (max-width: 1500px) {
   #world-column { width:215px !important; }
   #feed-column { min-width:290px !important; max-width:380px !important; }

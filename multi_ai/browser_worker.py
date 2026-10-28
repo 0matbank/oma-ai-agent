@@ -133,7 +133,8 @@ def open_url(url):
         time.sleep(0.4)
         _wait_loaded(c)
         c('Page.bringToFront')
-        return f"opened: {c.js('document.title')} ({c.js('location.href')})"
+        here = c.js('location.href')
+        return f"opened: {c.js('document.title')} ({here})" + login_note(here)
     return _with_tab(go)
 
 
@@ -210,9 +211,80 @@ def shot():
     return _with_tab(s)
 
 
+def close_browser():
+    if not running():
+        return "Oma's browser is not open"
+    from websockets.sync.client import connect
+    ws = connect(_http('/json/version')['webSocketDebuggerUrl'], open_timeout=5)
+    ws.send(json.dumps({'id': 1, 'method': 'Browser.close'}))
+    ws.close()
+    for _ in range(20):
+        time.sleep(0.25)
+        if not running():
+            return "closed Oma's browser"
+    return "Error: Oma's browser did not close"
+
+
 def tabs():
     ensure()
     return '\n'.join(f"{i + 1}. {p.get('title', '')[:70]} — {p.get('url', '')[:100]}" for i, p in enumerate(_pages())) or 'no tabs'
+
+
+# The user's own chat sites, used only when the user asks ("DeepSeek-ke jiggesh koro ..."), visibly in Oma's window:
+# Oma types the question the way the user would and reads the answer on screen. Never a hidden or automatic fallback.
+SITES = {
+    'deepseek': {'url': 'https://chat.deepseek.com/', 'input': 'textarea', 'answer': '.ds-markdown',
+                 'login': r'sign_in|/login|passport'},
+    'chatgpt': {'url': 'https://chatgpt.com/', 'input': '#prompt-textarea, div[contenteditable=true]', 'answer': '[data-message-author-role="assistant"]',
+                'login': r'auth\.openai|/auth/|login'},
+    'gemini': {'url': 'https://gemini.google.com/app', 'input': 'rich-textarea .ql-editor, div[contenteditable=true]', 'answer': 'message-content',
+               'login': r'accounts\.google\.com|signin'},
+}
+LOGIN_PAGE = r'accounts\.google\.com/.*signin|/login|/sign[_-]?in|/auth/|passport'
+
+
+def ask_site(site, question, wait=50):
+    """Asks the user's chat site in Oma's window and returns the answer text it shows (or why it could not)."""
+    cfg = SITES.get(site.lower())
+    if not cfg:
+        return f'Error: unknown site "{site}" (deepseek, chatgpt, gemini)'
+    def run(c):
+        import re
+        c('Page.navigate', url=cfg['url'])
+        time.sleep(1)
+        _wait_loaded(c)
+        c('Page.bringToFront')
+        box = None
+        for _ in range(20):   # the chat box appears after the app loads
+            box = c.js(f"(() => {{ const e = document.querySelector({json.dumps(cfg['input'])}); if (!e) return null; e.focus(); return true; }})()")
+            if box or re.search(cfg['login'], c.js('location.href') or ''):
+                break
+            time.sleep(0.5)
+        if not box:
+            return (f"Error: {site} needs you to sign in in Oma's browser first (Settings > Integrations > Open Oma's browser), "
+                    f"then ask again. Page: {c.js('location.href')}")
+        count = c.js(f"document.querySelectorAll({json.dumps(cfg['answer'])}).length") or 0
+        c('Input.insertText', text=question)
+        time.sleep(0.3)
+        key(c, 'Enter')
+        last, same, end = '', 0, time.time() + wait
+        while time.time() < end:   # done when a new answer exists and stops changing for ~3 s
+            time.sleep(1)
+            n, txt = c.js(f"(() => {{ const a = document.querySelectorAll({json.dumps(cfg['answer'])}); "
+                          "return [a.length, a.length ? a[a.length - 1].innerText : '']; })()") or [0, '']
+            if n > count and txt.strip():
+                same = same + 1 if txt == last else 0
+                last = txt
+                if same >= 3:
+                    return f'{site} answered:\n{txt.strip()[:6000]}'
+        return f'{site} answered (may still be writing):\n{last.strip()[:6000]}' if last else f'Error: no answer from {site} in {wait} s'
+    return _with_tab(run)
+
+
+def login_note(url):
+    """Shown after `open` when a site sent Oma's window to a sign-in page (an expired session)."""
+    import re
+    return "\nNote: this site asks you to sign in. Sign in once in Oma's browser; Oma never types passwords." if re.search(LOGIN_PAGE, url or '', re.I) else ''
 
 
 def main(args):
@@ -235,8 +307,12 @@ def main(args):
             print(shot())
         elif verb == 'tabs':
             print(tabs())
+        elif verb == 'ask' and len(rest) >= 2:
+            print(ask_site(rest[0], ' '.join(rest[1:])))
+        elif verb == 'close':   # closes Oma's browser window (its logins stay in the profile)
+            print(close_browser())
         else:
-            print('Error: usage: atticus --browser open <url> | read | click "<text>" | type "<field>" "<text>" [--enter] | key <name> | shot | tabs')
+            print('Error: usage: atticus --browser open <url> | read | click "<text>" | type "<field>" "<text>" [--enter] | key <name> | shot | tabs | ask <deepseek|chatgpt|gemini> "<question>" | close')
     except BrowserError as e:
         print(f'Error: {e}')
     except Exception as e:

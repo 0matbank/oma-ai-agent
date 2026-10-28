@@ -61,8 +61,8 @@ class ModelRouter:
     def __init__(self):
         self.adapters: Dict[str, Any] = {
             'claude_code': ClaudeCodeAdapter(),
-            'ollama': OllamaAdapter('http://localhost:11434'),
-            'lm_studio': OpenAICompatAdapter('lm_studio', 'LM Studio', 'http://localhost:1234/v1', local=True),
+            'ollama': OllamaAdapter('http://127.0.0.1:11434'),
+            'lm_studio': OpenAICompatAdapter('lm_studio', 'LM Studio', 'http://127.0.0.1:1234/v1', local=True),
         }
         self.adapters.update({pid: cli_agents.CliAgentAdapter(pid) for pid in cli_agents.CLI})
 
@@ -86,7 +86,9 @@ class ModelRouter:
         if 'ollama' not in excluded:   # an already-loaded model first: never load a second big model into VRAM
             from multi_ai.health_monitor import ollama_fit
             out += [('ollama', m) for m in ollama_fit(ollama_pick(vision=vision))[:2]]
-        if 'lm_studio' not in excluded and self.adapters['lm_studio'].is_available():
+        from multi_ai import health_monitor as hm   # a closed port costs ~2 s on Windows: trust the monitor's recent check
+        lm_up = (hm.load().get('providers', {}).get('lm_studio') or {}).get('state') == 'READY'   # set by the background check only
+        if 'lm_studio' not in excluded and lm_up:
             out += [('lm_studio', m.model_id) for m in self.adapters['lm_studio'].discover_models()[:1]]
         return out
 
@@ -103,7 +105,7 @@ class ModelRouter:
             out += [(pid, m) for m in mids]
         return out
 
-    def candidates(self, settings=None, exclude=(), vision=False) -> List[tuple]:
+    def candidates(self, settings=None, exclude=(), vision=False, purpose='agent') -> List[tuple]:
         s = settings if settings is not None else _settings()
         excluded = set(exclude)
         if os.environ.get("OMA_ROUTER_FALLBACK") == "1":
@@ -123,7 +125,11 @@ class ModelRouter:
         elif mode == 'local':
             cands = self._local(excluded, vision)
         else:   # auto and cloud: the user's cloud accounts first (login CLIs, then API keys); local models only as the last resort
-            cands = self._clis(excluded) + self._cloud(excluded) + (self._local(excluded, vision) if fallback or mode == 'auto' else [])
+            if purpose == 'chat':   # a fast conversational answer: API clouds, then Claude, then the slower sign-in CLIs; Ollama last
+                claude = [('claude_code', s.get('model', 'haiku'))] if 'claude_code' not in excluded else []
+                cands = self._cloud(excluded) + claude + self._clis(excluded) + (self._local(excluded, vision) if fallback or mode == 'auto' else [])
+            else:
+                cands = self._clis(excluded) + self._cloud(excluded) + (self._local(excluded, vision) if fallback or mode == 'auto' else [])
         order = [p.strip() for p in str(s.get('aiFallbackOrder') or '').split(',') if p.strip()]
         if order and mode != 'manual':
             rank = {p: i for i, p in enumerate(order)}
@@ -136,13 +142,13 @@ class ModelRouter:
                 cands = [(pid, mid)] + [c for c in cands if c != (pid, mid)]
         return list(dict.fromkeys(cands))
 
-    def plan(self, settings=None, exclude=(), vision=False, need_tools=False):
+    def plan(self, settings=None, exclude=(), vision=False, need_tools=False, purpose='agent'):
         """candidates() filtered and ranked by the health monitor, BEFORE any request is sent.
         A manual pick that is unavailable is reported in `note`, never silently swapped: with Fallback on another model
         answers and the reason is recorded; with Fallback off nothing else is tried. -> (cands, skipped, note)"""
         from multi_ai import health_monitor as hm
         s = settings if settings is not None else _settings()
-        raw = self.candidates(s, exclude, vision)
+        raw = self.candidates(s, exclude, vision, purpose)
         cands, skipped = hm.order(raw, s, need_tools)
         note = ''
         if raw and raw[0] not in cands:
@@ -152,13 +158,16 @@ class ModelRouter:
                 note += f", next retry {time.strftime('%H:%M', time.localtime(first['retry_at']))}"
             if normalize_mode(s.get('aiMode', 'auto')) == 'manual' and not s.get('aiFallback', True):
                 cands = []
+        local = [c for c in cands if c[0] in ('ollama', 'lm_studio')]
+        if len(cands) > MAX_ATTEMPTS and local and local[0] not in cands[:MAX_ATTEMPTS]:   # the last try stays local: the final fallback
+            return [c for c in cands if c not in local][:MAX_ATTEMPTS - 1] + local[:1], skipped, note
         return cands[:MAX_ATTEMPTS], skipped, note
 
     def get_status_overview(self) -> Dict[str, Any]:
         return provider_mgr.get_full_overview()
 
     def execute(self, prompt: str, task_id: Optional[str] = None, event_callback=None, exclude_providers: Optional[List[str]] = None,
-                system_prompt: str = "", tracker=None) -> Dict[str, Any]:
+                system_prompt: str = "", tracker=None, purpose: str = 'agent') -> Dict[str, Any]:
         clean_prompt = clean_user_prompt(prompt)
         task_id = task_id or (tracker.id if tracker is not None else f"task_{int(time.time() * 1000)}")
         journal.create_task(task_id, clean_prompt)
@@ -171,7 +180,7 @@ class ModelRouter:
                     pass
 
         from multi_ai import health_monitor as hm
-        cands, skipped, note = self.plan(exclude=exclude_providers or ())
+        cands, skipped, note = self.plan(exclude=exclude_providers or (), purpose=purpose)
         if note and cands:
             hm.note_switch(note.split(' is ')[0], f'{cands[0][0]}/{cands[0][1]}', note)
             emit('fallback', f'Skipping {note}')
@@ -191,10 +200,17 @@ class ModelRouter:
             else:
                 t0 = time.time()
                 try:
+                    if purpose == 'chat' and hasattr(adapter, 'timeout'):   # a chat answer that is not back in 15 s goes to the next model
+                        adapter.timeout = min(adapter.timeout, 15.0)
                     res = adapter.generate(mid, clean_prompt, system_prompt=system_prompt)
                 except Exception as e:
                     res = {'success': False, 'error_type': 'exception', 'error': str(e)}
             ok = bool(res.get('success') and (res.get('reply') or '').strip())
+            err = res.get('error') or ''
+            if adapter:   # the health monitor learns from every real request: a model out of quota is skipped until it may work
+                quota = not ok and re.search(r'exceeded your current quota|quota exceeded|resource.?exhausted', err, re.I)
+                hm.record(pid, res.get('resolved_model') or mid, ok, 'rate_limited' if quota else res.get('error_type', '') if not ok else '',
+                          err[:200], time.time() - t0, retry_at=time.time() + 3600 if quota else 0)
             attempts.append({'provider': pid, 'model': mid, 'ok': ok, 'error_type': res.get('error_type', ''), 'error': (res.get('error') or '')[:300]})
             if tracker is not None:
                 tracker.model_attempt(pid, mid, ok, res.get('error_type', ''), res.get('error', ''), res.get('resolved_model', ''))

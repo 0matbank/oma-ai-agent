@@ -118,7 +118,7 @@ class ProviderManager:
             "type": "local",
             "auth_type": "None (Localhost)",
             "local": True,
-            "base_url": "http://localhost:11434",
+            "base_url": "http://127.0.0.1:11434",
             "default_models": [],   # discovered live from /api/tags
             "doc_url": "https://ollama.com",
             "description": "Private, zero-cost, local model execution directly on your GPU/CPU."
@@ -129,7 +129,7 @@ class ProviderManager:
             "type": "local",
             "auth_type": "None (Localhost)",
             "local": True,
-            "base_url": "http://localhost:1234/v1",
+            "base_url": "http://127.0.0.1:1234/v1",
             "default_models": ["local-model"],
             "doc_url": "https://lmstudio.ai",
             "description": "Local inference server with OpenAI-compatible endpoint."
@@ -215,7 +215,7 @@ class ProviderManager:
         """Queries local Ollama runtime on port 11434 for installed models."""
         models = []
         try:
-            req = urllib.request.Request("http://localhost:11434/api/tags", headers={"User-Agent": "Oma-AI"})
+            req = urllib.request.Request("http://127.0.0.1:11434/api/tags", headers={"User-Agent": "Oma-AI"})
             with urllib.request.urlopen(req, timeout=2.0) as res:
                 if res.status == 200:
                     data = json.loads(res.read().decode("utf-8"))
@@ -238,7 +238,7 @@ class ProviderManager:
         """Queries local LM Studio runtime on port 1234."""
         models = []
         try:
-            req = urllib.request.Request("http://localhost:1234/v1/models", headers={"User-Agent": "Oma-AI"})
+            req = urllib.request.Request("http://127.0.0.1:1234/v1/models", headers={"User-Agent": "Oma-AI"})
             with urllib.request.urlopen(req, timeout=1.5) as res:
                 if res.status == 200:
                     data = json.loads(res.read().decode("utf-8"))
@@ -259,14 +259,17 @@ class ProviderManager:
             c = cli_agents.CLI[p_id]
             if not cli_agents.exe(p_id):
                 return {"status": "Not installed", "ok": False, "badge": "wait", "detail": "CLI not installed", "models": []}
-            if c.get("experimental"):
-                return {"status": "Experimental (off)", "ok": False, "badge": "wait", "detail": "used only after a real test with Oma's safety gate", "models": c["models"]}
+            if c.get("off"):   # switched off on purpose: e.g. DeepSeek's account route bills an empty platform balance
+                st, why = (c["off"].split(": ", 1) + [""])[:2]
+                return {"status": st.replace("_", " ").title(), "ok": False, "badge": "no", "detail": why, "models": []}
             from multi_ai import health_monitor as hm
             st, why, _ = hm.status(p_id)
             ok = st in ("READY", "UNKNOWN", "DEGRADED")
+            snap = next((x for x in hm.snapshot().get("providers", []) if x["id"] == p_id), {})
+            mods = [m["id"] for m in snap.get("models", []) if m.get("id") not in ("auto", "-") and m.get("state") != "MODEL_RETIRED"]
             return {"status": {"READY": "Connected", "AUTH_REQUIRED": "Not signed in", "QUOTA_EXHAUSTED": "Plan limit reached"}.get(st, st.title()),
                     "ok": ok, "badge": "ok" if st == "READY" else "no" if not ok else "wait",
-                    "detail": why or f"Sign in once: {c['login']}", "models": c["models"]}
+                    "detail": (why or f"Sign in once: {c['login']}") + (f" · models: {', '.join(mods[:6])}" if mods else ""), "models": mods or c["models"]}
         # 1. Claude Code
         if p_id == "claude_code":
             import subprocess
@@ -394,7 +397,7 @@ class ProviderManager:
                 if r.get("success"):
                     return {"ok": True, "status": "Ready", "message": f"{names[0]} answered in {ms} ms. Installed: {', '.join(names)}", "latency_ms": ms, "models": names}
                 return {"ok": False, "status": r.get("error_type", "Failed"), "message": f"{names[0]}: {r.get('error', '')[:160]}", "latency_ms": ms, "models": names}
-            return {"ok": False, "status": "Offline", "message": "Ollama service unreachable on http://localhost:11434", "latency_ms": -1}
+            return {"ok": False, "status": "Offline", "message": "Ollama service unreachable on http://127.0.0.1:11434", "latency_ms": -1}
 
         if p_id == "lm_studio":
             models = self.discover_local_lmstudio_models()
@@ -402,7 +405,7 @@ class ProviderManager:
             if models:
                 names = [m["name"] for m in models]
                 return {"ok": True, "status": "Ready", "message": f"LM Studio running. Models: {', '.join(names)}", "latency_ms": ms, "models": names}
-            return {"ok": False, "status": "Offline", "message": "LM Studio unreachable on http://localhost:1234/v1", "latency_ms": -1}
+            return {"ok": False, "status": "Offline", "message": "LM Studio unreachable on http://127.0.0.1:1234/v1", "latency_ms": -1}
 
         # Cloud or Custom Provider
         p_def = next((p for p in self.BUILTIN_PROVIDERS if p["id"] == p_id), None)

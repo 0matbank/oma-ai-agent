@@ -25,14 +25,15 @@ import urllib.request
 HOME = os.path.expanduser('~')
 DIR = os.environ.get('ATTICUS_DIR') or os.path.join(os.environ.get('APPDATA') or os.path.join(HOME, '.config'), 'Atticus')
 FILE = os.path.join(DIR, 'provider_health.json')
-OLLAMA = 'http://localhost:11434'
-BLOCKING = {'RATE_LIMITED', 'QUOTA_EXHAUSTED', 'AUTH_REQUIRED', 'MODEL_RETIRED', 'OFFLINE', 'COOLDOWN'}
+OLLAMA = 'http://127.0.0.1:11434'
+BLOCKING = {'RATE_LIMITED', 'QUOTA_EXHAUSTED', 'AUTH_REQUIRED', 'MODEL_RETIRED', 'OFFLINE', 'COOLDOWN', 'BILLING_REQUIRED'}
 BREAKER = 3   # consecutive failures that open the circuit
 # request error_type -> (state, default seconds until it may be tried again; 0 = until something changes)
 ERRORS = {'quota_exhausted': ('QUOTA_EXHAUSTED', 1800), 'rate_limited': ('RATE_LIMITED', 60), 'busy': ('RATE_LIMITED', 60),
           'auth_error': ('AUTH_REQUIRED', 0), 'auth': ('AUTH_REQUIRED', 0), 'model_unavailable': ('MODEL_RETIRED', 7 * 86400),
           'gone': ('MODEL_RETIRED', 7 * 86400), 'network_error': ('OFFLINE', 60), 'timeout': ('DEGRADED', 120),
-          'empty_output': ('DEGRADED', 120), 'not_available': ('OFFLINE', 300), 'not_configured': ('AUTH_REQUIRED', 0)}
+          'empty_output': ('DEGRADED', 120), 'not_available': ('OFFLINE', 300), 'not_configured': ('AUTH_REQUIRED', 0),
+          'billing_required': ('BILLING_REQUIRED', 0)}
 
 
 def _now():
@@ -122,7 +123,7 @@ def record(pid, mid, ok, error_type='', detail='', latency=0.0, retry_at=0.0):
             state, until = 'COOLDOWN', t + min(60 * 2 ** (m['fails'] - BREAKER), 1800)   # circuit open: 1, 2, 4 ... 30 min
             detail = f'{m["fails"]} failures in a row: {detail}'
         m.update(state=state, reason=(detail or error_type)[:200], at=t, retry_at=until)
-        if state in ('QUOTA_EXHAUSTED', 'AUTH_REQUIRED') or (state == 'OFFLINE' and pid in ('ollama', 'lm_studio')):
+        if state in ('QUOTA_EXHAUSTED', 'AUTH_REQUIRED', 'BILLING_REQUIRED') or (state == 'OFFLINE' and pid in ('ollama', 'lm_studio')):
             p.update(state=state, reason=(detail or error_type)[:200], retry_at=until)
     save(d)
 
@@ -181,8 +182,9 @@ def _check_clis(d):
         if not cli_agents.exe(pid):
             p.update(state='OFFLINE', reason='not installed', checked=t)
             continue
-        if cli_agents.CLI[pid].get('experimental'):
-            p.update(state='OFFLINE', reason='experimental: off until it passes a real test with Oma\'s safety gate', checked=t)
+        if cli_agents.CLI[pid].get('off'):   # switched off on purpose (e.g. billing required): never probed with a paid request
+            st, why = (cli_agents.CLI[pid]['off'].split(': ', 1) + [''])[:2]
+            p.update(state=st, reason=why, checked=t, retry_at=0)
             continue
         if p.get('state') in ('QUOTA_EXHAUSTED', 'RATE_LIMITED') and p.get('retry_at', 0) > t:
             p['checked'] = t
@@ -194,6 +196,16 @@ def _check_clis(d):
             p.update(state='READY' if ok else 'UNKNOWN', reason='installed and signed in' if ok else why, checked=t, retry_at=0)
         for mid in cli_agents.CLI[pid]['models']:
             _model(p, mid).setdefault('caps', {'tools': True, 'vision': False})
+        live = cli_agents._MODELS.get(pid, (0, []))[1]
+        if live:   # the CLI's own list: new models appear, models it no longer offers are marked retired (never deleted)
+            for mid in live:
+                m = _model(p, mid)
+                m.setdefault('caps', {'tools': True, 'vision': False})
+                if m.get('state') == 'MODEL_RETIRED':
+                    m.update(state='UNKNOWN', reason='offered again', retry_at=0)
+            for mid, m in p.get('models', {}).items():
+                if mid not in live and mid not in ('auto', '-') and m.get('state') != 'MODEL_RETIRED':
+                    m.update(state='MODEL_RETIRED', reason=f'{cli_agents.CLI[pid]["name"]} no longer lists it', at=t)
 
 
 def _check_ollama(p):
@@ -268,6 +280,12 @@ def refresh():
     _check_claude(_prov(d, 'claude_code'))
     _check_ollama(_prov(d, 'ollama'))
     _check_clis(d)
+    try:   # LM Studio: checked here in the background, so a request never waits on its closed port
+        from multi_ai.adapters.openai_compat import OpenAICompatAdapter
+        up = OpenAICompatAdapter('lm_studio', 'LM Studio', 'http://127.0.0.1:1234/v1', local=True).is_available()
+        _prov(d, 'lm_studio').update(state='READY' if up else 'OFFLINE', reason='server running' if up else 'LM Studio server not running', checked=_now())
+    except Exception:
+        pass
     for pid in ('gemini', 'openai', 'deepseek', 'groq') + tuple(c['id'] for c in provider_mgr.customs()):
         d_def = provider_mgr.definition(pid) or {}
         if d_def.get('base_url'):

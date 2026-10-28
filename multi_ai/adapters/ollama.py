@@ -17,7 +17,7 @@ from multi_ai.models import ModelInfo
 
 
 class OllamaAdapter:
-    def __init__(self, base_url: str = "http://localhost:11434", timeout: float = 120.0):
+    def __init__(self, base_url: str = "http://127.0.0.1:11434", timeout: float = 120.0):
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
 

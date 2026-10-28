@@ -148,7 +148,7 @@ class LearningTests(unittest.TestCase):
                     brain.cmds, brain.ran = [], ['step']
                     return ('Finished.' if brain.ok else 'Fixture failed.'), .001, ['fixture step']
                 brain = unittest.mock.Mock(side_effect=attempt)
-                with patch.multiple(atticus, licensed=lambda: True, ping=lambda: None, fast=lambda _: None, front=lambda: ('Notepad', ''),
+                with patch.multiple(atticus, licensed=lambda: True, ping=lambda: None, fast=lambda _: None, fast_chat=lambda _: None, front=lambda: ('Notepad', ''),
                                     screens=lambda: [], describe=lambda *a: '', me_line=lambda: '', relevant_rules=lambda _: '', recent=lambda: [],
                                     screen_for=lambda *a: None, wait_commit=lambda: True, run=brain, remember_turn=lambda *a: None,
                                     restore_focus=lambda *a: None, tip=lambda *a: None, look=lambda: [], tool_help=lambda _: ''), \

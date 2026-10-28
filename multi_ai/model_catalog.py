@@ -20,7 +20,7 @@ import urllib.request
 HOME = os.path.expanduser('~')
 DIR = os.environ.get('ATTICUS_DIR') or os.path.join(os.environ.get('APPDATA') or os.path.join(HOME, '.config'), 'Atticus')
 HEALTH_FILE = os.path.join(DIR, 'model_health.json')
-OLLAMA = 'http://localhost:11434'
+OLLAMA = 'http://127.0.0.1:11434'
 
 TTL = {'ok': 24 * 3600, 'gone': 7 * 24 * 3600, 'busy': 300, 'auth': 600, 'error': 300}
 CLAUDE_ALIASES = ['haiku', 'sonnet', 'opus']
