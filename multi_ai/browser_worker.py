@@ -243,14 +243,32 @@ SITES = {
 LOGIN_PAGE = r'accounts\.google\.com/.*signin|/login|/sign[_-]?in|/auth/|passport'
 
 
+ACCOUNTS = os.path.join(HOME, 'browser_accounts.json')   # {"gemini": "<gmail>"}: which signed-in Google account a site uses
+
+
+def site_account(site):
+    try:
+        return json.load(open(ACCOUNTS, encoding='utf-8')).get(site, '')
+    except (OSError, ValueError):
+        return ''
+
+
+def site_url(site):
+    """Several Google accounts can be signed in at once in Oma's browser (Add another account); Gemini opens with the
+    one the user chose (authuser=<gmail>), so signing in to ChatGPT with another Gmail never changes it."""
+    cfg, acct = SITES[site], site_account(site)
+    return cfg['url'] + (f'?authuser={acct}' if acct and site == 'gemini' else '')
+
+
 def ask_site(site, question, wait=50):
     """Asks the user's chat site in Oma's window and returns the answer text it shows (or why it could not)."""
     cfg = SITES.get(site.lower())
     if not cfg:
         return f'Error: unknown site "{site}" (deepseek, chatgpt, gemini)'
+    site = site.lower()
     def run(c):
         import re
-        c('Page.navigate', url=cfg['url'])
+        c('Page.navigate', url=site_url(site))
         time.sleep(1)
         _wait_loaded(c)
         c('Page.bringToFront')
