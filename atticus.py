@@ -286,10 +286,10 @@ Tools (atticus is a command on your PATH):
 - Open windows: {WINDOWS} ["<app>"] lists app, process and title of each, front first.
 - Type text into the box the user is in (search bar, chat box, doc): {TYPE} "<text>". It goes back to the user's app and pastes; {TYPE} --in "<app>" "<text>" for another app. Before you say it is filled, pasted or sent, {LOOK} once and check it landed in the right place.
 - Message someone in Discord, Slack or Teams (their buttons can't be read): ONE call: {KEYS} Discord ctrl+k; {TYPE} --in Discord "<person or channel>"; {KEYS} Discord enter; {TYPE} --in Discord "<message>"; {KEYS} Discord enter. Send only when the user said to send; otherwise stop before the last Enter.
-- Clipboard: {CLIP}. Music (Spotify or any player): {MEDIA} playpause|next|previous.
+- Clipboard: {CLIP}. Media keys: {MEDIA} playpause|next|previous.
 - Inside an app, when nothing above does it (buttons, menus, tabs, fields): {UI} see "<app>" ["title words"] lists them with IDs (B3 Button "Play", E1 Edit "To" = "text", X2 Text "Display is 9"); then {UI} click <ID or exact name>..., several in one call in order ({UI} click "Seven" "Plus" "Two"), or {UI} set <ID> "<text>" to fill a field. IDs last until the next see. Keys: {KEYS} "<app>" ctrl+s (alt+f4, f5, enter…).
-- Spotify: play any song, album, artist or the user's own playlist: {PLAY} "<name, plus artist if known>". Music requests mean Spotify unless the user names another app.
-- YouTube in Oma's own player: {ME} --player "<url | words>".
+- Spotify, only when the user names it: {PLAY} "<name, plus artist if known>".
+- Songs, music, videos: {ME} --player "<url | words>". Signed-in sites: {ME} --browser open <url> | read | click "<text>" | type "<field>" "<text>" [--enter].
 - To-do, "remind me", "note this": {NOTE} "<text>" keeps it in the user's notes file. For a time ("remind me in 20 minutes"): {WATCH} cmd '[ $(date +%s) -ge <unix time> ]' and say when. "Where are my notes" = {SHOW} "~/Documents/Atticus Notes.md".
 - "Tell me when / watch / monitor X" (a reply finishes, a build or download ends, a page shows something): look once, pick a short phrase on screen that shows the state, then ONE call: {WATCH} "<app>" "<window title words or empty>" <gone|shows> "<phrase>" ["<what to do then, as a request>"]. gone = done when the phrase disappears; shows = done when it appears. It reads that window every 5 s with no AI (it must stay open, covered is fine, not minimized), notifies the user, then runs the request. Without the screen: {WATCH} cmd '<shell test, exit 0 = done>' ["<request>"]; prefer cmd when it fits. A Codex task is done when: tail -n 2 "$(ls -t ~/.codex/sessions/*/*/*/*.jsonl | head -1)" | grep -q task_complete. Reply that you are watching. "Stop watching": {ME} --unwatch.
 - Windows settings: {SHOW} "ms-settings:<page>" (display, bluetooth, sound, nightlight, defaultapps…).
@@ -414,6 +414,14 @@ def risky(cmd):
                 it = winctl.ui_item(next(x for x in i if x)) or {}
                 if CLICKED.search(it.get('name', '')):
                     return f'Click "{it["name"]}"?'
+            continue
+        if part.startswith(ME + ' --browser'):   # Oma's browser: a click is as risky as its button; Enter in a message box sends
+            verb = part[len(ME + ' --browser'):].split()[:1]
+            target = part.split(None, 3)[3] if len(part.split(None, 3)) > 3 else ''
+            if verb == ['click'] and CLICKED.search(target):
+                return 'Click "' + target.strip('"\' ')[:60] + '" in Oma\'s browser?'
+            if verb == ['type'] and '--enter' in part and re.search(r'message|chat|comment|reply|post|tweet|compose|mail', part, re.I):
+                return 'Send this?'
             continue
         if re.match(re.escape(KEYS) + r'\b', part) and re.search(r'\b(delete|del)\b', part, re.I):
             return 'Delete something?'
@@ -1249,6 +1257,11 @@ def label(name, inp):
         return 'Asking you which one'
     if c.startswith(SET):
         return 'Changing a setting'
+    if c.startswith(ME + ' --browser'):
+        a = c[len(ME + ' --browser'):].strip().split(None, 1) or ['open']
+        return {'open': 'Opening in Oma\'s browser', 'read': 'Reading the page in Oma\'s browser', 'click': 'Clicking in Oma\'s browser',
+                'type': 'Typing in Oma\'s browser', 'key': 'Pressing a key in Oma\'s browser', 'shot': 'Looking at Oma\'s browser',
+                'tabs': 'Checking Oma\'s browser tabs'}.get(a[0], 'Using Oma\'s browser') + (f": {a[1].split('&&')[0].strip().strip(chr(34))[:60]}" if len(a) > 1 and a[0] in ('open', 'click') else '')
     if c.startswith(ME + ' --player-stop'):
         return 'Stopping the Oma player'
     if c.startswith(ME + ' --player'):
@@ -2219,6 +2232,9 @@ def main():
         name = ' '.join(args[1:]).lower()
         json.dump([x for x in user_skills() if x.get('name', '').lower() != name], open(USER_SKILLS, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
         return print('deleted')
+    if args[:1] == ['--browser']:   # Oma's own Chrome profile, driven like a person (multi_ai/browser_worker.py)
+        from multi_ai import browser_worker
+        return browser_worker.main(args[1:])
     if args[:1] == ['--player-stop']:
         return print(player_stop())
     if args[:1] == ['--player'] and len(args) > 1:

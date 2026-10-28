@@ -86,8 +86,10 @@ def _chat(provider, base_url, key, model, messages, timeout=None):
 
 
 CLI_STEP = ('\n\nHow to answer (you are only the planner; Oma runs commands, you never do): reply with ONLY a JSON object. '
-            'To run one command on the PC: {"command": "<one Git Bash command>", "reply": ""}. '
-            'When the task is done, or for a plain question: {"command": "", "reply": "<short answer in the user\'s language>"}. '
+            'To run one command on the PC: {"command": "<one Git Bash command>", "reply": "", "final": "no"}. '
+            'If that one command completes the whole task, say so to save a round trip: "final": "yes" and in "reply" the short '
+            'answer to show if it succeeds (Oma checks the exit code and asks you again if it fails). '
+            'When the task is done, or for a plain question: {"command": "", "reply": "<short answer in the user\'s language>", "final": "yes"}. '
             'Never use your own tools, never edit files.')
 
 
@@ -112,7 +114,9 @@ def _chat_cli(provider, model, messages):
     if not cmd and not reply:
         reply = text.strip()
     raw = {'content': json.dumps({'command': cmd} if cmd else {'reply': reply}, ensure_ascii=False), 'tool_calls': None}
-    return reply, ([(f'cli{len(messages)}', cmd)] if cmd else []), raw
+    if cmd and reply and str(j.get('final', '')).lower() in ('yes', 'true'):
+        raw['final_reply'] = reply   # used only if the command exits 0 (run_agent), else the planner is asked again
+    return ('' if cmd else reply), ([(f'cli{len(messages)}', cmd)] if cmd else []), raw
 
 
 def _cli_error():
@@ -162,14 +166,19 @@ def run_agent(task, provider, model, base_url, key, system, eng, tracker=None):
                 messages.append({'role': 'assistant', 'content': raw.get('content') or '', 'tool_calls': raw.get('tool_calls')})
             else:
                 messages.append({'role': 'assistant', 'content': raw.get('content'), 'tool_calls': raw.get('tool_calls')})
+            all_ok = True
             for cid, cmd in calls:
                 result, failed = _one(cmd, cid, eng, bash, seen, cmds, steps, tracker, out)
+                all_ok = all_ok and not failed
                 messages.append({'role': 'tool', 'tool_call_id': cid, 'content': result} if provider != 'ollama' else
                                 {'role': 'tool', 'content': result, 'tool_name': 'bash'})
                 if out['denied']:
                     break
             if out['denied']:
                 out['reply'] = "Not done: you chose Don't Allow, so nothing was changed."
+                break
+            if all_ok and raw.get('final_reply'):   # the planner said this one command finishes the task, and it did
+                out['reply'] = raw['final_reply']
                 break
         else:
             out.update(error_type='step_limit', error=f'stopped after {MAX_STEPS} steps')

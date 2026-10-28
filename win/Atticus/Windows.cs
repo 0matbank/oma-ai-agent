@@ -469,6 +469,7 @@ sealed class SettingsWindow : PageWindow
                     Program.Post(() => { if (j.TrimStart().StartsWith("[")) Js($"st.integrations({j})"); Js($"st.intResult({Web.Json(new[] { name, r })})"); });
                 });
                 break;
+            case "omaBrowser": Task.Run(() => Py.Run(new[] { "--browser", "open", "https://accounts.google.com" })); break;   // sign in to sites once
             case "telegramConnect":
                 if (S("token") is { } tok) Task.Run(() => { Py.RunWithInput(new[] { "--secret-set", "remote_telegram" }, tok.Trim() + "\n", 15); Prefs.Set("telegramChat", 0.0); TelegramBridge.Start(); });
                 break;

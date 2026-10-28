@@ -2198,6 +2198,11 @@ body {
     <div class="settings-container">
       <h1>Integrations</h1>
       <p class="lede">Your own servers. Set up the ones you run: Oma only mentions a service to the AI when you ask about it. Keys stay in Windows Credential Manager.</p>
+      <h3>Oma's browser</h3>
+      <div class="group">
+        <div class="row"><div class="t"><b>Your sites, signed in once</b><span>A separate Chrome window just for Oma. Sign in to Gmail, ChatGPT, Gemini, DeepSeek or any site there once; Oma then opens, reads, types and clicks in it for you. Send / Buy / Delete clicks always ask first.</span></div>
+          <span style="display:flex; gap:6px;"><button class="btn blue" id="omaBrowserOpen">Open Oma's browser</button></span></div>
+      </div>
       <h3>Phone remote: chat with Oma</h3>
       <div class="group">
         <div class="row"><div class="t"><b>Telegram</b><span id="tgStatus">Create a bot with @BotFather in Telegram, paste its token here, then send /pair and the code to your bot. Only your paired chat is obeyed; risky steps ask you on the phone.</span></div>
@@ -2483,6 +2488,7 @@ body {
     $('cpId').value = $('cpName').value = $('cpUrl').value = $('cpKey').value = $('cpModel').value = '';
   };
   $('btnRefreshLocal').onclick = () => post({ do: 'providers' });
+  if ($('omaBrowserOpen')) $('omaBrowserOpen').onclick = () => post({ do: 'omaBrowser' });
   $('tgConnect').onclick = () => { const v = $('tgToken').value.trim(); if (v.length < 20) return; post({ do: 'telegramConnect', token: v }); $('tgToken').value = ''; $('tgStatus').textContent = 'Checking the bot…'; };
   $('tgDisconnect').onclick = () => post({ do: 'telegramDisconnect' });
   post({ do: 'telegramStatus' });

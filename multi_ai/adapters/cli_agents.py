@@ -24,7 +24,7 @@ CLI = {
     'deepseek_cli': {'name': 'DeepSeek (DeepSeek Harness)', 'exe': ('dsh',), 'login': 'dsh web', 'models': ['default'], 'experimental': True},
 }
 ORDER = ('codex_cli', 'antigravity_cli', 'deepseek_cli')   # after Claude Code, before API-key clouds and local models
-STEP_SCHEMA = {'type': 'object', 'properties': {'command': {'type': 'string'}, 'reply': {'type': 'string'}}}
+STEP_SCHEMA = {'type': 'object', 'properties': {'command': {'type': 'string'}, 'reply': {'type': 'string'}, 'final': {'type': 'string'}}}
 
 
 class CliError(Exception):
