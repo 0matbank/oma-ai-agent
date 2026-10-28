@@ -2922,7 +2922,7 @@ body {
   // Wire UI Controls
   window.addEventListener('DOMContentLoaded', () => {
     try {
-      holoOrb = new window.OmaHoloOrb('orb-canvas', { theme: (P && P.theme) || 'stonic' });
+      holoOrb = new window.OmaHoloOrb('orb-canvas', { theme: (P && P.theme) || 'stonic', count: 2000 });
       holoOrb.onLabel = (label, s) => {   // the orb's real state names the footer and the button
         const l = $('orb-state-label'), c = holoOrb.colorsFor(s).a;
         if (l) { l.textContent = label; l.parentElement.style.color = `rgb(${c})`; }

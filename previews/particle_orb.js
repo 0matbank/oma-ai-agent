@@ -115,7 +115,7 @@ class OmaParticleOrb {
   frame(ts) {
     this.raf = 0;
     if (this.hidden) return;
-    const cap = this.state === 'idle' ? Math.min(30, this.fpsCap) : this.fpsCap;
+    const cap = this.state === 'idle' ? Math.min(20, this.fpsCap) : this.fpsCap;   // standby is slow anyway: save CPU
     if (ts - this.last >= 1000 / cap - 1) {
       const dt = Math.min(0.05, (ts - (this.last || ts)) / 1000);
       this.last = ts;

@@ -29,9 +29,12 @@
     return [cx + x * R, cy - y2 * R, z2];
   }
 
+  let lastDraw = 0;
   function draw(t) {
     raf = 0;
     const c = $('globeCanvas'); if (!c || document.hidden) return;
+    if (!drag && t - lastDraw < 66) { raf = requestAnimationFrame(draw); return; }   // 15 fps is plenty for a slow globe (CPU)
+    lastDraw = t;
     const w = c.clientWidth, h = c.clientHeight, d = Math.min(devicePixelRatio || 1, 2);
     if (c.width !== Math.round(w * d)) { c.width = Math.round(w * d); c.height = Math.round(h * d); }
     const g = c.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, w, h);
@@ -54,7 +57,7 @@
       g.fillStyle = `rgb(${col})`; g.beginPath(); g.arc(x, y, 2.2, 0, 6.283); g.fill();
       s._x = x; s._y = y;
     }
-    if (!drag && mode === '3d') rot += 0.0025;
+    if (!drag && mode === '3d') rot += 0.01;
     raf = requestAnimationFrame(draw);
   }
   const kick = () => { if (!raf) raf = requestAnimationFrame(draw); };
