@@ -2208,7 +2208,8 @@ def verification_checks(task, reply, cmds, tracker, before=frozenset()):
             checks.append(('Browser page', _browser_check(cmds, task)))
         else:
             named = next((name for name, rx in BROWSER_WORDS if re.search(rx, task or '', re.I)), '')
-            if named:   # "open it in Chrome" but no step opened a page: the answer cannot claim it
+            page = re.search(r'youtube|google|facebook|gmail|whatsapp web|http|www\.|\.com|search|সার্চ|খোঁজ|খুঁজ|ইউটিউব|\bsite\b|\bpage\b', task or '', re.I)
+            if named and page:   # "open it in Chrome" but no step opened a page: the answer cannot claim it
                 checks.append(('Browser page', lambda named=named: (False, f'asked to open it in {named}, but no step opened a page')))
         yt = [s for s in tracker.steps if s['worker'] == 'eve']
         if yt:

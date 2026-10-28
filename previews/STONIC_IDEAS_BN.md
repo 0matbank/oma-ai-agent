@@ -1,7 +1,7 @@
 # Stonic AI থেকে Oma-তে কী নেওয়া যায়
 
 উৎস:
-- "Stonic How work-.mp4" (১১ মিনিট): ১৫০টা scene frame দেখা হয়েছে, আর পুরো narration transcribe করা হয়েছে।
+- "Stonic How work-.mp4" (১১ মিনিট): ১৫০টা scene frame দেখা হয়েছে। পুরো narration GPU-তে ১৩.৯ সেকেন্ডে transcribe করা হয়েছে।
 - "Stonic ver.mp4" (৩০ সেকেন্ড)।
 - stonicai.com এবং তার changelog।
 
@@ -16,10 +16,31 @@ Stonic-এর সাজানো (v1.0.55) অনেকটা Oma-র মতো�
 - **মাঝে নিচে:** Agent Town, যার তিনটা tab আছে: agents, visual hub, gesture।
 - **ডানে:** VOICE / AGENT / NOTES tab, চ্যাট, আর প্রতিটি tool-এর জন্য আলাদা "Module: web_search 7.4s" chip।
 
+## Narration থেকে যা জানা গেল
+
+এই অংশ GPU transcript থেকে নেওয়া। ভাষা Urdu/Hindi, transcript-এ ইংরেজিতে এসেছে।
+
+- **দ্রুত মনে হওয়ার আসল কারণ:**
+  - Voice assistant সাথে সাথে উত্তর দেয় ("I have told Alice…"), আর Alice ব্যাকগ্রাউন্ডে browser চালিয়ে কাজ করে (dollar rate, gold rate)।
+  - কাজ শেষ হলে voice আবার জানায়।
+  - Chat box-এ লেখা "Type to Assistant (Gemini Live)", অর্থাৎ realtime streaming voice।
+- **Memory:**
+  - কথা থেকে নিজে নিজে pattern শেখে (নাম, শহর, আগ্রহ, যেমন GTA 6-এর খবর)।
+  - শুরুতে নিজে থেকেই সময়, আবহাওয়া আর আগ্রহের খবর জানায়।
+- **কাজের ভাগ:**
+  - Agent tab জটিল কাজের জন্য।
+  - Voice assistant-ও agent-কে কাজ দিতে পারে।
+  - Agent-রা Agent Town-এ চোখে দেখা যায়, আর চ্যাটেও দেখায়।
+- **অন্যান্য:**
+  - Camera বা screen share করে প্রশ্ন করা যায় ("আমার হাতে কী?" → "লাল-সাদা marker, dry erase")।
+  - মোবাইল (WhatsApp/Remote) থেকে কমান্ড দেওয়া যায়।
+- **নির্মাতার নিজের কথা:** "Stonic bulk automation বা business operation-এর জন্য নয়, এটা অভিজ্ঞতার জন্য; software-এর সীমাবদ্ধতা আছে।"
+
 ## নেওয়ার তালিকা (গুরুত্ব অনুযায়ী)
 
 | # | জিনিস | Stonic-এ কেমন | Oma-তে কীভাবে | অবস্থা |
 |---|---|---|---|---|
+| 0 | **তাৎক্ষণিক স্বীকৃতি আর ব্যাকগ্রাউন্ড কাজ** | Voice সাথে সাথে বলে "Alice-কে দিলাম"; agent পরে কাজ শেষ করে জানায়। | লম্বা কাজে Oma ১ সেকেন্ডের মধ্যে ছোট স্বীকৃতি দেবে। task-state-এর worker lane আগে থেকেই আছে, ব্যাকগ্রাউন্ডে চালানো আর শেষে জানানো বাকি। | সবচেয়ে বড় গতির লাভ, পরের ধাপ |
 | 1 | **Particle orb (face)** | Particle-এর গোলক, ভেতরে উজ্জ্বল core, হেলানো orbital ring আর তাতে একটা ঘূর্ণায়মান বিন্দু। অবস্থা অনুযায়ী রঙ বদলায়: ম্লান (standby), সোনালি (CALIBRATING), উজ্জ্বল (active)। | `previews/particle_orb.js`, পুরনো orb-এর একই API (setState/setAudioLevel), তাই সরাসরি বসানো যায়। | Preview তৈরি, অনুমোদনের অপেক্ষায় |
 | 2 | **Theme switcher** | Stonic Default (teal), Hacker (green), Cyberpunk (magenta), Danger Red। | orb-এ ৪টা theme আছে। পুরো UI-তে CSS token দিয়ে করা যাবে। | Orb-এ হয়েছে, UI-তে বাকি |
 | 3 | **Tool chip চ্যাটে** | প্রতিটি ধাপ "Module: generate_diagram 0.8s ›" আকারে আলাদা লাইনে, সময়সহ। | Oma-র task-state-এ ধাপ, সময় আর worker আগে থেকেই আছে। শুধু চ্যাটে chip দেখানো বাকি। | করা সহজ |

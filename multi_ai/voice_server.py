@@ -11,8 +11,8 @@ limited to the languages the user speaks (speechLanguages, default "bn,en"): the
 added to Bangla (as, hi, ur), then the best allowed language is used for decoding. Banglish (Bangla with English words)
 decodes as Bangla; clear English stays English.
 VAD: Silero (built into faster-whisper) trims silence, so silence never becomes invented text.
-VRAM: float16 needs about 1.6 GB; with less than 2.5 GB free it loads int8_float16 (about 1 GB). Ollama keeps its own
-models; nothing here unloads them.
+VRAM: int8_float16 uses about 1.2 GB (float16 2.3 GB, same speed and accuracy here). Ollama keeps its own models;
+nothing here unloads them.
 """
 import json
 import os
@@ -23,7 +23,7 @@ import time
 HOME = os.path.expanduser('~')
 MODELS = os.path.join(os.environ.get('LOCALAPPDATA', HOME), 'Atticus', 'models', 'faster-whisper')
 RELATIVES = {'bn': ('as', 'hi', 'ur', 'ne', 'or')}
-VOCAB = 'ক্যালকুলেটর খোলো, নোটপ্যাড খোলো, ক্রোম খোলো, ইউটিউবে খোঁজো, বন্ধ করো. Open Chrome, YouTube, WhatsApp, Notepad.'
+VOCAB = 'ক্যালকুলেটর খোলো, নোটপ্যাড খোলো, ক্রোম খোলো, ইউটিউবে খোঁজো, বন্ধ করো. Open Chrome, YouTube, WhatsApp, Notepad.'   # one mixed prompt: measured better than per-language prompts (mean CER 0.389 vs 0.465)
 
 
 def _cuda_dlls():
@@ -56,7 +56,7 @@ def load(name='large-v3-turbo', device='auto'):
     t0 = time.time()
     cuda = device != 'cpu' and ctranslate2.get_cuda_device_count() > 0
     free = vram_free_mb() if cuda else None
-    compute = ('float16' if free is None or free > 2500 else 'int8_float16') if cuda else 'int8'
+    compute = (os.environ.get('OMA_FW_COMPUTE') or 'int8_float16') if cuda else 'int8'   # measured: same speed and accuracy as float16, half the VRAM (1.2 vs 2.3 GB)
     os.makedirs(MODELS, exist_ok=True)
     local = os.path.join(MODELS, name)   # a complete local copy (model.bin + json files) needs no network at all
     if os.path.exists(os.path.join(local, 'model.bin')):
@@ -74,24 +74,47 @@ def load(name='large-v3-turbo', device='auto'):
 
 def pick_language(model, audio, allowed):
     """-> (lang, prob, top3) among the allowed languages; relatives of Bangla count as Bangla."""
+    pick_language.raw = {}
     if len(allowed) == 1:
         return allowed[0], 1.0, []
     _, _, probs = model.detect_language(audio)
-    p = dict(probs)
+    p = pick_language.raw = dict(probs)
     score = {lang: p.get(lang, 0) + sum(p.get(r, 0) for r in RELATIVES.get(lang, ())) for lang in allowed}
     best = max(score, key=score.get)
     total = sum(score.values()) or 1
     return best, round(score[best] / total, 3), sorted(probs, key=lambda x: -x[1])[:3]
 
 
-def transcribe(model, audio, allowed, prompt='', partial=False):
-    t0 = time.time()
-    lang, prob, top = pick_language(model, audio, allowed)
+EN_SURE = 0.9   # measured: clear English commands score 0.93-0.995; one- or two-word Bangla commands can score 0.7 English
+
+
+def _decode(model, audio, lang, prompt, partial):
     segs, _ = model.transcribe(audio, language=lang, beam_size=1 if partial else 5, vad_filter=not partial,
                                vad_parameters={'min_silence_duration_ms': 300}, condition_on_previous_text=False,
                                without_timestamps=True, initial_prompt=(prompt + ' ' + VOCAB).strip()[-600:] or None,
                                temperature=0.0 if partial else (0.0, 0.2, 0.4))
-    text = ' '.join(s.text.strip() for s in segs).strip()
+    segs = list(segs)
+    score = sum(s.avg_logprob for s in segs) / len(segs) if segs else -9
+    return ' '.join(s.text.strip() for s in segs).strip(), score
+
+
+def transcribe(model, audio, allowed, prompt='', partial=False):
+    """Clear English -> English; clearly Bangla (or Hindi/Urdu, which Whisper confuses it with) -> Bangla;
+    otherwise (short commands like "Notepad kholo") both are decoded and the more confident one wins."""
+    t0 = time.time()
+    lang, prob, top = pick_language(model, audio, allowed)
+    if set(allowed) == {'bn', 'en'} and top:
+        en = pick_language.raw.get('en', 0)   # Whisper's own English probability, not a share of {bn, en}
+        if en >= EN_SURE:
+            lang = 'en'
+        elif en <= 0.3 or partial:
+            lang = 'bn'
+        else:
+            (tb, sb), (te, se) = _decode(model, audio, 'bn', prompt, partial), _decode(model, audio, 'en', prompt, partial)
+            lang, text = ('bn', tb) if sb >= se else ('en', te)
+            return {'text': text, 'lang': lang, 'lang_prob': round(max(sb, se), 3), 'both': True,
+                    'top': [[l, round(v, 3)] for l, v in top], 'ms': round((time.time() - t0) * 1000)}
+    text, _ = _decode(model, audio, lang, prompt, partial)
     return {'text': text, 'lang': lang, 'lang_prob': prob, 'top': [[l, round(v, 3)] for l, v in top], 'ms': round((time.time() - t0) * 1000)}
 
 
