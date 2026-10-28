@@ -2031,6 +2031,10 @@ def verification_checks(task, reply, cmds, tracker, before=frozenset()):
         if research:
             done = [s for s in research if s['status'] == 'DONE']
             checks.append(('Sources retrieved', lambda done=done, n=len(research): (bool(done), f'{len(done)} of {n} research steps returned content')))
+        yt = [s for s in tracker.steps if s['worker'] == 'eve']
+        if yt:
+            ok = [s for s in yt if s['status'] == 'DONE' and not s.get('output', '').startswith('Error')]
+            checks.append(('YouTube data', lambda ok=ok, n=len(yt): (bool(ok), f'{len(ok)} of {n} YouTube steps returned data')))
         failed = [s for s in tracker.steps if s['status'] == 'FAILED']
         if failed:
             checks.append(('Tool errors', lambda failed=failed: (None, f"{len(failed)} step(s) failed: {failed[-1]['label']}")))

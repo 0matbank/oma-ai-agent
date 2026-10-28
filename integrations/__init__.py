@@ -105,6 +105,10 @@ def configured():
     import winctl
     saved, out = _saved(), []
     for n, mod in modules().items():
+        if getattr(mod, 'NO_SETUP', False):   # needs no key (YouTube): on unless the user turned it off
+            if (saved.get(n) or {}).get('enabled', True):
+                out.append(n)
+            continue
         if not saved.get(n) or not saved[n].get('enabled', True):
             continue
         secrets = [k for k, _, sec in mod.FIELDS if sec]
@@ -203,7 +207,7 @@ def run(name, args):
     if not mod:
         return f'no integration called {name}'
     cfg = config(name)
-    if not cfg:
+    if not cfg and not getattr(mod, 'NO_SETUP', False):
         return f'{mod.TITLE} is not set up: Atticus Settings → Integrations'
     try:
         return mod.run(cfg, args)
