@@ -667,8 +667,51 @@ body {
   #agent-town-panel { min-height:440px; }
   #feed-column { height:620px; }
   .town-header { flex-wrap:wrap; gap:6px; }
-  #agentTownActivity { display:none; }
 }
+/* ===== UX pass (approved suggestions) ===== */
+/* 1. Settings: two columns on wide screens; each heading stays with its own card */
+@media (min-width: 1500px) {
+  #settings-drawer .settings-container { max-width: 1320px !important; column-count: 2; column-gap: 28px; }
+  #settings-drawer .settings-container > h1, #settings-drawer .settings-container > p.lede { column-span: all; }
+  #settings-drawer .sblock { break-inside: avoid; display: block; padding-top: 1px; }
+}
+/* 2. Provider health: one-line summary, details fold away */
+.ph-sum { display:flex; flex-wrap:wrap; gap:6px; padding:8px 14px 10px; }
+.ph-sum .chip { font-size:11.5px; font-weight:600; padding:3px 9px; border-radius:999px; border:1px solid; }
+details.ph { box-shadow: inset 0 .5px 0 var(--line); }
+details.ph > summary { list-style:none; cursor:pointer; display:flex; gap:10px; align-items:center; padding:8px 14px; min-height:36px; }
+details.ph > summary::-webkit-details-marker { display:none; }
+details.ph > summary::before { content:'›'; color:var(--fg3); transition:transform .15s; width:8px; }
+details.ph[open] > summary::before { transform:rotate(90deg); }
+details.ph > summary .why { opacity:.75; font-size:12px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+details.ph .ph-models { padding:0 14px 8px 26px; }
+/* 3. Bangla line under technical settings */
+.bn-hint { display:block; font-style:normal; font-size:11.5px; color:#8fd3e3; margin-top:3px; line-height:1.4; }
+/* 4. Quick chips: fade + arrow show there are more */
+.qc-wrap { position:relative; flex:none; border-top:1px solid var(--line); }
+.qc-wrap .qc-row { display:flex; gap:6px; padding:6px 34px 6px 10px; overflow-x:auto; scrollbar-width:none; scroll-behavior:smooth; }
+.qc-wrap .qc-row::-webkit-scrollbar { display:none; }
+.qc-wrap::after { content:''; position:absolute; right:0; top:0; bottom:0; width:56px; pointer-events:none;
+  background:linear-gradient(90deg, transparent, var(--bg-panel, #0b0f17) 70%); transition:opacity .2s; }
+.qc-wrap.end::after, .qc-wrap.end .qc-more { opacity:0; pointer-events:none; }
+.qc-wrap .qc-more { position:absolute; right:6px; top:50%; transform:translateY(-50%); z-index:1; width:24px; height:24px; border-radius:50%;
+  border:1px solid var(--line); background:#121a27; color:var(--neon-cyan); cursor:pointer; font-size:14px; line-height:1; transition:opacity .2s; }
+/* 5. Integrations: real Set up buttons with an inline form */
+.int-form { padding:4px 14px 12px; display:none; }
+.int-form.open { display:block; }
+.int-form .row { padding:6px 0; min-height:0; box-shadow:none !important; }
+.int-form .help { color:var(--fg2); font-size:11.5px; margin:2px 0 6px; line-height:1.4; }
+.int-form .res { font-size:11.5px; margin-top:6px; color:var(--fg2); white-space:pre-wrap; }
+/* 6. Feed: cards of finished requests fold to two lines; click to open */
+.feed-card.old { opacity:.7; cursor:pointer; transition:opacity .15s; }
+.feed-card.old:hover { opacity:.95; }
+.feed-card.old:not(.open) .feed-text { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.feed-card.old:not(.open) pre, .feed-card.old:not(.open) .expired, .feed-card.ask-card.old:not(.open) .feed-text ~ div { display:none; }
+.module-chip.old { display:none; }
+/* 7. Agent Town: status lives in the footer with the other live facts */
+.town-stats .tf.tf-status { flex:0 1 auto; min-width:0; max-width:190px; overflow:hidden; }
+.town-footer #agentTownActivity { display:block !important; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.town-footer #agentTownActivity b { font-weight:700; }
 .g-head { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid var(--border-subtle); }
 .g-cap { font:700 10px Consolas,monospace; letter-spacing:1.6px; color:var(--neon-cyan); }
 .g-help, .g-act { all:unset; cursor:pointer; border:1px solid rgba(var(--accent-rgb),.45); border-radius:6px; color:var(--neon-cyan); font:700 10.5px Consolas,monospace; letter-spacing:1.4px; }
@@ -1701,9 +1744,6 @@ body {
           <button class="town-tab" data-tab="gesture">gesture</button>
         </div>
 
-        <div style="font-size:11px; color:var(--text-muted); display:flex; gap:10px;">
-          <span id="agentTownActivity">Status: <b>Idle</b></span>
-        </div>
       </div>
 
       <!-- Agent Status Chips Sub-Bar -->
@@ -1760,6 +1800,7 @@ body {
         <div class="town-stats">
           <span class="tf" title="Engine sign-in state"><i id="tfDot" class="tf-dot"></i><b id="tfOnline">Checking</b></span>
           <span class="tf" title="The model that answered the last request">⚡ <b id="tfModel">No model yet</b></span>
+          <span class="tf tf-status" title="What Oma is doing now"><span id="agentTownActivity">Status: <b>Idle</b></span></span>
           <span class="tf" title="Workers sitting at a desk or a seat right now">👥 <b id="tfSeat">0/5 seat</b></span>
           <span class="tf" id="town-busy-stat"><b>0/5 busy</b></span>
           <span class="tf" title="Last task">LAST <b id="town-last-task">none</b></span>
@@ -1792,13 +1833,13 @@ body {
       </div>
 
       <!-- Quick Prompts Chips -->
-      <div style="display:flex; gap:6px; padding:6px 10px; overflow-x:auto; border-top:1px solid var(--line); flex:none;">
+      <div class="qc-wrap" id="qcWrap"><button class="qc-more" id="qcMore" title="More">›</button><div class="qc-row" id="qcRow">
         <button class="btn quick-chip" data-prompt="ক্যালকুলেটর খোলো" style="font-size:11px; height:24px;">🧮 ক্যালকুলেটর</button>
         <button class="btn quick-chip" data-prompt="নোটপ্যাড খোলো" style="font-size:11px; height:24px;">📝 নোটপ্যাড</button>
         <button class="btn quick-chip" data-prompt="ক্রোম খোলো" style="font-size:11px; height:24px;">🌐 ক্রোম</button>
         <button class="btn quick-chip" data-prompt="স্ক্রিনে কি দেখা যাচ্ছে বলো" style="font-size:11px; height:24px;">🖥️ স্ক্রিন</button>
         <button class="btn quick-chip" data-prompt="এআই প্রযুক্তির নতুন খবর রিসার্চ করো" style="font-size:11px; height:24px;">🔍 এআই রিসার্চ</button>
-      </div>
+      </div></div>
 
       <!-- Input Dock -->
       <div class="feed-input-dock" style="padding:10px; border-top:1px solid var(--line); background:rgba(0,0,0,0.25); flex:none;">
@@ -2050,6 +2091,7 @@ body {
           <div class="t"><b>Check interval (seconds)</b><span>60 to 3600. Checks only list models and read local status.</span></div>
           <input class="field" data-k="healthInterval" placeholder="300" spellcheck="false" style="max-width:90px">
         </div>
+        <div class="ph-sum" id="phSum"></div>
         <div id="phList"><div class="empty">Waiting for the first check...</div></div>
       </div>
 
@@ -2224,6 +2266,7 @@ body {
         <div class="row"><div class="t"><b>WhatsApp</b><span>Not connected. WhatsApp has no free personal bot API. Options: (1) WhatsApp Business Cloud API: official, needs a Meta business app, a separate phone number and a public webhook (a tunnel such as Cloudflare); (2) a linked-device bridge (like WhatsApp Web): works with your own number, but it is unofficial and WhatsApp may ban the number. Tell Oma's developer which one you want.</span></div>
           <span class="pill">Not set up</span></div>
       </div>
+      <h3>Your Services</h3>
       <div id="ints"><div class="group"><div class="empty">Loading integrations...</div></div></div>
     </div>
   </section>
@@ -2512,7 +2555,7 @@ body {
   post({ do: 'telegramStatus' });
   $('btnHealth').onclick = () => { $('phSummary').textContent = 'Checking...'; post({ do: 'providerHealth' }); };
   const PH_COL = { READY: '#00f59b', DEGRADED: '#ffc857', UNKNOWN: '#8a93a6', RATE_LIMITED: '#ffc857', COOLDOWN: '#ffc857',
-                   QUOTA_EXHAUSTED: '#ff5a6a', AUTH_REQUIRED: '#ff5a6a', MODEL_RETIRED: '#ff5a6a', OFFLINE: '#ff5a6a' };
+                   QUOTA_EXHAUSTED: '#ff5a6a', AUTH_REQUIRED: '#ff5a6a', MODEL_RETIRED: '#ff5a6a', OFFLINE: '#ff5a6a', BILLING_REQUIRED: '#b18cff' };
   const phTime = t => t ? new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
   const phEff = (r, now) => (r.retry_at && r.retry_at <= now && !['READY', 'DEGRADED', 'UNKNOWN'].includes(r.state)) ? 'UNKNOWN' : r.state;
   const phPill = st => `<span class="pill" style="background:${PH_COL[st] || '#8a93a6'}22;color:${PH_COL[st] || '#8a93a6'}">${escapeHtml(st)}</span>`;
@@ -2523,6 +2566,15 @@ body {
     const sw = d.switch && now - d.switch.at < 86400 ? ` Last switch ${phTime(d.switch.at)}: ${escapeHtml(d.switch.reason)}.` : '';
     $('phSummary').textContent = '';
     $('phSummary').innerHTML = `Last check ${phTime(d.checked) || 'never'}, every ${Math.round((d.interval || 300) / 60)} min.${sel}${sw}`;
+    const groups = [['ready', 'Ready', '#00f59b', ['READY']], ['slow', 'Slow', '#ffc857', ['DEGRADED']],
+                    ['limit', 'At a limit', '#ffc857', ['RATE_LIMITED', 'COOLDOWN', 'QUOTA_EXHAUSTED']],
+                    ['sign', 'Sign-in / key needed', '#ff5a6a', ['AUTH_REQUIRED']], ['bill', 'Needs payment', '#b18cff', ['BILLING_REQUIRED']],
+                    ['off', 'Offline / retired', '#ff5a6a', ['OFFLINE', 'MODEL_RETIRED']], ['unk', 'Not checked', '#8a93a6', ['UNKNOWN']]];
+    const count = {};
+    d.providers.forEach(p => { const g = groups.find(x => x[3].includes(phEff(p, now))); if (g) count[g[0]] = (count[g[0]] || 0) + 1; });
+    if ($('phSum')) $('phSum').innerHTML = groups.filter(g => count[g[0]]).map(g =>
+      `<span class="chip" style="color:${g[2]};border-color:${g[2]}55;background:${g[2]}14">${count[g[0]]} ${g[1]}</span>`).join('');
+    const open = new Set([...document.querySelectorAll('#phList details[open]')].map(x => x.dataset.id));
     $('phList').innerHTML = d.providers.map(p => {
       const ps = phEff(p, now);
       const models = (p.models || []).filter(m => m.state !== 'UNKNOWN' || m.loaded).slice(0, 6).map(m => {
@@ -2532,11 +2584,62 @@ body {
                `${m.reason && ms !== 'READY' ? ` <span style="opacity:.7">${escapeHtml(m.reason.slice(0, 90))}</span>` : ''}` +
                `${m.retry_at > now ? ` <span style="opacity:.7">retry ${phTime(m.retry_at)}</span>` : ''}</div>`;
       }).join('');
-      return `<div class="row" style="display:block"><div style="display:flex;gap:10px;align-items:center"><b style="min-width:96px">${escapeHtml(p.id)}</b>${phPill(ps)}` +
-             `<span style="opacity:.75;font-size:12px">${escapeHtml((p.reason || '').slice(0, 110))}${p.retry_at > now ? ` · next retry ${phTime(p.retry_at)}` : ''}</span></div>${models}</div>`;
+      return `<details class="ph" data-id="${escapeHtml(p.id)}"${open.has(p.id) ? ' open' : ''}><summary><b style="min-width:96px">${escapeHtml(p.id)}</b>${phPill(ps)}` +
+             `<span class="why">${escapeHtml((p.reason || '').slice(0, 110))}${p.retry_at > now ? ` · next retry ${phTime(p.retry_at)}` : ''}</span></summary>` +
+             `<div class="ph-models">${models || '<span style="opacity:.6;font-size:12px">No model details.</span>'}</div></details>`;
     }).join('');
   }
   post({ do: 'providerHealth' });
+
+  // 1. Settings: each heading and the cards under it travel together (two columns on wide screens)
+  document.querySelectorAll('#settings-drawer .settings-container').forEach(c => {
+    let block = null;
+    [...c.children].forEach(el => {
+      if (el.tagName === 'H3') { block = document.createElement('div'); block.className = 'sblock'; c.insertBefore(block, el); }
+      if (block && el !== block) block.appendChild(el);
+    });
+  });
+  // 3. A short Bangla line under the technical settings
+  const BN = {
+    'Routing mode': 'কোন AI কখন কাজ করবে, Oma সেটা কীভাবে বেছে নেবে।',
+    'Active / Primary Model': 'যে AI model সবার আগে চেষ্টা করা হবে।',
+    'Automatic Fallback': 'একটা AI কাজ না করলে Oma নিজে থেকে পরের AI দিয়ে চেষ্টা করবে।',
+    'Custom fallback order': 'কোন AI-এর পরে কোনটা আসবে, নিজে ঠিক করুন। ফাঁকা রাখলে Oma নিজেই ঠিক করবে।',
+    'Fallback Notification': 'AI বদলালে একটা ছোট নোটিশ দেখাবে।',
+    'Availability before you ask': 'কোন AI এখন কাজ করছে, প্রশ্ন করার আগেই Oma দেখে রাখে।',
+    'Check interval (seconds)': 'কত সেকেন্ড পরপর AI-গুলোর অবস্থা দেখা হবে।',
+    'Local runtime detection': 'এই PC-তে চলা AI (Ollama, LM Studio) খুঁজে বের করে।',
+    'How you talk': 'Shortcut চেপে ধরে কথা বলবেন, নাকি একবার চেপে ছেড়ে দিয়ে।',
+    'Start with typing': 'Shortcut চাপলে কথা বলার বদলে লেখার ঘর খুলবে।',
+    'Start Oma AI at login': 'PC চালু হলে Oma নিজে থেকেই চালু হবে।',
+    'Pause Oma AI': 'কিছুক্ষণের জন্য Oma বন্ধ রাখুন; তখন shortcut কাজ করবে না।',
+    'Show icon in system tray': 'Taskbar-এর কোণে Oma-র icon দেখাবে।',
+    'Read answers aloud': 'উত্তর জোরে পড়ে শোনাবে।',
+    'Copy answers automatically': 'প্রতিটা উত্তর নিজে থেকেই copy হয়ে যাবে।',
+    'Tips': 'মাঝে মাঝে ছোট পরামর্শ দেখাবে।',
+    'Ask me when unsure': 'নিশ্চিত না হলে Oma অনুমান না করে আপনাকে জিজ্ঞেস করবে।',
+    'Hidden from screen sharing': 'Screen share করার সময় অন্যরা Oma-র box দেখতে পাবে না।',
+  };
+  document.querySelectorAll('#settings-drawer .row .t > b').forEach(b => {
+    const h = BN[b.textContent.trim()];
+    if (h && !b.parentElement.querySelector('.bn-hint')) b.parentElement.insertAdjacentHTML('beforeend', `<em class="bn-hint">${h}</em>`);
+  });
+  // 4. Quick chips: the arrow scrolls; fade and arrow hide at the end
+  const qcRow = $('qcRow'), qcWrap = $('qcWrap');
+  if (qcRow && qcWrap) {
+    const qcEnd = () => qcWrap.classList.toggle('end', qcRow.scrollLeft + qcRow.clientWidth >= qcRow.scrollWidth - 4);
+    $('qcMore').onclick = () => { qcRow.scrollLeft += Math.max(120, qcRow.clientWidth * 0.7); };
+    qcRow.addEventListener('scroll', qcEnd, { passive: true });
+    new ResizeObserver(qcEnd).observe(qcRow);
+    qcEnd();
+  }
+  // 6. Feed: a click opens or folds a card of an earlier request
+  const feedEl = $('homeFeedStream');
+  if (feedEl) feedEl.addEventListener('click', e => {
+    if (e.target.closest('button, a, input')) return;
+    const c = e.target.closest('.feed-card.old');
+    if (c) c.classList.toggle('open');
+  });
   $('btnToProviders').onclick = () => document.querySelector('nav button[data-s=providers]').click();
 
   // HTML Escaping Helper (Prevents XSS / Arbitrary Markup Injection)
@@ -2670,13 +2773,51 @@ body {
   }
 
   // Integrations handler
+  let intOpen = '';
   function integrations(list) {
-    $('ints').innerHTML = list.map(i => `
-      <div class="row">
-        <div class="t"><b>${i.title}</b><span>${i.about}</span></div>
-        ${i.on ? '<span class="pill ok">Connected</span>' : '<span class="pill">Available</span>'}
-      </div>
-    `).join('') || '<div class="empty">No integrations detected.</div>';
+    window._ints = list;
+    const field = (i, f) => `<div class="row"><div class="t" style="flex:none;width:170px"><b>${escapeHtml(f.label)}</b></div>` +
+      `<input class="field" data-f="${escapeHtml(f.k)}" ${f.secret ? 'type="password" autocomplete="off"' : 'spellcheck="false"'} ` +
+      `value="${f.secret ? '' : escapeHtml(f.value || '')}" placeholder="${escapeHtml(f.secret ? (f.has ? 'Saved. Leave empty to keep it' : 'Paste it here') : (f.example || ''))}"></div>`;
+    $('ints').innerHTML = `<div class="group">` + (list.map(i => `
+      <div class="int-item" data-name="${escapeHtml(i.name)}">
+        <div class="row">
+          <div class="t"><b>${escapeHtml(i.title)}</b><span>${escapeHtml(i.about)}</span></div>
+          ${i.on ? '<span class="pill ok">Connected</span>' : ''}
+          ${(i.fields || []).length ? `<button class="btn ${i.on ? '' : 'blue'} int-toggle">${i.on ? 'Edit' : 'Set up'}</button>` : ''}
+        </div>
+        <div class="int-form${intOpen === i.name ? ' open' : ''}">
+          ${i.keyHelp ? `<div class="help">${escapeHtml(i.keyHelp)}</div>` : ''}
+          ${(i.fields || []).map(f => field(i, f)).join('')}
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <button class="btn blue int-save">Save &amp; test</button>
+            ${i.keyPage ? '<button class="btn int-key">Where is my key?</button>' : ''}
+            ${i.on ? '<button class="btn red int-remove">Remove</button>' : ''}
+          </div>
+          <div class="res"></div>
+        </div>
+      </div>`).join('') || '<div class="empty">No integrations detected.</div>') + `</div>`;
+    $('ints').querySelectorAll('.int-item').forEach(el => {
+      const name = el.dataset.name, form = el.querySelector('.int-form'), res = el.querySelector('.res');
+      const values = () => Object.fromEntries([...form.querySelectorAll('[data-f]')].map(x => [x.dataset.f, x.value.trim()]));
+      el.querySelector('.int-toggle')?.addEventListener('click', () => { form.classList.toggle('open'); intOpen = form.classList.contains('open') ? name : ''; });
+      el.querySelector('.int-save')?.addEventListener('click', () => { res.style.color = 'var(--fg2)'; res.textContent = 'Saving and testing…'; post({ do: 'intSave', name, values: values() }); });
+      el.querySelector('.int-remove')?.addEventListener('click', () => { if (confirm('Remove this integration and its saved key?')) { intOpen = ''; post({ do: 'intRemove', name }); } });
+      el.querySelector('.int-key')?.addEventListener('click', () => {
+        const i = (window._ints || []).find(x => x.name === name) || {};
+        const base = (values().url || '').replace(/\/+$/, '');
+        if (!/^https?:\/\//i.test(base)) { res.style.color = '#ffb300'; res.textContent = 'Type the Address first, then press this again.'; return; }
+        post({ do: 'openMonitor', url: base + (i.keyPage || '') });
+      });
+    });
+  }
+  function intResult(a) {   // [name, what the test said]
+    const [name, r] = a || [];
+    const res = document.querySelector(`.int-item[data-name="${CSS.escape(name || '')}"] .res`);
+    if (!res) return;
+    const t = String(r || '').trim() || 'Saved.';
+    res.style.color = /error|fail|could not|refused|401|403|404|timed out/i.test(t) ? '#ff453a' : 'var(--neon-green)';
+    res.textContent = t.slice(0, 400);
   }
 
   // Global Bridge
@@ -2737,8 +2878,14 @@ body {
       card.innerHTML = `<div class="feed-meta"><span>${esc(head)}</span><span>${esc(ev.task_id)} · ${new Date(ev.ts * 1000).toLocaleTimeString()}</span></div><div class="feed-text">${esc(text)}</div>`;
       box.appendChild(card); box.scrollTop = box.scrollHeight;
     }
+    function foldEarlier() {
+      const el = $('homeFeedStream'); if (!el) return;
+      const kids = [...el.children];
+      const mine = kids.length && kids[kids.length - 1].classList.contains('user') ? kids.length - 1 : kids.length;   // the new question stays open
+      kids.slice(0, mine).forEach(k => { if (k.classList.contains('feed-card') || k.classList.contains('module-chip')) k.classList.add('old'); });
+    }
     function event(ev) {
-      if (!cur || cur.id !== ev.task_id) cur = { id: ev.task_id, status: ev.status };
+      if (!cur || cur.id !== ev.task_id) { foldEarlier(); cur = { id: ev.task_id, status: ev.status }; }
       cur.status = ev.status; cur.stage = ev.stage; cur.model = ev.active_model; cur.workers = ev.workers; cur.last = ev;
       const [head, text] = describe(ev);
       if (ev.kind === 'step') stepChip(ev);   // the chat shows each step as one module chip (Stonic style); the Agent tab keeps every event
@@ -3053,6 +3200,8 @@ body {
       window.currentNotesList = list || [];
       renderNotes(window.currentNotesList);
     },
+    intResult,
+    ownResult(r) { /* "Add your own" is not in this window; nothing to show */ },
     tab(name) {
       const b = document.querySelector(`nav button[data-s="${name}"]`);
       if (b) b.click();
