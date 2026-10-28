@@ -286,7 +286,7 @@ APP = os.environ.get('ATTICUS_APP') or os.path.join(os.environ.get('LOCALAPPDATA
 FIND, CLIP, MEDIA, TRASH, NOTE, WINDOWS, UI, KEYS, JOPLIN, INT = (ME + f' --{c}' for c in ('find', 'clip', 'media', 'trash', 'note', 'windows', 'ui', 'keys', 'joplin', 'int'))
 
 SYSTEM = f"""You are Oma AI (built on Atticus), a Windows PC helper. The user holds a hotkey or types; your reply shows in the Oma window.
-Reply in the user's language: Bangla script -> Bangla, Banglish -> Bangla, English -> English.
+Bangla/Banglish -> reply in Bangla script, not Banglish (names/tech terms/code stay English); else English.
 Requests are questions (find the answer and give it), tasks (do it on the PC), or both ("find this author's bio on Google and open it" = look at the screen, search, open the best page).
 Speed matters; every extra round costs the user a second. Answer stable facts without a tool. For current facts (news, prices, schedules, weather), search once and prefer a dated primary source. Never invent details missing from the screen or search results. Do the whole task in ONE Bash call when you can (chain steps that depend on each other with &&, others with ;). Never say an action or a send worked without checking its result. Need several things? Ask for them all in the same turn, not one after another.
 Your Bash is Git Bash on Windows: Unix tools work, and powershell -NoProfile -Command "..." reaches Windows itself. Paths look like C:/Users/... or ~/...
@@ -1741,7 +1741,7 @@ def fast_chat(task):
         TRACK.set_stage('analyzing', 'A conversation: answering with a fast chat model (no PC action needed)')
     try:
         res = router.execute(clean_user_prompt(task), tracker=TRACK, purpose='chat',
-                             system_prompt=intent.chat_system(m.get('name', ''), m.get('facts', []), recent()))
+                             system_prompt=intent.chat_system(m.get('name', ''), m.get('facts', []), recent(), task))
     except Exception as e:
         say('!', f'fast chat failed: {e}')
         return None
@@ -1760,7 +1760,7 @@ def tool_fallback(task, request, why):
     """Claude Code is unavailable: the next healthy tools-capable model runs the request through the same gated `bash`
     tool (multi_ai.tool_agent). Tries models in health order; stops at the first one that acted, or at a Don't Allow.
     -> (reply, cost, steps), or None when no tools model could act (then the caller answers honestly as text)."""
-    from multi_ai import health_monitor as hm, tool_agent
+    from multi_ai import health_monitor as hm, intent, tool_agent
     from multi_ai.router import router
     from multi_ai.providers import get_secret, provider_mgr
     cands, skipped = hm.order(router.candidates(exclude=['claude_code'], vision=False), need_tools=True)
@@ -1768,7 +1768,7 @@ def tool_fallback(task, request, why):
         return None
     system = (SYSTEM.replace('NEVER_RISKY', ASK_FIRST if pref('safe', True) else NEVER) +
               '\nYou act through the `bash` tool only. Run the command, check its output, then reply in at most 2 short sentences '
-              'in the user\'s language saying what you did. Never claim something was done unless a command did it.')
+              'saying what you did. Never claim something was done unless a command did it.\n' + intent.lang_rule(request))
     browser = next((name for name, rx in BROWSER_WORDS if re.search(rx, request, re.I)), '')
     if browser:   # small models ignore a general hint: say it for this request
         system += f'\nThe user asked for {browser}: open pages with {SHOW} "{browser.lower()} <url>", never the default browser.'
@@ -1810,6 +1810,7 @@ def text_only(task, why):
     """Claude Code (the Atticus engine) could not run and nothing was executed: answer with the Multi-AI router as text.
     The router never runs PC actions, so permissions and the safety gate are never bypassed by switching providers.
     -> (reply, cost, steps); sets run.ok / run.text_only / run.model."""
+    from multi_ai import intent
     from multi_ai.router import clean_user_prompt, router
     run.text_only = True
     request = clean_user_prompt(task)
@@ -1830,8 +1831,8 @@ def text_only(task, why):
         TRACK.set_stage('fallback', f'Atticus engine unavailable ({why}). Short text-only answer from the Multi-AI router; no PC actions will run.')
     try:
         res = router.execute(request, exclude_providers=['claude_code'], tracker=TRACK, purpose='chat',
-                             system_prompt="Answer in at most 4 short sentences, in the user's language (Bangla, Banglish or English). "
-                                           "You cannot open apps or act on the PC; if asked to, say so in one sentence.")
+                             system_prompt="Answer in at most 4 short sentences. " + intent.lang_rule(request) +
+                                           " You cannot open apps or act on the PC; if asked to, say so in one sentence.")
     except Exception as e:
         res = {'success': False, 'reply': f'Fallback failed: {e}', 'error': str(e)}
     run.fallback = res
@@ -2618,7 +2619,8 @@ def serve(task, warm=None, snap=None):
                      "pie, timeline or xychart-beta; at most 25 nodes; labels in the user's language). It is drawn in the Oma Visual Hub; do not open any app for it.")
     prompt = (f'Context: {ctx}\n' + (f'Earlier:\n{earlier}' if earlier else '') + (f'Memory:\n{mem}\n' if mem else '') +
               (f'Integrations:\n{int_hints}\n' if int_hints else '') + ''.join(helps) +
-              (f'Saved workflow (historical guidance):\n{procedure}\n' if procedure else '') + f'Request: {clean_task}')
+              (f'Saved workflow (historical guidance):\n{procedure}\n' if procedure else '') +
+              f'{intent.lang_rule(clean_task)}\nRequest: {clean_task}')
     reply, cost, steps = run(prompt, warm, images or ())
     if not wait_commit():
         return 'CANCELLED', ''

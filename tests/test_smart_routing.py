@@ -108,3 +108,18 @@ class SiteAsk(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ReplyLanguage(unittest.TestCase):
+    def test_bangla_and_banglish_get_bangla_script(self):
+        from multi_ai import intent
+        for q in ('জাপানের রাজধানী কী?', 'japan er capital ki?', 'amk ekta joke bolo', 'kemon acho', 'browser ta keta diya abar open koro'):
+            self.assertEqual(intent.reply_lang(q), 'bn', q)
+            self.assertIn('Bangla script', intent.lang_rule(q))
+            self.assertIn('Keep in English', intent.lang_rule(q))   # names and tech terms are not force-translated
+
+    def test_english_stays_english(self):
+        from multi_ai import intent
+        for q in ('What is the capital of Japan?', 'open notepad', 'Explain how a browser works'):
+            self.assertEqual(intent.reply_lang(q), 'en', q)
+            self.assertEqual(intent.lang_rule(q), 'Reply language: English.')

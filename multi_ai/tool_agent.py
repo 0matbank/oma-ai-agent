@@ -89,7 +89,7 @@ CLI_STEP = ('\n\nHow to answer (you are only the planner; Oma runs commands, you
             'To run one command on the PC: {"command": "<one Git Bash command>", "reply": "", "final": "no"}. '
             'If that one command completes the whole task, say so to save a round trip: "final": "yes" and in "reply" the short '
             'answer to show if it succeeds (Oma checks the exit code and asks you again if it fails). '
-            'When the task is done, or for a plain question: {"command": "", "reply": "<short answer in the user\'s language>", "final": "yes"}. '
+            'When the task is done, or for a plain question: {"command": "", "reply": "<short answer, in the reply language the instructions name>", "final": "yes"}. '
             'Never use your own tools, never edit files.')
 
 

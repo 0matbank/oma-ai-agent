@@ -39,13 +39,43 @@ def classify(text, has_image=False):
     return 'chat'
 
 
-def chat_system(name='', facts=(), recent=()):
+BN_SCRIPT = re.compile(r'[ঀ-৿]')
+BANGLISH = re.compile(
+    r'\b(ami|amar|amake|amk|tumi|tomar|tomake|tmk|apni|apnar|ki|kii|keno|kno|kemon|kmn|koro|kore|korbo|korte|korsi|korchi|kor|'
+    r'dao|daw|diba|dibo|bolo|bolen|bolte|bolba|ache|asa|ase|achhe|nai|naii|nei|hobe|hoba|hoy|hoise|hoisa|hossa|hocche|kothay|'
+    r'kothai|kobe|keta|kivabe|kibhabe|ekta|akta|eta|aeita|aita|oita|sob|shob|ektu|akto|valo|bhalo|kharap|thik|kintu|tahole|'
+    r'taila|jodi|jokhon|tokhon|tokon|niye|niya|diye|diya|theke|thaka|gula|gulo|shathe|sathe|bujhi|bujhlam|janao|jano|jani|'
+    r'er|ke|ta|bangla|vai|bhai|apu|accha|acha|haan|hya|na|naki|abar|aber|ekhane|okhane|shuru|ses|shesh|uttor)\b', re.I)
+
+
+def reply_lang(text):
+    """'bn' when the user wrote Bangla script or Banglish (Bangla in English letters), else 'en'."""
+    t = text or ''
+    if BN_SCRIPT.search(t):
+        return 'bn'
+    words = re.findall(r'[a-z]+', t.lower())
+    hits = len(BANGLISH.findall(t))
+    return 'bn' if hits >= 2 or (hits and len(words) <= 3) else 'en'
+
+
+def lang_rule(text):
+    """One explicit line for this request, so every model answers in the right script."""
+    if reply_lang(text) == 'bn':
+        return ('Reply language: the user wrote Bangla/Banglish, so write your sentences in Bangla script (বাংলা অক্ষরে), '
+                'never in Banglish. Keep in English, exactly as written: names of apps, sites, products, AI models, buttons '
+                'and menus as they appear on screen, technical terms with no common Bangla word (e.g. browser, login, file, '
+                'settings), code, commands, file paths, URLs, error messages and units. Do not force-translate or transliterate '
+                'these; a natural professional Bangla sentence with English terms beats a wrong translation.')
+    return 'Reply language: English.'
+
+
+def chat_system(name='', facts=(), recent=(), task=''):
     """The fast chat model's instructions: Oma's voice, the user's language, and an honest hand-off when it cannot answer."""
     who = f"The user's name is {name}. " if name else ''
     known = ('What you know about the user: ' + '; '.join(facts[:8]) + '. ') if facts else ''
     earlier = ''.join(f'\nEarlier — user: {r["q"][:200]} / you: {r["a"][:200]}' for r in recent[-3:])
     return ("You are Oma, the user's personal AI assistant on their Windows PC. " + who + known +
-            "Reply in the language and script the user wrote in (Bangla, Banglish or English), warm and short: at most 4 sentences, "
+            lang_rule(task) + " Warm and short: at most 4 sentences, "
             "plain text, no markdown. Never claim you did anything on the PC. "
             f"If answering needs current information (news, prices, weather, today's events), the user's screen or files, "
             f"or doing something on the PC, reply with exactly {AGENT_TOKEN} and nothing else." + earlier)
