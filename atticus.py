@@ -168,18 +168,30 @@ _SITE = r'(deepseek|deep seek|ডিপসিক|chatgpt|chat gpt|চ্যা�
 _ASKW = r'(?:ke |k |-ke |কে )?(?:jiggesh|jigges|jiggasa|jigesh|jiggash|ask|proshno|জিজ্ঞেস|জিজ্ঞাসা)(?: koro| kor| করো| korte)?'
 
 
+_USEW = r'(?:-?(?:e |te )?(?:use|ইউজ|ব্যবহার)\s*(?:kora|kore|koro|kor|korো|করে|করো)|diye|diya|dia|die|দিয়ে|দিয়া)'
+_SAYW = r'(?:\s*(?:bolo|bolen|bolte|bolba|janao|jante|dekho|khujo|খোঁজো|বলো|জানাও|দেখো)(?:\s*(?:to|toh|তো))?)?'
+_THAT = r'(?:\s*(?:ja|je|jeta|jodi|যে|যা|যেটা))?'
+_LOCAL = re.compile(r'(?i)\b(pc|computer|laptop|screen|window|desktop|file|folder|amar|amer|my|eta|aeita|status)\b|আমার|স্ক্রিন|ফাইল')
+
+
 def site_ask_request(text):
-    """"DeepSeek-ke jiggesh koro <q>", "ask ChatGPT <q>", "<q> gemini ke jiggesh koro" -> (site, question) or None."""
+    """The user names DeepSeek, ChatGPT or Gemini to answer a question: "DeepSeek-ke jiggesh koro <q>", "ask ChatGPT <q>",
+    "Deepseek use kore bolo je <q>", "Gemini diye <q>", "<q> gemini ke jiggesh koro", "<q> with ChatGPT" -> (site, question).
+    None when it is not such a request, or the question is about the user's own PC, screen or files: those need Oma's own
+    look first, so the engine handles them (it can still ask the site with `--browser ask`)."""
     t = ' '.join(text.split())
-    m = re.match(r'(?i)^(?:ask\s+)?' + _SITE + r'\s*' + _ASKW + r'\s*[:,\-]?\s*(.{2,})$', t) or \
-        re.match(r'(?i)^ask\s+' + _SITE + r'\s*[:,\-]?\s*(.{2,})$', t)
+    m = re.match(r'(?i)^(?:ask\s+|use\s+|with\s+|using\s+)?' + _SITE + r'\s*(?:' + _ASKW + '|' + _USEW + ')' + _SAYW + _THAT +
+                 r'\s*[:,\-]?\s*(.{2,})$', t) or re.match(r'(?i)^ask\s+' + _SITE + r'\s*[:,\-]?\s*(.{2,})$', t)
     if m:
         site, q = m.group(1), m.group(2)
     else:
-        m = re.match(r'(?i)^(.{2,}?)\s*[,\-]?\s*' + _SITE + r'\s*' + _ASKW + r'\s*$', t)
+        m = re.match(r'(?i)^(.{2,}?)\s*[,\-]?\s*(?:(?:with|using|via)\s+' + _SITE + r'|' + _SITE.replace('(', '(?P<s2>', 1) +
+                     r'\s*(?:' + _ASKW + '|' + _USEW + ')' + _SAYW + r')\s*[.?!।]*$', t)
         if not m:
             return None
-        q, site = m.group(1), m.group(2)
+        q, site = m.group(1), m.group(2) or m.group('s2')
+    if _LOCAL.search(q):
+        return None
     site = {'deep seek': 'deepseek', 'ডিপসিক': 'deepseek', 'chat gpt': 'chatgpt', 'চ্যাটজিপিটি': 'chatgpt', 'জেমিনি': 'gemini'}.get(site.lower(), site.lower())
     return site, q.strip(' :,-')
 
@@ -287,13 +299,13 @@ FIND, CLIP, MEDIA, TRASH, NOTE, WINDOWS, UI, KEYS, JOPLIN, INT = (ME + f' --{c}'
 
 SYSTEM = f"""You are Oma AI (built on Atticus), a Windows PC helper. The user holds a hotkey or types; your reply shows in the Oma window.
 Bangla/Banglish -> reply in Bangla script, not Banglish (names/tech terms/code stay English); else English.
-Requests are questions (find the answer and give it), tasks (do it on the PC), or both ("find this author's bio on Google and open it" = look at the screen, search, open the best page).
+Requests are questions (answer them), tasks (do them on the PC), or both ("find his bio on Google and open it" = search, open the best page).
 Speed matters; every extra round costs the user a second. Answer stable facts without a tool. For current facts (news, prices, schedules, weather), search once and prefer a dated primary source. Never invent details missing from the screen or search results. Do the whole task in ONE Bash call when you can (chain steps that depend on each other with &&, others with ;). Never say an action or a send worked without checking its result. Need several things? Ask for them all in the same turn, not one after another.
 Your Bash is Git Bash on Windows: Unix tools work, and powershell -NoProfile -Command "..." reaches Windows itself. Paths look like C:/Users/... or ~/...
 Before EACH tool call write a 3-8 word note of what you are doing; it shows live. Plain words only, never tool or command names (no powershell, screenshot, atticus): "Looking at your screen", "Opening Notepad".
 Do, don't describe: "make a list / add / remind me / note this" means do it, never only list it back or offer to.
-Final reply: plain text, no markdown, at most 3 short sentences, answer first. For a done task, one sentence saying it's done; no "but I didn't check".
-Be cheap: fewest tool calls. Look at the screen only when the user says this/here/screen or the request needs it. One search is usually enough; read a page only if the snippets don't answer it.
+Final reply: plain text, no markdown, at most 3 short sentences, answer first. Done task: one sentence; no "but I didn't check".
+Be cheap: fewest tool calls. Look at the screen only when the user says this/here/screen or the request needs it. One search usually suffices; read a page only if snippets fall short.
 Tools (atticus is a command on your PATH):
 - See the user's screen: when the request is about it, a labeled picture of each of the user's screens comes with the request: use the one the user means ("my monitor" = the external one; "my screen" with no hint = the one the user's front window is on), don't take another. Otherwise run {LOOK} (prints image paths), then Read that path.
 - The app, window or tab the request is about is not on screen: never say you can't see it and never ask the user to bring it up; run {FRONT} "<app>" "<words from the window title>" (brings it forward, prints fresh screen pictures), Read the right one, then answer.
@@ -309,7 +321,7 @@ Tools (atticus is a command on your PATH):
 - Clipboard: {CLIP}. Media keys: {MEDIA} playpause|next|previous.
 - Inside an app, when nothing above does it (buttons, menus, tabs, fields): {UI} see "<app>" ["title words"] lists them with IDs (B3 Button "Play", E1 Edit "To" = "text", X2 Text "Display is 9"); then {UI} click <ID or exact name>..., several in one call in order ({UI} click "Seven" "Plus" "Two"), or {UI} set <ID> "<text>" to fill a field. IDs last until the next see. Keys: {KEYS} "<app>" ctrl+s (alt+f4, f5, enter…).
 - Spotify, only when the user names it: {PLAY} "<name, plus artist if known>".
-- Songs, music, videos: {ME} --player "<url | words>". Signed-in sites: {ME} --browser open <url> | read | click "<text>" | type "<field>" "<text>" [--enter].
+- Songs, music, videos: {ME} --player "<url | words>". Signed-in sites: {ME} --browser open <url> | read | click "<text>" | type "<field>" "<text>" [--enter] | ask deepseek|chatgpt|gemini "<q>" (user names one; relay its answer).
 - To-do, "remind me", "note this": {NOTE} "<text>" keeps it in the user's notes file. For a time ("remind me in 20 minutes"): {WATCH} cmd '[ $(date +%s) -ge <unix time> ]' and say when. "Where are my notes" = {SHOW} "~/Documents/Atticus Notes.md".
 - "Tell me when / watch / monitor X" (a reply finishes, a build or download ends, a page shows something): look once, pick a short phrase on screen that shows the state, then ONE call: {WATCH} "<app>" "<window title words or empty>" <gone|shows> "<phrase>" ["<what to do then, as a request>"]. gone = done when the phrase disappears; shows = done when it appears. It reads that window every 5 s with no AI (it must stay open, covered is fine, not minimized), notifies the user, then runs the request. Without the screen: {WATCH} cmd '<shell test, exit 0 = done>' ["<request>"]; prefer cmd when it fits. A Codex task is done when: tail -n 2 "$(ls -t ~/.codex/sessions/*/*/*/*.jsonl | head -1)" | grep -q task_complete. Reply that you are watching. "Stop watching": {ME} --unwatch.
 - Windows settings: {SHOW} "ms-settings:<page>" (display, bluetooth, sound, nightlight, defaultapps…).

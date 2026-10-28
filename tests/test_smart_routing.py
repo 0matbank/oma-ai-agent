@@ -105,9 +105,18 @@ class SiteAsk(unittest.TestCase):
         for text in ('deepseek kholo', 'deepseek ki free?', 'gemini ke ekta message pathao'):
             self.assertIsNone(atticus.site_ask_request(text), text)
 
-
-if __name__ == '__main__':
-    unittest.main()
+    def test_other_phrasings_and_own_pc(self):
+        ask = atticus.site_ask_request
+        self.assertEqual(ask('Deepseek use kora bolo ja akhon bangladesh ar stock market ar obostha ki'),
+                         ('deepseek', 'akhon bangladesh ar stock market ar obostha ki'))
+        self.assertEqual(ask('Gemini diye bolo to Mars e pani ase?'), ('gemini', 'Mars e pani ase?'))
+        self.assertEqual(ask('Mars e pani ase? chatgpt diye bolo'), ('chatgpt', 'Mars e pani ase?'))
+        self.assertEqual(ask('explain recursion using gemini'), ('gemini', 'explain recursion'))
+        self.assertEqual(ask('ডিপসিক দিয়ে বলো যে বাংলাদেশের রাজধানী কী'), ('deepseek', 'বাংলাদেশের রাজধানী কী'))
+        for text in ('pc ar status bolo with chatgpt', 'chatgpt use kore amar pc er status bolo'):   # needs Oma's own look first
+            self.assertIsNone(ask(text), text)
+        self.assertIn('--browser open <url> | read', atticus.SYSTEM)
+        self.assertIn('ask deepseek|chatgpt|gemini', atticus.SYSTEM)
 
 
 class ReplyLanguage(unittest.TestCase):
@@ -123,3 +132,6 @@ class ReplyLanguage(unittest.TestCase):
         for q in ('What is the capital of Japan?', 'open notepad', 'Explain how a browser works'):
             self.assertEqual(intent.reply_lang(q), 'en', q)
             self.assertEqual(intent.lang_rule(q), 'Reply language: English.')
+
+if __name__ == '__main__':
+    unittest.main()
