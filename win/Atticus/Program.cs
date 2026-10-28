@@ -98,6 +98,8 @@ static class Program
             Hooks.Install();
             Err("Hooks installed to SettingsWindow");
             _ = Speech.Load();
+            ProviderHealth.Changed = j => Program.Post(() => { if (Settings is { Visible: true } w) w.Js($"st.providerHealth({j})"); });
+            ProviderHealth.Start();
             Listen();
             Err("Listen started");
             Updater.Schedule();

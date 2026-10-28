@@ -17,7 +17,8 @@ sealed class Speech
     int session;
     public string Prompt = "";   // app names and the user's own words: Whisper leans toward them
     public bool Running => mic != null;
-    public bool Ready => factory != null;
+    public bool Ready => factory != null || Fast.Ready;
+    public readonly FastWhisper Fast = new();   // warm GPU large-v3-turbo; Whisper.net below is the fallback
     public string Error = "";
 
     public static string Url(string model) => $"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{model}.bin";
@@ -26,7 +27,10 @@ sealed class Speech
     {
         try { if (File.Exists(Paths.Model) && factory == null) factory = WhisperFactory.FromPath(Paths.Model); Error = ""; }
         catch (Exception e) { Error = e.Message; }
+        if (FastWhisper.Wanted) Fast.Start().Wait();
     });
+
+    public void Reload() { Fast.Stop(); _ = Load(); }   // engine or language changed
 
     // Settings / setup: fetch the model once (~150 MB for base.en). progress: 0..1
     public static async Task<bool> Download(Action<double> progress)
@@ -98,7 +102,7 @@ sealed class Speech
             {
                 float[] a; lock (audio) a = audio.ToArray();
                 if (a.Length < 8000 || loudest < 0.01f) return;
-                var t = await Transcribe(a);
+                var t = await Transcribe(a, true);
                 if (session == me && mic != null) ui?.Post(_ => { if (session == me) onWords(t); }, null);
             }
             catch { }
@@ -133,8 +137,15 @@ sealed class Speech
 
     public Task<string> TranscribeOnce(float[] a) => Transcribe(a);
 
-    async Task<string> Transcribe(float[] a)
+    async Task<string> Transcribe(float[] a, bool partial = false)
     {
+        if (Fast.Ready)
+        {
+            var f = await Fast.Transcribe(a, Prompt, partial);
+            if (f != null) return Clean(f);
+            if (!Fast.Ready) _ = Fast.Start();   // the server died: restart it in the background, whisper.cpp answers now
+        }
+        if (factory == null) return "";
         string lang = Prefs.Str("speechLanguage");
         if (string.IsNullOrEmpty(lang))
             lang = Prefs.Str("speechModel").EndsWith(".en") ? "en" : "auto";

@@ -346,7 +346,9 @@ sealed class SettingsWindow : PageWindow
         if (k == "paused" && v is true) Program.Box.Close(false);
         if (k == "safe") Program.Box.js("mode", v is true);
         if (k == "speechModel") _ = Program.Speech.Load();
+        if (k is "speechEngine" or "speechLanguage") Program.Speech.Reload();
         if (k == "login") Startup(v is true);
+        if (k is "aiMode" or "activeModel" or "aiFallback" or "aiFallbackOrder" or "healthInterval") ProviderHealth.Refresh("settings");
     }
 
     public static void Startup(bool on)
@@ -428,6 +430,10 @@ sealed class SettingsWindow : PageWindow
                     Program.Post(() => { if (j.TrimStart().StartsWith("[")) Js($"st.integrations({j})"); Js($"st.intResult({Web.Json(new[] { name, r })})"); });
                 });
                 break;
+            case "providerHealth":
+                if (ProviderHealth.Last != "") Js($"st.providerHealth({ProviderHealth.Last})");
+                ProviderHealth.Refresh("opened");
+                break;
             case "providers":
                 Task.Run(() => {
                     var j = Py.Run(new[] { "--providers-list" });
@@ -460,6 +466,7 @@ sealed class SettingsWindow : PageWindow
                 if (S("id") is { } prId) {
                     Task.Run(() => {
                         Py.Run(new[] { "--provider-remove", prId });
+                        ProviderHealth.Refresh("settings");
                         var j = Py.Run(new[] { "--providers-list" });
                         if (j.TrimStart().StartsWith("{") || j.TrimStart().StartsWith("[")) Program.Post(() => Js($"st.providers({j})"));
                     });
@@ -611,6 +618,7 @@ sealed class SettingsWindow : PageWindow
             askFile = "";
             askLock.Release();
             Program.Post(() => Js("st.feedDone()"));
+            ProviderHealth.Reload();   // the engine recorded this request's outcome: show it
         }
     }
 

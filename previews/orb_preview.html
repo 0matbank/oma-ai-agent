@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oma Orb Preview</title>
+<style>
+  :root { --bg: #05080b; --panel: #0a1116; --line: rgba(45,226,230,.28); --acc: #2de2e6; --text: #cfe9ea; --mute: #5f7a80; }
+  :root[data-theme="hacker"] { --line: rgba(57,255,106,.28); --acc: #39ff6a; --panel: #07120a; }
+  :root[data-theme="cyberpunk"] { --line: rgba(255,43,214,.3); --acc: #ff2bd6; --panel: #120914; }
+  :root[data-theme="danger"] { --line: rgba(255,51,68,.32); --acc: #ff3344; --panel: #140809; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 "Segoe UI", system-ui, sans-serif; min-height: 100vh; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px; }
+  h1 { font-size: 15px; letter-spacing: 3px; color: var(--acc); margin: 0 0 4px; font-weight: 700; }
+  p.note { color: var(--mute); margin: 0 0 16px; }
+  .stage { display: grid; grid-template-columns: 220px 1fr; gap: 18px; align-items: center; }
+  .nodes { display: flex; flex-direction: column; gap: 14px; position: relative; z-index: 1; }
+  .node { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); background: linear-gradient(90deg, rgba(255,255,255,.03), transparent);
+          clip-path: polygon(0 0, 92% 0, 100% 50%, 92% 100%, 0 100%); font: 700 11px/1 Consolas, monospace; letter-spacing: 2px; }
+  .node i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+  .orbbox { position: relative; height: 420px; border: 1px solid var(--line); background: radial-gradient(ellipse at center, rgba(255,255,255,.025), transparent 70%), var(--panel);
+            clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 14px 100%, 0 calc(100% - 14px), 0 14px); }
+  .chip { position: absolute; top: 12px; left: 14px; font: 700 10px Consolas, monospace; letter-spacing: 2px; color: var(--mute); border: 1px solid var(--line); padding: 4px 8px; border-radius: 4px; }
+  .chip b { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--acc); margin-left: 6px; box-shadow: 0 0 6px var(--acc); }
+  canvas { width: 100%; height: 100%; display: block; }
+  .label { position: absolute; left: 0; right: 0; bottom: 58px; text-align: center; font: 700 11px Consolas, monospace; letter-spacing: 4px; color: var(--acc); }
+  .btn { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 8px 26px; font: 700 11px Consolas, monospace; letter-spacing: 3px; color: var(--acc);
+         background: rgba(0,0,0,.4); border: 1px solid var(--acc); clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0 50%); cursor: pointer; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 8px; }
+  .controls button { background: transparent; color: var(--text); border: 1px solid var(--line); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .controls button.on { border-color: var(--acc); color: var(--acc); }
+  .small { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px; }
+  .small .orbbox { width: 260px; height: 230px; }
+  .muted { color: var(--mute); font-size: 12px; }
+  @media (max-width: 720px) { .stage { grid-template-columns: 1fr; } .nodes { flex-direction: row; flex-wrap: wrap; } .orbbox { height: 320px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>OMA ORB · PREVIEW</h1>
+  <p class="note">Stonic-style voice globe for Oma. Not installed. States come from Oma's real task events; the audio level comes from the real microphone. Drag the orb to turn it.</p>
+  <div class="stage">
+    <div class="nodes">
+      <div class="node" style="--c:#2de2e6"><i></i>MEMORY</div>
+      <div class="node" style="--c:#ff9a3c"><i></i>SKILLS</div>
+      <div class="node" style="--c:#39ff6a"><i></i>VOICES</div>
+      <div class="node" style="--c:#a7b4c2"><i></i>SETTING</div>
+    </div>
+    <div class="orbbox" id="big">
+      <div class="chip">THINKING<b id="dot"></b></div>
+      <canvas id="orb"></canvas>
+      <div class="label" id="lbl">STANDBY</div>
+      <button class="btn" id="act">START AI</button>
+    </div>
+  </div>
+  <div class="controls" id="states"></div>
+  <div class="controls" id="themes"></div>
+  <div class="controls">
+    <button id="demo">Play demo cycle</button>
+    <button id="mic">Use my microphone (level only)</button>
+    <span class="muted" id="micnote"></span>
+  </div>
+  <p class="muted">App size (the orb panel in the Oma window is about this big):</p>
+  <div class="small"><div class="orbbox"><canvas id="orb2"></canvas></div></div>
+</div>
+<script src="particle_orb.js"></script>
+<script>
+  const big = new OmaParticleOrb('orb'), small = new OmaParticleOrb('orb2', { count: 2200 });
+  const all = [big, small];
+  big.onLabel = (l, s) => { const L = document.getElementById('lbl'); L.textContent = l; const c = big.colorsFor(s).a; L.style.color = `rgb(${c})`; L.style.textShadow = `0 0 8px rgba(${c},.6)`; document.getElementById('act').textContent = s === 'idle' ? 'START AI' : 'TERMINATE'; };
+  const states = ['idle', 'listening', 'thinking', 'active', 'speaking', 'waiting', 'partial', 'completed', 'error'];
+  const sb = document.getElementById('states');
+  const setState = s => { all.forEach(o => o.setState(s)); [...sb.children].forEach(b => b.classList.toggle('on', b.textContent === s)); };
+  states.forEach(s => { const b = document.createElement('button'); b.textContent = s; b.onclick = () => { stopDemo(); setState(s); }; sb.appendChild(b); });
+  const tb = document.getElementById('themes');
+  ['stonic', 'hacker', 'cyberpunk', 'danger'].forEach(t => {
+    const b = document.createElement('button'); b.textContent = t;
+    b.onclick = () => { all.forEach(o => o.setTheme(t)); document.documentElement.dataset.theme = t === 'stonic' ? '' : t; [...tb.children].forEach(x => x.classList.toggle('on', x === b)); };
+    tb.appendChild(b);
+  });
+  tb.children[0].classList.add('on');
+  setState('idle');
+  document.getElementById('act').onclick = () => setState(big.state === 'idle' ? 'listening' : 'idle');
+
+  let demoTimer = null, fake = null;
+  function stopDemo() { clearTimeout(demoTimer); demoTimer = null; clearInterval(fake); fake = null; all.forEach(o => o.setAudioLevel(0)); }
+  document.getElementById('demo').onclick = () => {
+    stopDemo();
+    const seq = [['listening', 2500, true], ['thinking', 3000], ['active', 2000], ['speaking', 3000, true], ['completed', 2500], ['idle', 2000], ['thinking', 2000], ['error', 2500], ['idle', 1000]];
+    let i = 0;
+    const next = () => {
+      if (i >= seq.length) return stopDemo();
+      const [s, ms, talk] = seq[i++];
+      setState(s);
+      clearInterval(fake); fake = null; all.forEach(o => o.setAudioLevel(0));
+      if (talk) fake = setInterval(() => all.forEach(o => o.setAudioLevel(Math.abs(Math.sin(performance.now() / 160)) * 0.7 * Math.random())), 60);   // demo only
+      demoTimer = setTimeout(next, ms);
+    };
+    next();
+  };
+  document.getElementById('mic').onclick = async () => {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const ac = new AudioContext(), an = ac.createAnalyser(); an.fftSize = 512;
+      ac.createMediaStreamSource(s).connect(an);
+      const buf = new Float32Array(an.fftSize);
+      setState('listening');
+      (function tick() { an.getFloatTimeDomainData(buf); let sum = 0; for (const v of buf) sum += v * v;
+        const lvl = Math.min(1, Math.sqrt(sum / buf.length) * 14); all.forEach(o => o.setAudioLevel(lvl)); requestAnimationFrame(tick); })();
+      document.getElementById('micnote').textContent = 'Microphone level is driving the orb (nothing is recorded).';
+    } catch (e) { document.getElementById('micnote').textContent = 'Microphone not available: ' + e.message; }
+  };
+  const q = new URLSearchParams(location.search);
+  if (q.get('state')) setState(q.get('state'));
+  if (q.get('theme')) [...tb.children].find(b => b.textContent === q.get('theme'))?.click();
+  if (q.get('demo')) document.getElementById('demo').click();
+</script>
+</body>
+</html>

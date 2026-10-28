@@ -1809,7 +1809,7 @@ body {
           </select>
         </div>
         <div class="row">
-          <div class="t"><b>Automatic Fallback</b><span>PC actions always run on the Atticus engine (Claude Code) with your permissions. If Claude cannot start or fails before doing anything (quota, retired model, sign-in, network), another model gives a text-only answer and the task is marked PARTIAL when an action was asked for. Local Only and Manual non-Claude models are text-only too.</span></div>
+          <div class="t"><b>Automatic Fallback</b><span>If Claude cannot start or fails before doing anything (quota, retired model, sign-in, network), the next healthy model takes over. For PC actions it uses the same Atticus tools and the same Allow / Don't Allow cards; models without tool support only answer as text, and the task is then marked PARTIAL. A command that already ran is never repeated by another model.</span></div>
           <label class="sw"><input type="checkbox" data-k="aiFallback" checked></label>
         </div>
         <div class="row">
@@ -1820,6 +1820,19 @@ body {
           <div class="t"><b>Fallback Notification</b><span>Show a notification badge whenever model switching occurs.</span></div>
           <label class="sw"><input type="checkbox" data-k="aiFallbackNotify" checked></label>
         </div>
+      </div>
+
+      <h3>Live Provider Health</h3>
+      <div class="group">
+        <div class="row">
+          <div class="t"><b>Availability before you ask</b><span id="phSummary">Checked in the background at startup, every 5 minutes and when these settings change. No AI requests are spent on checks.</span></div>
+          <button class="btn blue" id="btnHealth">Check now</button>
+        </div>
+        <div class="row">
+          <div class="t"><b>Check interval (seconds)</b><span>60 to 3600. Checks only list models and read local status.</span></div>
+          <input class="field" data-k="healthInterval" placeholder="300" spellcheck="false" style="max-width:90px">
+        </div>
+        <div id="phList"><div class="empty">Waiting for the first check...</div></div>
       </div>
 
       <h3>Installed Local AI Models</h3>
@@ -2243,6 +2256,33 @@ body {
     $('cpId').value = $('cpName').value = $('cpUrl').value = $('cpKey').value = $('cpModel').value = '';
   };
   $('btnRefreshLocal').onclick = () => post({ do: 'providers' });
+  $('btnHealth').onclick = () => { $('phSummary').textContent = 'Checking...'; post({ do: 'providerHealth' }); };
+  const PH_COL = { READY: '#00f59b', DEGRADED: '#ffc857', UNKNOWN: '#8a93a6', RATE_LIMITED: '#ffc857', COOLDOWN: '#ffc857',
+                   QUOTA_EXHAUSTED: '#ff5a6a', AUTH_REQUIRED: '#ff5a6a', MODEL_RETIRED: '#ff5a6a', OFFLINE: '#ff5a6a' };
+  const phTime = t => t ? new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  const phEff = (r, now) => (r.retry_at && r.retry_at <= now && !['READY', 'DEGRADED', 'UNKNOWN'].includes(r.state)) ? 'UNKNOWN' : r.state;
+  const phPill = st => `<span class="pill" style="background:${PH_COL[st] || '#8a93a6'}22;color:${PH_COL[st] || '#8a93a6'}">${escapeHtml(st)}</span>`;
+  st.providerHealth = d => {
+    if (!d || !d.providers) return;
+    const now = Date.now() / 1000;
+    const sel = d.selected ? ` Your pick ${escapeHtml(d.selected.id)}: ${escapeHtml(d.selected.state)}.` : '';
+    const sw = d.switch && now - d.switch.at < 86400 ? ` Last switch ${phTime(d.switch.at)}: ${escapeHtml(d.switch.reason)}.` : '';
+    $('phSummary').textContent = '';
+    $('phSummary').innerHTML = `Last check ${phTime(d.checked) || 'never'}, every ${Math.round((d.interval || 300) / 60)} min.${sel}${sw}`;
+    $('phList').innerHTML = d.providers.map(p => {
+      const ps = phEff(p, now);
+      const models = (p.models || []).filter(m => m.state !== 'UNKNOWN' || m.loaded).slice(0, 6).map(m => {
+        const ms = phEff(m, now);
+        return `<div style="display:flex;gap:8px;align-items:center;margin:2px 0 0 12px;font-size:12px;opacity:.9">${phPill(ms)}<code>${escapeHtml(m.id)}</code>` +
+               `${m.loaded ? ' <span style="opacity:.7">in VRAM</span>' : ''}${m.latency ? ` <span style="opacity:.7">${m.latency}s</span>` : ''}` +
+               `${m.reason && ms !== 'READY' ? ` <span style="opacity:.7">${escapeHtml(m.reason.slice(0, 90))}</span>` : ''}` +
+               `${m.retry_at > now ? ` <span style="opacity:.7">retry ${phTime(m.retry_at)}</span>` : ''}</div>`;
+      }).join('');
+      return `<div class="row" style="display:block"><div style="display:flex;gap:10px;align-items:center"><b style="min-width:96px">${escapeHtml(p.id)}</b>${phPill(ps)}` +
+             `<span style="opacity:.75;font-size:12px">${escapeHtml((p.reason || '').slice(0, 110))}${p.retry_at > now ? ` · next retry ${phTime(p.retry_at)}` : ''}</span></div>${models}</div>`;
+    }).join('');
+  };
+  post({ do: 'providerHealth' });
   $('btnToProviders').onclick = () => document.querySelector('nav button[data-s=providers]').click();
 
   // HTML Escaping Helper (Prevents XSS / Arbitrary Markup Injection)
@@ -2334,8 +2374,7 @@ body {
     currentLang = currentLang === 'bn' ? 'en' : 'bn';
     $('current-lang-label').textContent = currentLang === 'bn' ? 'বাংলা' : 'English';
     if (typeof set === 'function') {
-      set('speechLanguage', currentLang);
-      set('speechModel', currentLang === 'bn' ? 'base' : 'base.en');
+      set('speechLanguage', currentLang);   // bn = Bangla + English auto-detect on the GPU engine; the model is not swapped
     }
   };
 

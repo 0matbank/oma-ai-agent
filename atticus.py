@@ -23,7 +23,7 @@ tasks on the Mac. Output lines for the overlay: "· note", "▸ step", "✓ answ
   atticus.py --media playpause|next|previous   |  --trash <path>   |  --note "<text>"   |  --windows [app]
 Completed requests go to %APPDATA%/Atticus/log.jsonl with their cost (live actions are marked).
 """
-import atexit, base64, html, json, platform, shlex, shutil, threading, os, re, signal, subprocess, sys, tempfile, time, urllib.parse, urllib.request
+import atexit, base64, ctypes, html, json, platform, shlex, shutil, threading, os, re, signal, subprocess, sys, tempfile, time, urllib.parse, urllib.request
 try:
     import winctl
 except ImportError:   # tests and syntax checks on other systems
@@ -449,8 +449,14 @@ def show(target):
     mine, _ = front()
     t = os.path.expanduser(target.strip())
     app = None
+    named = re.match(r'(?i)(chrome|edge|msedge|firefox|brave)\s+(\S+)$', t)   # "chrome https://..." : that browser, not the default
     try:
-        if is_url(t) or os.path.exists(t):
+        if named and is_url(named[2]):
+            exe = {'chrome': 'chrome.exe', 'edge': 'msedge.exe', 'msedge': 'msedge.exe', 'firefox': 'firefox.exe', 'brave': 'brave.exe'}[named[1].lower()]
+            if ctypes.windll.shell32.ShellExecuteW(None, 'open', exe, f'"{named[2]}"', None, 1) <= 32:   # App Paths finds the browser
+                return f'{named[1]} is not installed'
+            t, app = named[2], {'chrome.exe': 'Google Chrome', 'msedge.exe': 'Microsoft Edge', 'firefox.exe': 'Firefox', 'brave.exe': 'Brave'}[exe]
+        elif is_url(t) or os.path.exists(t):
             os.startfile(t)
             app = winctl.opener(t)
         else:
@@ -1455,13 +1461,60 @@ def quota_until(text):
 def claude_blocked():
     """While Claude's plan limit is known to be used up, say until when (and skip starting Claude: saves time and tokens)."""
     try:
-        from multi_ai.model_catalog import _load
-        rec = _load().get('claude_code', {}).get('_quota') or {}
+        from multi_ai import health_monitor as hm
+        st, why, until = hm.status('claude_code')
     except Exception:
         return ''
-    if rec.get('until', 0) > time.time():
-        return f"Claude plan limit reached; it resets at {time.strftime('%I:%M %p', time.localtime(rec['until'])).lstrip('0')}"
+    if st == 'QUOTA_EXHAUSTED' and until > time.time():
+        return f"Claude plan limit reached; it resets at {time.strftime('%I:%M %p', time.localtime(until)).lstrip('0')}"
+    if st in ('AUTH_REQUIRED', 'OFFLINE', 'COOLDOWN'):
+        return f'Claude Code is {st.lower().replace("_", " ")}: {why}'
     return ''
+
+
+def tool_fallback(task, request, why):
+    """Claude Code is unavailable: the next healthy tools-capable model runs the request through the same gated `bash`
+    tool (multi_ai.tool_agent). Tries models in health order; stops at the first one that acted, or at a Don't Allow.
+    -> (reply, cost, steps), or None when no tools model could act (then the caller answers honestly as text)."""
+    from multi_ai import health_monitor as hm, tool_agent
+    from multi_ai.router import router
+    from multi_ai.providers import get_secret, provider_mgr
+    cands, skipped = hm.order(router.candidates(exclude=['claude_code'], vision=False), need_tools=True)
+    if not cands:
+        return None
+    system = (SYSTEM.replace('NEVER_RISKY', ASK_FIRST if pref('safe', True) else NEVER) +
+              '\nYou act through the `bash` tool only. Run the command, check its output, then reply in at most 2 short sentences '
+              'in the user\'s language saying what you did. Never claim something was done unless a command did it.')
+    browser = next((name for name, rx in BROWSER_WORDS if re.search(rx, request, re.I)), '')
+    if browser:   # small models ignore a general hint: say it for this request
+        system += f'\nThe user asked for {browser}: open pages with {SHOW} "{browser.lower()} <url>", never the default browser.'
+    first = True
+    for pid, mid in cands[:2]:   # bounded: at most two models act on one request
+        if TRACK is not None:
+            TRACK.set_stage('fallback', f'Atticus engine unavailable ({why}). {pid} · {mid} runs the request through the same safety-gated tools.')
+        base = 'http://localhost:11434' if pid == 'ollama' else (provider_mgr.definition(pid) or {}).get('base_url', '')
+        key = '' if pid == 'ollama' else get_secret(f'ai_key_{pid}')
+        if not base or (pid != 'ollama' and not key):
+            continue
+        if not first:
+            hm.note_switch(prev, f'{pid}/{mid}', f'{prev} could not act: {res.get("error_type") or "no command ran"}')
+        t0 = time.time()
+        res = tool_agent.run_agent(f'{task}', pid, mid, base, key, system, sys.modules[__name__], TRACK)
+        hm.record(pid, mid, res['ok'] or bool(res['cmds']), res.get('error_type', ''), res.get('error', ''), time.time() - t0)
+        if TRACK is not None:
+            TRACK.model_attempt(pid, mid, res['ok'], res.get('error_type', ''), res.get('error', ''))
+        prev, first = f'{pid}/{mid}', False
+        if res['denied']:
+            run.ok, run.denied, run.ran, run.cmds = False, True, res['cmds'], []
+            return res['reply'], 0, res['steps']
+        if res['cmds']:   # something ran: never hand the same request to another model (no duplicate real-world actions)
+            run.ok, run.ran, run.text_only = res['ok'], res['cmds'], False
+            run.cmds = res['cmds'] if res['ok'] else []
+            run.model = f'{pid}/{mid}'
+            if TRACK is not None:
+                TRACK.text_only = False
+            return res['reply'] or 'The commands ran, but the model gave no final answer, so the result is not confirmed.', 0, res['steps']
+    return None
 
 
 def text_only(task, why):
@@ -1473,7 +1526,11 @@ def text_only(task, why):
     request = clean_user_prompt(task)
     if TRACK is not None:
         TRACK.text_only = True
-    if ACTION_WORDS.search(request):   # another model cannot act on the PC: say so at once instead of a slow, useless essay
+    if ACTION_WORDS.search(request) and pref('toolFallback', True):   # a tools-capable model drives the same gated execution layer
+        r = tool_fallback(task, request, why)
+        if r is not None:
+            return r
+    if ACTION_WORDS.search(request):   # no model can act on the PC now: say so at once instead of a slow, useless essay
         run.ok = False
         run.ran = []
         if TRACK is not None:
@@ -1508,6 +1565,7 @@ def run(task, p=None, shots=()):
     run.model = ''
     run.fallback = None
     run.denied = False   # the user answered Don't Allow on the safety gate
+    run.t0 = time.time()
     alias = getattr(p, 'model', '') or pref('model', 'haiku')
     if pref('aiMode', 'auto') == 'local_only':
         if p:
@@ -1518,7 +1576,7 @@ def run(task, p=None, shots=()):
         if p:
             stop_claude(p)
         if TRACK is not None:
-            TRACK.model_attempt('claude_code', alias, False, 'quota_exhausted', blocked)
+            TRACK.model_attempt('claude_code', alias, False, 'quota_exhausted' if 'plan limit' in blocked else 'skipped_unhealthy', blocked)
         return text_only(task, blocked) if pref('aiFallback', True) else (f'Not done: {blocked}.', 0, [])
     p = p or start_claude()
     if not p:
@@ -1588,19 +1646,25 @@ def run(task, p=None, shots=()):
         kind = claude_error_type(f'{reply} {err_msg}', p.returncode)
         if TRACK is not None:
             TRACK.model_attempt('claude_code', alias, False, kind, (reply or err_msg)[:300], resolved)
-        if kind == 'quota_exhausted':   # remember until the reset so the next requests skip Claude at once
-            try:
-                from multi_ai.model_catalog import _load, _save
-                d = _load(); d.setdefault('claude_code', {})['_quota'] = {'until': quota_until(f'{reply} {err_msg}'), 'at': time.time()}; _save(d)
-            except Exception:
-                pass
+        try:   # the monitor keeps it across restarts: a used-up plan is not launched again before its reset time
+            from multi_ai import health_monitor as hm
+            hm.record('claude_code', alias, False, kind, (reply or err_msg)[:200], time.time() - run.t0,
+                      quota_until(f'{reply} {err_msg}') if kind == 'quota_exhausted' else 0)
+        except Exception:
+            pass
         if not cmds and pref('aiFallback', True):   # nothing ran yet: another model may answer, as text only
             r = text_only(task, kind)
             if run.ok:
                 return r
             reply = (reply + ' ' if reply else '') + r[0]
-    elif TRACK is not None:
-        TRACK.model_attempt('claude_code', alias, True, resolved=resolved)
+    else:
+        if TRACK is not None:
+            TRACK.model_attempt('claude_code', alias, True, resolved=resolved)
+        try:
+            from multi_ai import health_monitor as hm
+            hm.record('claude_code', alias, True, latency=time.time() - run.t0)
+        except Exception:
+            pass
     if not reply and p.returncode:
         c = plan()   # the usual cause: not installed, signed out, or no paid plan
         if not c['ok']:
@@ -1947,6 +2011,12 @@ def main():
         return print(json.dumps({'today': use(time.strftime('%Y-%m-%d')), 'week': use(week), 'all': use(''),
                                  'rules': [r for r in rules if r], 'plan': plan(), 'providers': providers_info,
                                  'skills': [{'say': k, 'reply': v} for k, v in sorted(learned.items())], 'me': me()}))
+    if args == ['--voice-server']:
+        from multi_ai import voice_server
+        return voice_server.serve()
+    if args[:1] in (['--health-refresh'], ['--health-status']):
+        from multi_ai import health_monitor
+        return health_monitor.main(args)
     if args == ['--providers-list']:
         from multi_ai.providers import provider_mgr
         return print(json.dumps(provider_mgr.get_full_overview()))
@@ -2080,14 +2150,21 @@ def _window_check(app, before=frozenset()):
     return check
 
 
-def _browser_check(cmds):
-    """Dave: does a browser tab title show the site the engine opened? (host name words, e.g. 'youtube')"""
+BROWSER_WORDS = (('Chrome', r'\bchrome\b|ক্রোম'), ('Edge', r'\bedge\b|এজ'), ('Firefox', r'\bfirefox\b|ফায়ারফক্স'), ('Brave', r'\bbrave\b'), ('Opera', r'\bopera\b'))
+
+
+def _browser_check(cmds, task=''):
+    """Dave: does a browser tab title show the site the engine opened? (host name words, e.g. 'youtube')
+    When the request names a browser ("in Chrome"), the page has to be in that browser, not just any."""
     hosts = [re.sub(r'^www\.', '', h).split('.')[0].lower() for c in cmds for h in re.findall(r'https?://([^/\s"\']+)', c)]
+    want = next((name for name, rx in BROWSER_WORDS if re.search(rx, task or '', re.I)), '')
     def check():
         ws = []
         for _ in range(25):
             ws = [w for b in winctl.BROWSERS for w in winctl.find(b)]
             hit = [w for w in ws if any(h and h in w['title'].lower() for h in hosts)]
+            if hit and want and not any(want.lower() in f"{w['app']} {w['title']}".lower() for w in hit):
+                return False, f"asked for {want}, but the page opened in {hit[0]['app']}: {hit[0]['title'][:60]}"
             if hit:
                 return True, f"{hit[0]['app']} shows: {hit[0]['title'][:70]}"
             time.sleep(0.2)
@@ -2115,7 +2192,11 @@ def verification_checks(task, reply, cmds, tracker, before=frozenset()):
             done = [s for s in research if s['status'] == 'DONE']
             checks.append(('Sources retrieved', lambda done=done, n=len(research): (bool(done), f'{len(done)} of {n} research steps returned content')))
         if any(s['worker'] == 'bob' and s['status'] == 'DONE' for s in tracker.steps):
-            checks.append(('Browser page', _browser_check(cmds)))
+            checks.append(('Browser page', _browser_check(cmds, task)))
+        else:
+            named = next((name for name, rx in BROWSER_WORDS if re.search(rx, task or '', re.I)), '')
+            if named:   # "open it in Chrome" but no step opened a page: the answer cannot claim it
+                checks.append(('Browser page', lambda named=named: (False, f'asked to open it in {named}, but no step opened a page')))
         yt = [s for s in tracker.steps if s['worker'] == 'eve']
         if yt:
             ok = [s for s in yt if s['status'] == 'DONE' and not s.get('output', '').startswith('Error')]

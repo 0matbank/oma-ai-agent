@@ -77,8 +77,9 @@ class ModelRouter:
     def _local(self, excluded, vision=False):
         from multi_ai.model_catalog import ollama_pick
         out = []
-        if 'ollama' not in excluded:
-            out += [('ollama', m) for m in ollama_pick(vision=vision)[:2]]
+        if 'ollama' not in excluded:   # an already-loaded model first: never load a second big model into VRAM
+            from multi_ai.health_monitor import ollama_fit
+            out += [('ollama', m) for m in ollama_fit(ollama_pick(vision=vision))[:2]]
         if 'lm_studio' not in excluded and self.adapters['lm_studio'].is_available():
             out += [('lm_studio', m.model_id) for m in self.adapters['lm_studio'].discover_models()[:1]]
         return out
@@ -129,7 +130,25 @@ class ModelRouter:
             pid = 'claude_code' if pid == 'claude' else pid
             if pid not in excluded and (pid in self.adapters or get_secret(f'ai_key_{pid}')):
                 cands = [(pid, mid)] + [c for c in cands if c != (pid, mid)]
-        return list(dict.fromkeys(cands))[:MAX_ATTEMPTS]
+        return list(dict.fromkeys(cands))
+
+    def plan(self, settings=None, exclude=(), vision=False, need_tools=False):
+        """candidates() filtered and ranked by the health monitor, BEFORE any request is sent.
+        A manual pick that is unavailable is reported in `note`, never silently swapped: with Fallback on another model
+        answers and the reason is recorded; with Fallback off nothing else is tried. -> (cands, skipped, note)"""
+        from multi_ai import health_monitor as hm
+        s = settings if settings is not None else _settings()
+        raw = self.candidates(s, exclude, vision)
+        cands, skipped = hm.order(raw, s, need_tools)
+        note = ''
+        if raw and raw[0] not in cands:
+            first = next((k for k in skipped if (k['provider'], k['model']) == raw[0]), {})
+            note = f"{raw[0][0]}/{raw[0][1]} is {first.get('state', 'unavailable')}" + (f" ({first.get('reason', '')[:120]})" if first.get('reason') else '')
+            if first.get('retry_at'):
+                note += f", next retry {time.strftime('%H:%M', time.localtime(first['retry_at']))}"
+            if normalize_mode(s.get('aiMode', 'auto')) == 'manual' and not s.get('aiFallback', True):
+                cands = []
+        return cands[:MAX_ATTEMPTS], skipped, note
 
     def get_status_overview(self) -> Dict[str, Any]:
         return provider_mgr.get_full_overview()
@@ -147,9 +166,13 @@ class ModelRouter:
                 except Exception:
                     pass
 
-        cands = self.candidates(exclude=exclude_providers or ())
+        from multi_ai import health_monitor as hm
+        cands, skipped, note = self.plan(exclude=exclude_providers or ())
+        if note and cands:
+            hm.note_switch(note.split(' is ')[0], f'{cands[0][0]}/{cands[0][1]}', note)
+            emit('fallback', f'Skipping {note}')
         if not cands:
-            msg = "No AI model is reachable for a fallback answer: Ollama is not running and no cloud provider with a working key is configured."
+            msg = ("No healthy AI model is available: " + '; '.join(f"{k['provider']}/{k['model']} {k['state']}" for k in skipped[:4])) if skipped else                   "No AI model is reachable for a fallback answer: Ollama is not running and no cloud provider with a working key is configured."
             if tracker is not None:
                 tracker.model_attempt('none', 'none', False, 'not_configured', msg)
             emit('error', msg)
@@ -162,6 +185,7 @@ class ModelRouter:
             if not adapter:
                 res = {'success': False, 'error_type': 'not_configured', 'error': f'{pid} is not configured'}
             else:
+                t0 = time.time()
                 try:
                     res = adapter.generate(mid, clean_prompt, system_prompt=system_prompt)
                 except Exception as e:
