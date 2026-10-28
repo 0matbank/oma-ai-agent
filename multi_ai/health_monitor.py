@@ -171,6 +171,31 @@ def _check_claude(p):
         _model(p, alias).setdefault('caps', {'tools': True, 'vision': True})
 
 
+def _check_clis(d):
+    """ChatGPT / Gemini / DeepSeek sign-in CLIs: installed and signed in? No model request is sent (costs nothing).
+    A known plan limit keeps its reset time, like Claude's."""
+    from multi_ai.adapters import cli_agents
+    t = _now()
+    for pid in cli_agents.CLI:
+        p = _prov(d, pid)
+        if not cli_agents.exe(pid):
+            p.update(state='OFFLINE', reason='not installed', checked=t)
+            continue
+        if cli_agents.CLI[pid].get('experimental'):
+            p.update(state='OFFLINE', reason='experimental: off until it passes a real test with Oma\'s safety gate', checked=t)
+            continue
+        if p.get('state') in ('QUOTA_EXHAUSTED', 'RATE_LIMITED') and p.get('retry_at', 0) > t:
+            p['checked'] = t
+            continue
+        ok, why = cli_agents.signed_in(pid)
+        if ok is False:
+            p.update(state='AUTH_REQUIRED', reason=f"sign in once: {cli_agents.CLI[pid]['login']} ({why})", checked=t, retry_at=0)
+        else:
+            p.update(state='READY' if ok else 'UNKNOWN', reason='installed and signed in' if ok else why, checked=t, retry_at=0)
+        for mid in cli_agents.CLI[pid]['models']:
+            _model(p, mid).setdefault('caps', {'tools': True, 'vision': False})
+
+
 def _check_ollama(p):
     t = _now()
     try:
@@ -242,6 +267,7 @@ def refresh():
     d = load()
     _check_claude(_prov(d, 'claude_code'))
     _check_ollama(_prov(d, 'ollama'))
+    _check_clis(d)
     for pid in ('gemini', 'openai', 'deepseek', 'groq') + tuple(c['id'] for c in provider_mgr.customs()):
         d_def = provider_mgr.definition(pid) or {}
         if d_def.get('base_url'):

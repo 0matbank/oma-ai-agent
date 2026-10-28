@@ -64,6 +64,9 @@ def _post(url, body, key, timeout):
 
 def _chat(provider, base_url, key, model, messages, timeout=None):
     """-> (text, [(call_id, command)]) in one shape for OpenAI-compatible clouds and Ollama's native /api/chat."""
+    from multi_ai.adapters import cli_agents
+    if provider in cli_agents.CLI:
+        return _chat_cli(provider, model, messages)
     timeout = timeout or (120 if provider == 'ollama' else 30)   # a local model may need to load first; a busy cloud is skipped sooner
     if provider == 'ollama':
         j = _post(f'{base_url.rstrip("/")}/api/chat', {'model': model, 'messages': messages, 'tools': [TOOL], 'stream': False,
@@ -80,6 +83,41 @@ def _chat(provider, base_url, key, model, messages, timeout=None):
         except ValueError:
             calls.append((c.get('id') or f'c{len(calls)}', ''))
     return (m.get('content') or '').strip(), calls, m
+
+
+CLI_STEP = ('\n\nHow to answer (you are only the planner; Oma runs commands, you never do): reply with ONLY a JSON object. '
+            'To run one command on the PC: {"command": "<one Git Bash command>", "reply": ""}. '
+            'When the task is done, or for a plain question: {"command": "", "reply": "<short answer in the user\'s language>"}. '
+            'Never use your own tools, never edit files.')
+
+
+def _chat_cli(provider, model, messages):
+    """An account-login CLI (Codex / Antigravity / DeepSeek Harness) as the planner: the whole conversation goes in one
+    prompt, the answer is {"command"} or {"reply"}; the command then runs through _one() and the gate like any model's."""
+    from multi_ai.adapters import cli_agents
+    lines = []
+    for m in messages:
+        role, c = m.get('role'), m.get('content') or ''
+        if role == 'system':
+            lines.insert(0, c + CLI_STEP)
+        elif role == 'user':
+            lines.append(f'User request: {c}')
+        elif role == 'assistant':
+            lines.append(f'You answered: {c}')
+        elif role == 'tool':
+            lines.append(f'Oma ran it. Output:\n{c[-3000:]}')
+    text, j = cli_agents.ask(provider, '\n\n'.join(lines), model, schema=cli_agents.STEP_SCHEMA)
+    j = j or {}
+    cmd, reply = (j.get('command') or '').strip(), (j.get('reply') or '').strip()
+    if not cmd and not reply:
+        reply = text.strip()
+    raw = {'content': json.dumps({'command': cmd} if cmd else {'reply': reply}, ensure_ascii=False), 'tool_calls': None}
+    return reply, ([(f'cli{len(messages)}', cmd)] if cmd else []), raw
+
+
+def _cli_error():
+    from multi_ai.adapters.cli_agents import CliError
+    return CliError
 
 
 def run_agent(task, provider, model, base_url, key, system, eng, tracker=None):
@@ -105,6 +143,9 @@ def run_agent(task, provider, model, base_url, key, system, eng, tracker=None):
         for _ in range(MAX_STEPS):
             try:
                 text, calls, raw = _chat(provider, base_url, key, model, messages)
+            except _cli_error() as e:
+                out.update(error_type=e.kind, error=e.msg[:300])
+                break
             except urllib.error.HTTPError as e:
                 b = e.read().decode('utf-8', 'ignore')[:300]
                 from multi_ai.model_catalog import classify_http

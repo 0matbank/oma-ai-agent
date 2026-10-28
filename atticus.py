@@ -1675,12 +1675,14 @@ def tool_fallback(task, request, why):
     if browser:   # small models ignore a general hint: say it for this request
         system += f'\nThe user asked for {browser}: open pages with {SHOW} "{browser.lower()} <url>", never the default browser.'
     first = True
-    for pid, mid in cands[:2]:   # bounded: at most two models act on one request
+    from multi_ai.adapters.cli_agents import CLI
+    for pid, mid in cands[:3]:   # bounded: at most three models act on one request (login CLIs, then API clouds, Ollama last)
         if TRACK is not None:
             TRACK.set_stage('fallback', f'Atticus engine unavailable ({why}). {pid} · {mid} runs the request through the same safety-gated tools.')
-        base = 'http://localhost:11434' if pid == 'ollama' else (provider_mgr.definition(pid) or {}).get('base_url', '')
-        key = '' if pid == 'ollama' else get_secret(f'ai_key_{pid}')
-        if not base or (pid != 'ollama' and not key):
+        cli = pid in CLI   # ChatGPT / Gemini / DeepSeek by account sign-in: no URL, no key
+        base = 'http://localhost:11434' if pid == 'ollama' else '' if cli else (provider_mgr.definition(pid) or {}).get('base_url', '')
+        key = '' if pid == 'ollama' or cli else get_secret(f'ai_key_{pid}')
+        if not cli and (not base or (pid != 'ollama' and not key)):
             continue
         if not first:
             hm.note_switch(prev, f'{pid}/{mid}', f'{prev} could not act: {res.get("error_type") or "no command ran"}')

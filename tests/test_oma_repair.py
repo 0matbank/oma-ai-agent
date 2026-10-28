@@ -157,13 +157,17 @@ class RouterTests(unittest.TestCase):
         r = R.ModelRouter()
         with patch('multi_ai.model_catalog.ollama_pick', return_value=['qwen3:8b', 'qwen3-vl:8b']), \
              patch.object(R.ModelRouter, '_cloud', return_value=[('gemini', 'g-new'), ('gemini', 'g-old')]), \
+             patch.object(R.ModelRouter, '_clis', return_value=[('codex_cli', 'default'), ('antigravity_cli', 'g-cli')]), \
              patch.object(r.adapters['lm_studio'], 'is_available', return_value=False):
             self.assertEqual(r.candidates({'aiMode': 'local'}), [('ollama', 'qwen3:8b'), ('ollama', 'qwen3-vl:8b')])
             self.assertEqual(r.candidates({'aiMode': 'local_only'}), r.candidates({'aiMode': 'local'}))   # the UI saves "local"
-            self.assertEqual(r.candidates({'aiMode': 'cloud'})[0], ('gemini', 'g-new'))
+            auto = r.candidates({'aiMode': 'auto'})   # the user's cloud accounts first (sign-in CLIs, then API keys), Ollama last
+            self.assertEqual(auto[:3], [('codex_cli', 'default'), ('antigravity_cli', 'g-cli'), ('gemini', 'g-new')])
+            self.assertEqual(auto[-1][0], 'ollama')
+            self.assertEqual(r.candidates({'aiMode': 'cloud'})[0], ('codex_cli', 'default'))
             self.assertEqual(r.candidates({'aiMode': 'auto', 'aiFallbackOrder': 'gemini,ollama'})[0], ('gemini', 'g-new'))
             self.assertEqual(r.candidates({'aiMode': 'manual', 'activeModel': 'ollama/qwen3:8b', 'aiFallback': False}), [('ollama', 'qwen3:8b')])
-            self.assertLessEqual(len(r.candidates({'aiMode': 'auto'})), R.MAX_ATTEMPTS)
+            self.assertLessEqual(len(r.plan({'aiMode': 'auto'})[0]), R.MAX_ATTEMPTS)
 
     def test_no_retired_ids_in_code(self):
         root = Path(__file__).resolve().parents[1] / 'multi_ai'

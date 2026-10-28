@@ -83,6 +83,36 @@ class ProviderManager:
             "description": "Native Claude plan (Pro / Max) or Anthropic API subscription via Claude Code."
         },
         {
+            "id": "codex_cli",
+            "name": "ChatGPT (Codex CLI)",
+            "type": "cli_oauth",
+            "auth_type": "Sign in with ChatGPT (no API key)",
+            "local": False,
+            "default_models": ["default"],
+            "doc_url": "https://developers.openai.com/codex/cli",
+            "description": "Your ChatGPT plan through OpenAI's Codex CLI. Sign in once: open a terminal and run `codex login`."
+        },
+        {
+            "id": "antigravity_cli",
+            "name": "Gemini (Antigravity CLI)",
+            "type": "cli_oauth",
+            "auth_type": "Google account sign-in (no API key)",
+            "local": False,
+            "default_models": ["gemini-3.8-flash-low", "gemini-3.8-flash-medium"],
+            "doc_url": "https://github.com/google-antigravity/antigravity-cli",
+            "description": "Your Google AI plan through Google's Antigravity CLI (agy). Sign in once: run `agy` in a terminal."
+        },
+        {
+            "id": "deepseek_cli",
+            "name": "DeepSeek (DeepSeek Harness)",
+            "type": "cli_oauth",
+            "auth_type": "DeepSeek account sign-in (developer preview)",
+            "local": False,
+            "default_models": ["default"],
+            "doc_url": "https://github.com/deepseek-ai/deepseek-harness",
+            "description": "DeepSeek's own harness (dsh), developer preview: used only after a real test passes."
+        },
+        {
             "id": "ollama",
             "name": "Ollama (Local AI)",
             "type": "local",
@@ -224,6 +254,19 @@ class ProviderManager:
 
     def get_provider_status(self, p_id: str) -> Dict[str, Any]:
         """Returns the live status, latency, and available models for a provider."""
+        from multi_ai.adapters import cli_agents
+        if p_id in cli_agents.CLI:   # ChatGPT / Gemini / DeepSeek by account sign-in (the health monitor's last check)
+            c = cli_agents.CLI[p_id]
+            if not cli_agents.exe(p_id):
+                return {"status": "Not installed", "ok": False, "badge": "wait", "detail": "CLI not installed", "models": []}
+            if c.get("experimental"):
+                return {"status": "Experimental (off)", "ok": False, "badge": "wait", "detail": "used only after a real test with Oma's safety gate", "models": c["models"]}
+            from multi_ai import health_monitor as hm
+            st, why, _ = hm.status(p_id)
+            ok = st in ("READY", "UNKNOWN", "DEGRADED")
+            return {"status": {"READY": "Connected", "AUTH_REQUIRED": "Not signed in", "QUOTA_EXHAUSTED": "Plan limit reached"}.get(st, st.title()),
+                    "ok": ok, "badge": "ok" if st == "READY" else "no" if not ok else "wait",
+                    "detail": why or f"Sign in once: {c['login']}", "models": c["models"]}
         # 1. Claude Code
         if p_id == "claude_code":
             import subprocess
@@ -319,6 +362,16 @@ class ProviderManager:
     def test_provider_connection(self, p_id: str) -> Dict[str, Any]:
         """Tests live latency and auth for a given provider."""
         t0 = time.time()
+        from multi_ai.adapters import cli_agents
+        if p_id in cli_agents.CLI:   # a real tiny request through the CLI; the outcome feeds the health monitor
+            from multi_ai import health_monitor as hm
+            mid = cli_agents.CLI[p_id]["models"][0]
+            r = cli_agents.CliAgentAdapter(p_id).generate(mid, "Reply with exactly: OK")
+            ms = int((time.time() - t0) * 1000)
+            hm.record(p_id, mid, r.get("success"), r.get("error_type", ""), r.get("error", ""), ms / 1000)
+            if r.get("success"):
+                return {"ok": True, "status": "Ready", "message": f"{cli_agents.CLI[p_id]['name']} answered ({ms} ms)", "latency_ms": ms, "models": cli_agents.CLI[p_id]["models"]}
+            return {"ok": False, "status": r.get("error_type", "Failed"), "message": r.get("error", "")[:200], "latency_ms": ms}
 
         if p_id == "claude_code":   # a real tiny request with the user's chosen alias, so a retired/unavailable model shows here
             from multi_ai.adapters.claude_code import ClaudeCodeAdapter

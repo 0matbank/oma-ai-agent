@@ -17,6 +17,7 @@ import re
 import time
 from typing import Any, Dict, List, Optional
 
+from multi_ai.adapters import cli_agents
 from multi_ai.adapters.claude_code import ClaudeCodeAdapter
 from multi_ai.adapters.ollama import OllamaAdapter
 from multi_ai.adapters.openai_compat import OpenAICompatAdapter
@@ -63,6 +64,7 @@ class ModelRouter:
             'ollama': OllamaAdapter('http://localhost:11434'),
             'lm_studio': OpenAICompatAdapter('lm_studio', 'LM Studio', 'http://localhost:1234/v1', local=True),
         }
+        self.adapters.update({pid: cli_agents.CliAgentAdapter(pid) for pid in cli_agents.CLI})
 
     def _cloud_adapter(self, provider_id: str) -> Optional[OpenAICompatAdapter]:
         key = get_secret(f"ai_key_{provider_id}")
@@ -74,6 +76,10 @@ class ModelRouter:
         return OpenAICompatAdapter(provider_id, p_def.get('name', provider_id), p_def['base_url'], api_key=key)
 
     # ---- candidates ----
+    def _clis(self, excluded):
+        """Account-login CLIs that are installed (ChatGPT, Gemini, DeepSeek): no API key, the user's own plans."""
+        return [(pid, cli_agents.CLI[pid]['models'][0]) for pid in cli_agents.installed() if pid not in excluded]
+
     def _local(self, excluded, vision=False):
         from multi_ai.model_catalog import ollama_pick
         out = []
@@ -112,14 +118,12 @@ class ModelRouter:
                 pid = 'claude_code' if pid == 'claude' else pid
                 if pid not in excluded:
                     first = [(pid, mid)]
-            rest = self._local(excluded, vision) + self._cloud(excluded) if fallback else []
+            rest = self._clis(excluded) + self._cloud(excluded) + self._local(excluded, vision) if fallback else []
             cands = first + rest
         elif mode == 'local':
             cands = self._local(excluded, vision)
-        elif mode == 'cloud':
-            cands = self._cloud(excluded) + (self._local(excluded, vision) if fallback else [])
-        else:
-            cands = self._local(excluded, vision) + (self._cloud(excluded) if fallback else [])
+        else:   # auto and cloud: the user's cloud accounts first (login CLIs, then API keys); local models only as the last resort
+            cands = self._clis(excluded) + self._cloud(excluded) + (self._local(excluded, vision) if fallback or mode == 'auto' else [])
         order = [p.strip() for p in str(s.get('aiFallbackOrder') or '').split(',') if p.strip()]
         if order and mode != 'manual':
             rank = {p: i for i, p in enumerate(order)}
