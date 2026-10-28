@@ -616,6 +616,82 @@ body {
 .whead { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; font:700 10.5px var(--font-mono, Consolas); letter-spacing:1.5px; color:var(--neon-cyan); }
 .wbtn { all:unset; cursor:pointer; padding:1px 6px; margin-left:2px; border:1px solid var(--border-subtle); border-radius:4px; font-size:11px; color:var(--text-secondary); }
 .wbtn:hover { border-color:var(--neon-cyan); color:var(--neon-cyan); }
+/* ---- one layout from big monitors down to laptops, tablets and phone-width windows (inline sizes need !important) */
+@media (max-width: 1500px) {
+  #world-column { width:215px !important; }
+  #feed-column { min-width:290px !important; max-width:380px !important; }
+  #nodes-panel { width:150px !important; }
+  #cables-panel { width:56px !important; }
+}
+@media (max-width: 1280px) {
+  #top-header .telem-chip:has(#telemHotkey) { display:none; }
+  #nodes-panel, #cables-panel { display:none !important; }
+  #sphere-panel { border-radius:12px !important; }
+}
+@media (max-width: 1080px) {
+  #world-column { display:none !important; }
+  #top-header .telem-chip:has(#telemActiveModel) { display:none; }
+  .town-stats .tf:nth-child(n+4) { display:none; }
+}
+@media (max-height: 820px) {
+  #upper-deck { height:220px !important; }
+  #world-column .wcard:first-child > div:nth-child(2) { height:90px !important; }
+}
+@media (max-width: 900px) {
+  html body #top-header { height:auto !important; flex-wrap:wrap; gap:6px; padding:6px 10px !important; }
+  html body { overflow-y:auto !important; overflow-x:hidden !important; height:auto !important; min-height:100vh; width:100% !important; }
+  html body #dashboard-viewport { width:100% !important; box-sizing:border-box; }
+  html body #dashboard-viewport > *, #upper-deck, #sphere-panel { width:auto !important; min-width:0 !important; max-width:100% !important; box-sizing:border-box; }
+  #top-header .telem-chip:has(#telemCore), #top-header .telem-chip:has(#header-pchealth-val) { display:none; }
+  html body #dashboard-viewport { flex-direction:column !important; overflow:visible !important; padding:8px !important; flex:none !important; }
+  #world-column { display:flex !important; width:auto !important; flex:none !important; }
+  #world-column .wcard { flex:none !important; }
+  #world-column .sat-box { height:300px; flex:none; }
+  #headlineList { max-height:260px; }
+  #workspace-column, #feed-column { flex:none !important; max-width:none !important; min-width:0 !important; }
+  #upper-deck { height:240px !important; }
+  #agent-town-panel { min-height:440px; }
+  #feed-column { height:620px; }
+  .town-header { flex-wrap:wrap; gap:6px; }
+  #agentTownActivity { display:none; }
+}
+.g-head { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid var(--border-subtle); }
+.g-cap { font:700 10px Consolas,monospace; letter-spacing:1.6px; color:var(--neon-cyan); }
+.g-help, .g-act { all:unset; cursor:pointer; border:1px solid rgba(var(--accent-rgb),.45); border-radius:6px; color:var(--neon-cyan); font:700 10.5px Consolas,monospace; letter-spacing:1.4px; }
+.g-help { width:24px; height:24px; display:grid; place-items:center; border-radius:50%; }
+.g-act { padding:4px 12px; background:rgba(var(--accent-rgb),.08); }
+.g-act:hover, .g-help:hover { background:rgba(var(--accent-rgb),.2); box-shadow:0 0 10px rgba(var(--accent-rgb),.3); }
+#gesturePane.live .g-act { color:#ff5a6a; border-color:rgba(255,90,106,.6); background:rgba(255,90,106,.1); }
+.g-idle { display:flex; flex-direction:column; align-items:center; gap:8px; color:var(--neon-cyan); text-align:center; padding:0 12px; }
+.g-idle b { font:700 11px Consolas,monospace; letter-spacing:2.5px; }
+.g-idle span { font:10.5px Consolas,monospace; color:var(--text-muted); max-width:300px; line-height:1.5; }
+#gesturePane.live .g-idle { display:none; }
+.g-note { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); font-size:11.5px; color:#ffb4a8; text-align:center; max-width:80%; }
+.g-note:empty { display:none; }
+.g-guide { position:absolute; top:10px; right:10px; width:210px; background:rgba(8,12,20,.92); border:1px solid var(--border-subtle); border-radius:8px; padding:10px 12px; }
+.g-guide > div:not(.g-cap):not(.g-foot) { display:grid; grid-template-columns:20px 1fr; column-gap:6px; margin-bottom:6px; }
+.g-guide i { font-style:normal; grid-row:span 2; font-size:13px; }
+.g-guide b { font-size:11px; color:#e8eefc; }
+.g-guide small { font-size:9.5px; color:var(--text-muted); font-family:Consolas,monospace; }
+.g-guide .g-foot { font-size:9.5px; color:var(--text-muted); border-top:1px solid var(--border-subtle); padding-top:6px; margin-top:2px; }
+.g-guide.hide { display:none; }
+.g-guide { max-height:calc(100% - 20px); overflow:auto; }
+#gesturePane:has(.g-guide:not(.hide)) .g-idle { padding-right:230px; }
+@media (max-width: 760px) { #gesturePane:has(.g-guide:not(.hide)) .g-idle { padding-right:12px; } }
+@media (max-width: 760px) { .g-guide { position:static; width:auto; margin:8px; } }
+.sat-box { flex:1; min-height:0; display:flex; flex-direction:column; background:#060a14; border:1px solid var(--border-subtle); border-radius:8px; overflow:hidden; }
+.sat-sub { display:flex; align-items:center; justify-content:space-between; padding:5px 8px; border-bottom:1px solid var(--border-subtle); background:rgba(255,255,255,.02); font:700 9.5px Consolas,monospace; letter-spacing:1.4px; color:var(--text-secondary); }
+.sat-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:#ff3344; margin-right:6px; box-shadow:0 0 6px #ff3344; }
+.sat-seg { display:flex; border:1px solid var(--border-subtle); border-radius:4px; overflow:hidden; }
+.sat-seg button, .sat-x { all:unset; cursor:pointer; padding:1px 7px; font:700 10px Consolas,monospace; color:var(--text-muted); }
+.sat-seg button.on { background:#22c55e; color:#04120a; }
+.sat-x { border:1px solid var(--border-subtle); border-radius:4px; }
+.sat-x:hover, .sat-seg button:not(.on):hover { color:var(--neon-cyan); }
+.sat-nav { display:flex; justify-content:space-around; padding:4px 2px 5px; border-top:1px solid var(--border-subtle); background:rgba(0,0,0,.35); }
+.sat-nav button { all:unset; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:1px; padding:2px 6px; border-radius:6px; font-size:9.5px; color:var(--text-muted); }
+.sat-nav button b { font-size:11px; font-weight:400; line-height:1.1; }
+.sat-nav button.on { color:#fff; background:rgba(255,255,255,.06); }
+.sat-nav button:hover { color:var(--neon-cyan); }
 .livepill { font-size:9px; background:#ff3344; color:#fff; padding:0 5px; border-radius:3px; margin-left:4px; }
 .hl { display:flex; gap:8px; padding:6px 2px; border-bottom:1px solid var(--border-subtle); font-size:11.5px; line-height:1.35; color:var(--text-primary); text-decoration:none; }
 .hl:hover { background:rgba(var(--accent-rgb), .06); }
@@ -629,6 +705,19 @@ body {
 .module-chip .spin { display:inline-block; animation:omaspin 1s linear infinite; }
 @keyframes omaspin { to { transform:rotate(360deg); } }
 .town-tab { white-space:nowrap; }
+.town-stats { gap:6px !important; overflow:hidden; flex:1; min-width:0; }
+.town-stats .tf { display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border:1px solid var(--border-subtle); border-radius:5px; background:rgba(255,255,255,.03); font-size:10.5px; flex:none; white-space:nowrap; }
+.town-stats .tf:nth-child(2), .town-stats .tf:last-child { flex:0 1 auto; min-width:0; max-width:200px; }
+.town-stats .tf b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.town-footer { padding:0 8px !important; gap:8px; }
+.tf-dot { width:7px; height:7px; border-radius:50%; background:#6b7280; flex:none; }
+.tf-dot.on { background:#22d3ee; box-shadow:0 0 6px #22d3ee; }
+.tf-chat { all:unset; cursor:pointer; padding:2px 10px; border:1px solid var(--border-subtle); border-radius:5px; font:700 10.5px Consolas,monospace; color:var(--text-secondary); white-space:nowrap; }
+.tf-chat:hover { border-color:var(--neon-cyan); color:var(--neon-cyan); }
+.agent-chip { padding:3px 10px 3px 3px !important; gap:7px !important; }
+.chip-face { width:30px; height:30px; border-radius:5px; image-rendering:pixelated; background:#1b2030; flex:none; }
+.chip-dot { width:8px; height:8px; border-radius:50%; flex:none; }
+#agent-chips-container { justify-content:center; }
 .town-viewport {
   flex: 1;
   position: relative;
@@ -1302,6 +1391,9 @@ body {
     background: rgba(var(--accent-rgb), 0.25);
     box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.4);
   }
+  #btn-mute.muted { color:#ff4d5e; border-color:rgba(255,77,94,.6); background:rgba(255,77,94,.12); }
+  #btn-mute.nudge { animation:muteNudge .5s 2; }
+  @keyframes muteNudge { 50% { box-shadow:0 0 14px #ff4d5e; transform:scale(1.12); } }
 
   /* Settings Slide-Over Drawer */
   #settings-drawer {
@@ -1512,8 +1604,16 @@ body {
       <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">While live, a frame goes with your next question.</div>
     </div>
     <div class="cyber-card wcard" style="flex:1; min-height:200px; display:flex; flex-direction:column;">
-      <div class="whead"><span>● SAT-LINK FEED</span><span><button class="wbtn" id="globeMode" title="Flat map / globe">2D</button><button class="wbtn" id="globeOpen" title="Open World Monitor">⤢</button></span></div>
-      <canvas id="globeCanvas" style="flex:1; width:100%; min-height:150px; cursor:grab;"></canvas>
+      <div class="whead"><span>● SAT-LINK FEED</span></div>
+      <div class="sat-box">
+        <div class="sat-sub"><span><i class="sat-dot"></i>SATELLITE STREAM</span>
+          <span style="display:flex; gap:4px;"><span id="globeSeg" class="sat-seg"><button data-m="2d">2D</button><button data-m="3d" class="on">3D</button></span><button class="sat-x" id="globeOpen" title="Open World Monitor">⤢</button></span></div>
+        <input id="globeSearch" class="field" placeholder="Search headlines or a country…" style="display:none; margin:4px 6px 0; width:calc(100% - 12px); font-size:11px; padding:4px 8px;">
+        <canvas id="globeCanvas" style="flex:1; width:100%; min-height:130px; cursor:grab;"></canvas>
+        <div id="globeNav" class="sat-nav">
+          <button data-v="today" class="on"><b>◉</b>Today</button><button data-v="map"><b>◎</b>Map</button><button data-v="search"><b>⌕</b>Search</button><button data-v="alerts"><b>△</b>Alerts</button><button data-v="more" title="Open the full World Monitor"><b>•••</b>More</button>
+        </div>
+      </div>
     </div>
     <div class="cyber-card wcard" style="flex:1; min-height:160px; display:flex; flex-direction:column;">
       <div class="whead"><span>● TODAY HEADLINES <i id="headlineStamp" style="font-style:normal; color:var(--text-muted);"></i></span><button class="wbtn" id="headlineRefresh" title="Refresh">↻</button></div>
@@ -1562,14 +1662,10 @@ body {
             <span id="orb-state-label">STANDBY</span>
           </div>
           <div style="display:flex; align-items:center; gap:6px;">
-            <!-- Animation Speed Controls (M2) -->
-            <div style="display:flex; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.08); border-radius:5px; padding:1px;">
-              <button id="btn-speed-slow" class="speed-btn active" style="all:unset; cursor:pointer; font-size:9.5px; padding:2px 6px; border-radius:4px; color:#fff; background:rgba(var(--accent-rgb),0.25);">Slow</button>
-              <button id="btn-speed-normal" class="speed-btn" style="all:unset; cursor:pointer; font-size:9.5px; padding:2px 6px; border-radius:4px; color:var(--text-muted);">Normal</button>
-              <button id="btn-speed-fast" class="speed-btn" style="all:unset; cursor:pointer; font-size:9.5px; padding:2px 6px; border-radius:4px; color:var(--text-muted);">Fast</button>
-            </div>
             <button id="btn-terminate" class="btn-cyber-terminate">TERMINATE</button>
-            <button class="btn-icon-sparkle" id="btn-holo-sparkle" title="Neural Scan / Reset View">✦</button>
+            <button class="btn-icon-sparkle" id="btn-mute" title="Mute the voice assistant (press again to unmute)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path class="slash" d="M4 4l16 16" style="display:none"/></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -1618,15 +1714,29 @@ body {
           </div>
           <div id="vhBody" style="flex:1; overflow:auto; display:grid; place-items:center; padding:10px; color:var(--text-muted); font-size:12px;">Ask for a diagram, e.g. “Elon Musk-er company gular diagram banao”.</div>
         </div>
-        <div class="town-pane" data-pane="gesture" style="display:none; position:absolute; inset:0; flex-direction:column; background:#070b10;">
-          <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; border-bottom:1px solid var(--border-subtle); font-size:11px; color:var(--text-muted);">
-            <span>GESTURE CONTROL · mouse by hand, through the webcam (off until you press Activate; Esc stops)</span>
-            <button class="btn blue" id="gestureBtn" style="font-size:11px; padding:2px 10px;">Activate</button>
+        <div class="town-pane" data-pane="gesture" id="gesturePane" style="display:none; position:absolute; inset:0; flex-direction:column; background:#05070c;">
+          <div class="g-head">
+            <span style="display:flex; align-items:center; gap:8px;"><i class="sat-dot"></i><span style="font-size:15px;">✋</span><span class="g-cap">GESTURE CONTROL</span></span>
+            <span style="display:flex; gap:6px;"><button class="g-help" id="gestureHelp" title="Gesture guide">?</button><button class="g-act" id="gestureBtn">⏻ ACTIVATE</button></span>
           </div>
-          <div style="flex:1; position:relative; display:grid; place-items:center;">
+          <div style="flex:1; position:relative; display:grid; place-items:center; overflow:hidden;">
             <video id="gestureVideo" playsinline muted style="max-width:100%; max-height:100%; transform:scaleX(-1); display:none;"></video>
             <canvas id="gestureCanvas" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;"></canvas>
-            <div id="gestureNote" style="font-size:12px; color:var(--text-muted); text-align:center; max-width:360px;">✋ Move: index + middle up · Click: thumb to index · Right click: thumb to middle · Scroll: three fingers · Drag: fist</div>
+            <div class="g-idle">
+              <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+              <b>IRON MAN CONTROL OFFLINE</b>
+              <span>Activate to control mouse, click, scroll &amp; drag with hand gestures.</span>
+            </div>
+            <div id="gestureNote" class="g-note"></div>
+            <div class="g-guide" id="gestureGuide">
+              <div class="g-cap" style="margin-bottom:6px;">GESTURE GUIDE</div>
+              <div><i>✌️</i><b>Move</b><small>Index + middle fingers up</small></div>
+              <div><i>👌</i><b>Left click</b><small>Touch thumb to index tip</small></div>
+              <div><i>🤏</i><b>Right click</b><small>Touch thumb to middle tip</small></div>
+              <div><i>🖐️</i><b>Scroll</b><small>Three fingers up, move up/down</small></div>
+              <div><i>✊</i><b>Drag &amp; drop</b><small>Fist to grab, open to drop</small></div>
+              <div class="g-foot">Esc stops at any time · the camera is used only while active</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1634,12 +1744,13 @@ body {
       <!-- Town Footer Telemetry -->
       <div class="town-footer" style="margin-top:6px; border-radius:6px; border:1px solid var(--border-subtle);">
         <div class="town-stats">
-          <span>LAST TASK: <b id="town-last-task">none</b></span>
-          <span id="town-busy-stat"><b>0/5 busy</b></span>
+          <span class="tf" title="Engine sign-in state"><i id="tfDot" class="tf-dot"></i><b id="tfOnline">Checking</b></span>
+          <span class="tf" title="The model that answered the last request">⚡ <b id="tfModel">No model yet</b></span>
+          <span class="tf" title="Workers sitting at a desk or a seat right now">👥 <b id="tfSeat">0/5 seat</b></span>
+          <span class="tf" id="town-busy-stat"><b>0/5 busy</b></span>
+          <span class="tf" title="Last task">LAST <b id="town-last-task">none</b></span>
         </div>
-        <div style="font-size:10.5px; color:var(--text-muted);">
-          Lanes of one Atticus engine · real events only
-        </div>
+        <button class="tf-chat" id="tfChat" title="Type to Oma">✉ CHAT</button>
       </div>
     </div>
 
@@ -2231,6 +2342,14 @@ body {
   });
 
   const set = (k, v) => { P[k] = v; post({ do: 'set', k, v }); paint(); };
+  // the orb's mic button: muted = no listening (button, hotkey, START AI) and no spoken replies; typing still works
+  function paintMute() {
+    const b = $('btn-mute'), m = !!(P && P.muted); if (!b) return;
+    b.classList.toggle('muted', m); b.querySelector('.slash').style.display = m ? '' : 'none';
+    b.title = m ? 'Voice assistant muted. Press to unmute' : 'Mute the voice assistant (press again to unmute)';
+    const l = $('orb-state-label'); if (l) l.textContent = l.textContent.replace(/ · MUTED$/, '') + (m ? ' · MUTED' : '');
+  }
+  if ($('btn-mute')) $('btn-mute').onclick = () => { set('muted', !P.muted); paintMute(); };
   document.querySelectorAll('.seg[data-k]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => set(g.dataset.k, b.dataset.v)));
   document.querySelectorAll('.sw input[data-k]').forEach(i => i.onchange = () => set(i.dataset.k, i.checked));
   document.querySelectorAll('input.field[data-k]').forEach(i => i.onchange = () => set(i.dataset.k, i.value.trim()));
@@ -2599,7 +2718,14 @@ body {
       cur.status = ev.status; cur.stage = ev.stage; cur.model = ev.active_model; cur.workers = ev.workers;
       const [head, text] = describe(ev);
       if (ev.kind === 'step') stepChip(ev);   // the chat shows each step as one module chip (Stonic style); the Agent tab keeps every event
-      else if (['task', 'permission', 'evidence'].includes(ev.kind) || (ev.kind === 'model' && ev.attempt && !ev.attempt.ok)) appendFeedEvent(head, text);
+      // The chat stays short: your message is already a bubble (no RECEIVED copy) and Dave's checks sit in the reply card.
+      // A model the health monitor skips (known plan limit) is said once per reason, not on every request.
+      else if (ev.kind === 'permission') appendFeedEvent(head, text);
+      else if (ev.kind === 'model' && ev.attempt && !ev.attempt.ok) {
+        const a = ev.attempt;
+        if (!String(a.error_type).startsWith('skipped')) appendFeedEvent(head, text);
+        else if ((window._skipSaid ||= {})[a.error] !== true) { window._skipSaid[a.error] = true; appendFeedEvent('MODEL SKIPPED', `${a.error}. Other models answer until then.`); }
+      }
       agentLine(ev, head, text);
       if ($('agentStreamTask')) $('agentStreamTask').textContent = `${ev.task_id} · ${ev.status}`;
       const act = $('agentTownActivity');
@@ -2613,7 +2739,7 @@ body {
       const status = rep.status || (rep.success ? 'COMPLETED' : 'FAILED');
       const [label, color] = BADGE[status] || BADGE.FAILED;
       const model = rep.provider_used ? `${rep.provider_used} · ${rep.model_used}` : '';
-      const tried = (rep.models_tried || []).filter(a => !a.ok).map(a => `${a.provider} ${a.model}: ${a.error_type}`).join('; ');
+      const tried = (rep.models_tried || []).filter(a => !a.ok && !String(a.error_type).startsWith('skipped')).map(a => `${a.provider} ${a.model}: ${a.error_type}`).join('; ');
       const ev = (rep.evidence || []).map(e => `${e.ok === true ? '✓' : e.ok === false ? '✕' : '?'} ${e.check}: ${e.evidence}`);
       let body = escapeHtml(rep.reply || '').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
       if (rep.error && status !== 'COMPLETED') body += `<div style="margin-top:6px;color:${color};font-size:11.5px;">Reason: ${esc(rep.error)}</div>`;
@@ -2683,6 +2809,7 @@ body {
       if (d.version) if ($('aboutver')) $('aboutver').textContent = 'Oma AI • Version ' + d.version; if ($('ver')) $('ver').textContent = 'Oma AI • Version ' + d.version;
       paint();
       window.omaApplyTheme?.(P.theme || 'stonic');
+      paintMute();
       if (d.state) state(d.state);
       post({ do: 'providers' });
     },
@@ -2715,7 +2842,8 @@ body {
     remoteAnswered() { document.querySelectorAll('.ask-card button').forEach(b => b.disabled = true); },
     memory(d) { window.omaPanels?.data(d); },
     skillSaved(r) { window.omaPanels?.saved(r); },
-    player(it) {   // the engine's {ME} --player: a YouTube video in the Agent Town panel
+    player(it) {   // the engine's {ME} --player: a YouTube video in the Agent Town panel ({stop:true} closes it)
+      if (it && it.stop) { $('npFrame').src = 'about:blank'; $('neuralPlayer').style.display = 'none'; return; }
       if (!it || !/^[\w-]{11}$/.test(it.id || '')) return;
       $('npFrame').src = 'https://oma.ui/player.html?v=' + it.id;
       $('npTitle').textContent = it.title || '';
@@ -2738,6 +2866,7 @@ body {
     providerSaveResult(res) {
       post({ do: 'providers' });
     },
+    mutedNudge() { const b = $('btn-mute'); if (!b) return; b.classList.remove('nudge'); void b.offsetWidth; b.classList.add('nudge'); },
     voiceStart() {
       holoOrb?.setState('listening');
       const badge = $('sphere-status-badge');
@@ -2925,7 +3054,7 @@ body {
       holoOrb = new window.OmaHoloOrb('orb-canvas', { theme: (P && P.theme) || 'stonic', count: 2000 });
       holoOrb.onLabel = (label, s) => {   // the orb's real state names the footer and the button
         const l = $('orb-state-label'), c = holoOrb.colorsFor(s).a;
-        if (l) { l.textContent = label; l.parentElement.style.color = `rgb(${c})`; }
+        if (l) { l.textContent = label + (P && P.muted ? ' · MUTED' : ''); l.parentElement.style.color = `rgb(${c})`; }
         const b = $('btn-terminate'); if (b) b.textContent = s === 'idle' ? 'START AI' : 'TERMINATE';
         post({ do: 'orbState', s, theme: P.theme || 'stonic' });   // the floating orb mirrors it while Oma is minimized
       };
@@ -2997,26 +3126,6 @@ body {
         modalPcHealth.style.display = 'none';
       };
     }
-
-    // Animation Speed Controls (M2)
-    const speedBtns = {
-      slow: $('btn-speed-slow'),
-      normal: $('btn-speed-normal'),
-      fast: $('btn-speed-fast')
-    };
-    Object.entries(speedBtns).forEach(([spd, btn]) => {
-      if (btn) {
-        btn.onclick = () => {
-          Object.values(speedBtns).forEach(b => { if (b) { b.classList.remove('active'); b.style.color = 'var(--text-muted)'; b.style.background = 'transparent'; } });
-          btn.classList.add('active');
-          btn.style.color = '#fff';
-          btn.style.background = 'rgba(var(--accent-rgb),0.25)';
-          if (window.holoOrb && window.holoOrb.setSpeedMode) {
-            window.holoOrb.setSpeedMode(spd);
-          }
-        };
-      }
-    });
 
     // Reset 3D Face View
     const btnResetFace = $('btn-holo-sparkle');

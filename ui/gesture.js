@@ -26,7 +26,7 @@
       return;
     }
     const v = $('gestureVideo'); v.srcObject = stream; v.style.display = 'block'; await v.play();
-    $('gestureBtn').textContent = 'Deactivate';
+    $('gestureBtn').textContent = '⏻ DEACTIVATE'; $('gesturePane')?.classList.add('live');
     note('Loading hand tracking…');
     try {
       if (!landmarker) {
@@ -46,7 +46,8 @@
     dragging = false;
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; post({ do: 'gesture', act: 'off' }); }
     const v = $('gestureVideo'); if (v) { v.srcObject = null; v.style.display = 'none'; }
-    const b = $('gestureBtn'); if (b) b.textContent = 'Activate';
+    const b = $('gestureBtn'); if (b) b.textContent = '⏻ ACTIVATE';
+    $('gesturePane')?.classList.remove('live');
   }
 
   function act(a, extra) {   // one discrete action at most every 600 ms
@@ -85,6 +86,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     const b = $('gestureBtn'); if (b) b.onclick = () => stream ? stop() : start();
+    const h = $('gestureHelp'); if (h) h.onclick = () => $('gestureGuide')?.classList.toggle('hide');
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') stop(); });
   window.omaGesture = { start, stop };

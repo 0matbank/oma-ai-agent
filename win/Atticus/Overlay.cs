@@ -593,7 +593,7 @@ addEventListener('DOMContentLoaded', () => {
     void Deliver(string a)   // Settings: read answers aloud, copy them
     {
         if (Prefs.Bool("autoCopy")) { try { Clipboard.SetText(a); } catch { } }
-        if (Prefs.Bool("speak")) Voice.Say(a, () => Hide(2));
+        if (Prefs.Bool("speak") && !Prefs.Bool("muted")) Voice.Say(a, () => Hide(2));
     }
 
     // Test hook: ATTICUS_DEMO="<request>" runs it once without the mic.

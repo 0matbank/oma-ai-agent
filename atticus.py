@@ -148,7 +148,7 @@ def player(what):
             return f'No YouTube video found for "{what}".'
         vid, title = hits[0]['id'], hits[0]['title'] or ''
     item = {'id': vid, 'title': title or what, 'url': f'https://www.youtube.com/watch?v={vid}'}
-    ask = os.environ.get('ATTICUS_ASK')
+    ask = os.environ.get('ATTICUS_ASK') or os.environ.get('ATTICUS_PLAYER')
     if not ask:
         show(item['url'])
         return f"opened {item['url']} in the browser"
@@ -162,6 +162,76 @@ def player(what):
             return f"playing \"{item['title']}\" in the Oma player ({item['url']})"
         time.sleep(0.1)
     return 'Error: the Oma player did not answer'
+
+
+def player_channel():
+    """The Oma window's player outside a Claude run (instant commands, the tool fallback of other models): a folder this
+    engine watches itself, used for play/stop hand-offs only (never the safety gate). Set in os.environ, so commands
+    started from here inherit it. -> True when Oma's window is listening."""
+    if os.environ.get('ATTICUS_UI') != '1':
+        return False
+    if os.environ.get('ATTICUS_PLAYER'):
+        return True
+    d = tempfile.mkdtemp(prefix='atticus-player-')
+
+    def watch():
+        q, a = os.path.join(d, 'q'), os.path.join(d, 'a')
+        while True:
+            if os.path.exists(q):
+                try:
+                    j = json.load(open(q, encoding='utf-8'))
+                    os.remove(q)
+                    if isinstance(j.get('player'), dict):
+                        print('▶ ' + json.dumps(j['player'], ensure_ascii=False), flush=True)
+                        open(a + '.tmp', 'w').write('ok')
+                        os.replace(a + '.tmp', a)
+                except Exception:
+                    pass
+            time.sleep(0.08)
+    threading.Thread(target=watch, daemon=True).start()
+    os.environ['ATTICUS_PLAYER'] = d
+    return True
+
+
+def player_stop():
+    """Closes the Oma player (the same ask-folder relay as player())."""
+    ask = os.environ.get('ATTICUS_ASK') or os.environ.get('ATTICUS_PLAYER')
+    if not ask:
+        return 'Error: no Oma window'
+    with open(os.path.join(ask, 'q.tmp'), 'w', encoding='utf-8') as f:
+        json.dump({'player': {'stop': True}}, f)
+    os.replace(os.path.join(ask, 'q.tmp'), os.path.join(ask, 'q'))
+    for _ in range(30):
+        if os.path.exists(os.path.join(ask, 'a')):
+            os.remove(os.path.join(ask, 'a'))
+            return 'stopped'
+        time.sleep(0.1)
+    return 'Error: the Oma player did not answer'
+
+
+_PLAY = r'(?:play|plz play|bajao|bajaw|bajan|chalao|chalaw|chalan|shunao|sunao|প্লে|বাজাও|বাজান|চালাও|চালান|শোনাও)'
+_MEDIA = r'(?:youtube|you tube|ইউটিউব|gan|gaan|gana|গান|song|songs|music|musik|মিউজিক|সঙ্গীত|video|ভিডিও|nasheed|naat|waz)'
+_STOP = r'(?:band|bondho|bondo|off|stop|বন্ধ|থামাও|thamao)'
+
+
+def media_request(text):
+    """A request to play or stop a song/video -> the YouTube search words ('' = any song), '<stop>', or None.
+    "youtube a ja kono gan play koro" -> 'bangla song'; "clam music play koro" -> 'clam music';
+    "gan name hossa Ami tomake bolbo play koro" -> 'ami tomake bolbo'; "music band koro" -> '<stop>'. Spotify stays with play()."""
+    t = ' '.join(re.sub(r'[,.!?।]', ' ', text.lower()).split())
+    if not t or 'spotify' in t or 'স্পটিফাই' in t or re.search(r'\b(keno|why|kno|কেন|nai keno)\b', t):
+        return None   # "play koro nai keno" is a complaint, not a new request
+    if re.search(_STOP, t) and re.search(r'(?:music|gan|gaan|গান|song|video|ভিডিও|player|youtube)', t) and not re.search(_PLAY, t):
+        return '<stop>'
+    if not (re.search(_PLAY, t) and re.search(_MEDIA, t)):
+        return None
+    named = re.search(r'(?:name|naam|nam|নাম)\s+(?:hossa|hocche|holo|hoilo|is|হচ্ছে|হলো)\s+(.+)', t)
+    q = named[1] if named else t
+    q = re.sub(r'\b(?:on|in|from)\s+youtube\b|\byoutube\s*(?:a|e|te|এ|তে)?\b|ইউটিউবে?', ' ', q)
+    q = re.sub(r'\b(?:play|plz|please|koro|koren|kor|karo|kore|dao|daw|den|bajao|bajaw|bajan|chalao|chalaw|chalan|shunao|sunao|amar|amk|amake|jonno|ekta|akta|ekti|ta|ti|the|a|me|for|gan|gaan|gana|song|video|ja|jekono|kono|any|some|aeii|aei|ei|ai|eita|aeita)\b', ' ', q)
+    q = re.sub(r'(?:প্লে|বাজাও|বাজান|চালাও|চালান|শোনাও|করো|করুন|একটা|গানটা|গান|ভিডিও|যেকোনো|আমার|জন্য)', ' ', q)
+    q = ' '.join(q.split())
+    return q if len(q) > 1 else 'bangla song'
 
 
 def brief():
@@ -917,6 +987,17 @@ def fast(text):
     Returns a reply, or None to hand the request to Haiku. fast.cmds: the commands that did it, so "When I say X, …" can save them."""
     fast.cmds = []
     raw_str = text.strip()
+    yt = media_request(raw_str)
+    if yt is not None and os.environ.get('ATTICUS_LIVE') != '1' and player_channel():   # songs and videos play in Oma's own player, never a browser tab
+        if yt == '<stop>':
+            player_stop()
+            fast.cmds = [f'{ME} --player-stop']
+            return 'বন্ধ করে দিয়েছি।'
+        r = player(yt)
+        if r.startswith('playing'):
+            fast.cmds = [f'{ME} --player {shlex.quote(yt)}']
+            return f'Oma player-এ চালাচ্ছি: {r.split(chr(34))[1] if chr(34) in r else yt}'
+        return r
     verbs = r'(?:খোলো|খুলুন|খুলো|চালু করো|চালু করুন|ওপেন করো|অন করো|kholo|kolo|khulo|khulun|open koro|chalu koro|on koro)'
     bn_open = re.search(verbs + r'\s+(.+)', raw_str, re.I) or re.fullmatch(r'(.+?)[\s,]*' + verbs + r'[\s.!?।]*', raw_str, re.I)
     # The English-only speech model (base.en) hears "খোলো" as "color"/"colo": accepted only right after an exact known app name
@@ -1168,6 +1249,8 @@ def label(name, inp):
         return 'Asking you which one'
     if c.startswith(SET):
         return 'Changing a setting'
+    if c.startswith(ME + ' --player-stop'):
+        return 'Stopping the Oma player'
     if c.startswith(ME + ' --player'):
         return 'Playing in the Oma player: ' + c[len(ME + ' --player'):].strip(' "\'')
     if c.startswith(PLAY):
@@ -1494,7 +1577,7 @@ def relay(p):
             elif 'player' in j:   # "▶ {json}": the Oma window's neural player (no window: the user's browser)
                 if os.environ.get('ATTICUS_UI') == '1':
                     print('▶ ' + json.dumps(j['player'], ensure_ascii=False), flush=True)
-                else:
+                elif j['player'].get('url'):
                     show(j['player']['url'])
                 open(a + '.tmp', 'w').write('ok')
                 os.rename(a + '.tmp', a)
@@ -1680,7 +1763,7 @@ def run(task, p=None, shots=()):
         if p:
             stop_claude(p)
         if TRACK is not None:
-            TRACK.model_attempt('claude_code', alias, False, 'quota_exhausted' if 'plan limit' in blocked else 'skipped_unhealthy', blocked)
+            TRACK.model_attempt('claude_code', alias, False, 'skipped_quota' if 'plan limit' in blocked else 'skipped_unhealthy', blocked)
         return text_only(task, blocked) if pref('aiFallback', True) else (f'Not done: {blocked}.', 0, [])
     p = p or start_claude()
     if not p:
@@ -2134,6 +2217,8 @@ def main():
         name = ' '.join(args[1:]).lower()
         json.dump([x for x in user_skills() if x.get('name', '').lower() != name], open(USER_SKILLS, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
         return print('deleted')
+    if args[:1] == ['--player-stop']:
+        return print(player_stop())
     if args[:1] == ['--player'] and len(args) > 1:
         return print(player(' '.join(args[1:])))
     if args[:1] == ['--headlines']:   # Sat-Link globe + Today Headlines (RSS, no AI)

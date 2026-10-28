@@ -25,13 +25,12 @@ const ROOMS = [
   { id: 'desktop', name: 'Desktop Automation', who: 'Carol', x: 36, y: 2, w: 11, h: 8, floor: 'teal', face: '#3c4b52', accent: '#8be0a4' },
   { id: 'qa', name: 'Verification / QA', who: 'Dave', x: 1, y: 14, w: 10, h: 8, floor: 'checker', face: '#45405a', accent: '#c3abff' },
   { id: 'studio', name: 'YouTube Studio', who: 'Eve', x: 12, y: 14, w: 9, h: 8, floor: 'purple', face: '#3a3046', accent: '#ff8a8a' },
-  { id: 'lounge', name: 'Break Lounge', who: '', x: 22, y: 14, w: 15, h: 8, floor: 'warm', face: '#4d4540', accent: '#f2c46b' },
-  { id: 'server', name: 'Server Room', who: '', x: 38, y: 14, w: 9, h: 8, floor: 'grate', face: '#2c313d', accent: '#8be08b' },
+  { id: 'lounge', name: 'Break Lounge', who: '', x: 22, y: 14, w: 25, h: 8, floor: 'warm', face: '#4d4540', accent: '#f2c46b' },
   { id: 'corridor', name: '', who: '', x: 1, y: 11, w: 46, h: 2, floor: 'corridor', face: '#3f4356', accent: '#9aa3b5' },
 ];
 const ROOM_BY_ID = Object.fromEntries(ROOMS.map(r => [r.id, r]));
 const DOORS = [[8, 10, 'library'], [16, 10, 'browser'], [27, 10, 'control'], [28, 10, 'control'], [40, 10, 'desktop'],
-  [8, 13, 'qa'], [16, 13, 'studio'], [28, 13, 'lounge'], [29, 13, 'lounge'], [41, 13, 'server']];
+  [8, 13, 'qa'], [16, 13, 'studio'], [28, 13, 'lounge'], [29, 13, 'lounge'], [41, 13, 'lounge']];
 
 const MAP = (() => {
   const kind = [...Array(MH)].map(() => new Array(MW).fill(0));
@@ -278,9 +277,9 @@ item('sofaNSeat', 23, 19, 3, 1, { baseAdj: -14 }); item('sofaNBack', 23, 19, 3, 
 item('cooler', 31, 14); item('counter', 33, 14, 4, 1); item('vending', 36, 17); item('roundTable', 31, 18); item('stool', 30, 18); item('stool', 32, 18);
 item('plant', 22, 14); item('plant', 22, 21); item('plant', 36, 21); item('plant', 30, 21); item('floorLamp', 27, 15);
 item('beanbag', 29, 20, 1, 1, { color: '#e0b24a', dark: '#b08a2a', light: '#f2d15c' }); item('beanbag', 28, 18, 1, 1, { color: '#4f8fd0', dark: '#3a6aa0', light: '#7fb7e6' }); item('shelf', 33, 21, 2, 1);
-// Server Room
-for (const x of [39, 40, 43, 44, 45]) { item('rack', x, 15, 1, 2, { rack: true }); item('rack', x, 18, 1, 2, { rack: true }); }
-item('cooling', 46, 15, 1, 2); item('cooling', 46, 18, 1, 2); item('ups', 38, 20);
+// Lounge, east side (was the server room)
+item('sofaS', 40, 15, 3, 1); item('coffeeTable', 40, 17, 3, 1); item('roundTable', 44, 19); item('stool', 43, 19); item('stool', 45, 19);
+item('plant', 38, 21); item('plant', 46, 21); item('plant', 46, 14); item('shelf', 40, 21, 2, 1); item('floorLamp', 38, 15);
 // Corridor
 item('vending', 1, 11); item('plant', 46, 11);
 item('bench', 4, 11, 2, 1); item('bench', 31, 11, 2, 1); item('bench', 44, 11, 2, 1); item('plant', 20, 11); item('plant', 36, 11);
@@ -337,7 +336,6 @@ const WALL_SCREENS = {
   bob2: { x: 18 * TILE + 1, y: TILE + 3, w: 30, h: 11 },
   tools: { x: 38 * TILE + 2, y: TILE + 2, w: 76, h: 26 },
   video: { x: 12 * TILE + 2, y: 13 * TILE + 2, w: 44, h: 24 },
-  srv: { x: 43 * TILE + 1, y: 13 * TILE + 4, w: 30, h: 9 },
   sign: { x: 30 * TILE + 2, y: 10 * TILE + 4, w: 60, h: 9 },
 };
 function renderBackground() {
@@ -396,7 +394,7 @@ function renderBackground() {
   frameDeco(g, 23 * TILE + 2, 13 * TILE + 4, 28, 9, ['#6f93b8', '#5aa86a', '#f2d15c']);
   clockDeco(g, 26 * TILE + 3, 13 * TILE + 4);
   { const X = 33 * TILE + 6, Y = 13 * TILE + 3; P(g, X, Y, 24, 6, '#2b2f3c'); P(g, X + 1, Y + 1, 22, 4, '#3a4152'); for (let i = 0; i < 4; i++) P(g, X + 3 + i * 5, Y + 2, 3, 1, '#f2d15c'); }
-  screenFrame(g, S.srv.x, S.srv.y, S.srv.w, S.srv.h);
+  frameDeco(g, 43 * TILE + 2, 13 * TILE + 4, 28, 9, ['#3a5560', '#8be0a4', '#e9edf3']);
   extinguisher(g, 39 * TILE + 5, 13 * TILE + 5);
   frameDeco(g, 3 * TILE + 2, 10 * TILE + 4, 22, 9, ['#4f8fd0', '#3e7a4c', '#f2d15c']);
   frameDeco(g, 12 * TILE + 4, 10 * TILE + 4, 12, 9, ['#8a6fc9', '#d6679a']);
@@ -419,7 +417,6 @@ function renderLighting() {
     g.fillStyle = gr; g.fillRect(rm.x * TILE, rm.y * TILE, rm.w * TILE, rm.h * TILE);
   }
   for (const [lx, ly] of [[6 * TILE + 8, 3 * TILE], [27 * TILE + 8, 14 * TILE], [8 * TILE + 8, 6 * TILE]]) { const gr = g.createRadialGradient(lx, ly, 2, lx, ly, 40); gr.addColorStop(0, 'rgba(255,214,150,0.12)'); gr.addColorStop(1, 'rgba(255,214,150,0)'); g.fillStyle = gr; g.fillRect(lx - 40, ly - 40, 80, 80); }
-  { const s = ROOM_BY_ID.server; P(g, s.x * TILE, s.y * TILE, s.w * TILE, s.h * TILE, 'rgba(20,40,70,0.16)'); }
   const v = g.createRadialGradient(LW / 2, LH / 2, LH * 0.35, LW / 2, LH / 2, LW * 0.62); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(4,5,10,0.26)');
   g.fillStyle = v; g.fillRect(0, 0, LW, LH);
   return c;
@@ -432,6 +429,16 @@ function buildSprites() {
     it.sprite = c;
   }
   return ITEMS;
+}
+// Stonic look: the same office at night, desaturated toward slate blue and dimmed (workers keep their colours)
+function nightTone(c) {
+  if (c._toned) return; c._toned = true;
+  const g = c.getContext('2d'), im = g.getImageData(0, 0, c.width, c.height), d = im.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const l = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+    d[i] = (d[i] * 0.4 + l * 0.6) * 0.74; d[i + 1] = (d[i + 1] * 0.4 + l * 0.6) * 0.8; d[i + 2] = (d[i + 2] * 0.4 + l * 0.6) * 0.98 + 6;
+  }
+  g.putImageData(im, 0, 0);
 }
 
 /* ---------------------------------------------------------------- workers */
@@ -559,6 +566,7 @@ const ICONS = {
   quest: { c: '#2f7fc0', rows: ['.##.', '#..#', '..#.', '....', '..#.'] },
   clock: { c: '#3a4152', rows: ['.###.', '#.#.#', '#.###', '#...#', '.###.'] },
   mag: { c: '#5a46a0', rows: ['.##..', '#..#.', '#..#.', '.##..', '...##'] },
+  zz: { c: '#2f7fc0', rows: ['#####', '...#.', '..#..', '.#...', '#####'] },
 };
 function iconBubble(g, x, y, type, t) { // x=center, y=tail tip
   const L = x - 5, T = y - 10;
@@ -612,6 +620,8 @@ class OfficeTown {
     this.ctx = this.canvas.getContext('2d');
     this.world = mk(LW, LH); this.g = this.world.getContext('2d');
     this.bg = renderBackground(); this.light = renderLighting(); this.items = buildSprites();
+    this.night = opts.look !== 'classic';
+    if (this.night) { nightTone(this.bg); for (const it of this.items) nightTone(it.sprite); }
     this.onTick = null; this.paused = false; this.timeScale = 1;
     this.selected = null; this._panelT = 0;
     this.panel = opts.panel ? document.getElementById(opts.panel) : null;
@@ -884,7 +894,6 @@ class OfficeTown {
       P(g, X, Y, W, H, '#151821'); for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) { P(g, X + 2 + i * 13, Y + 2 + j * 8, 11, 6, on ? ['#6a3a4a', '#3a4a6a', '#4a6a3a'][(i + j + (on ? step : 0)) % 3] : '#22283a'); }
       P(g, X + 18, Y + 6, 3, 4, on ? '#ff4d4d' : '#5a2a2a'); P(g, X + 21, Y + 7, 1, 2, on ? '#ff4d4d' : '#5a2a2a');
       P(g, X + 1, Y + H - 2, W - 2, 1, '#3a3f4f'); if (on) P(g, X + 1, Y + H - 2, 1 + (step % (W - 2)), 1, '#ff4d4d'); }
-    { const s = S.srv; for (let i = 0; i < 6; i++) { const a = running ? 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(t * 1.8 + i)) : 0.5; g.globalAlpha = a; P(g, s.x + 3 + i * 4, s.y + 3, 2, 2, i === 5 && running ? '#f2c46b' : '#5be37a'); g.globalAlpha = 1; } }
   }
   _iconFor(c) {
     const now = this.clock, r = c.rec, seatedDesk = c.mode === 'seated' && c.place === 'desk';
@@ -893,6 +902,7 @@ class OfficeTown {
     if (seatedDesk && r.state === 'WAITING') return 'clock';
     if (seatedDesk && r.state === 'VERIFYING') return 'mag';
     if (seatedDesk && r.state === 'WORKING') return 'dots';
+    if (this.night && (r.state === 'IDLE' || r.released) && (c.mode === 'seated' || (c.mode === 'stand' && c.place === 'idle')) && !(c.speech && now < c.speech.until)) return 'zz';
     return null;
   }
   render() {
@@ -917,7 +927,7 @@ class OfficeTown {
     // ---- to screen
     const ctx = this.ctx, cw = this.canvas.width, ch = this.canvas.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#12141b'; ctx.fillRect(0, 0, cw, ch);
+    ctx.fillStyle = this.night ? '#05060a' : '#12141b'; ctx.fillRect(0, 0, cw, ch);
     if (!this.sharp) { ctx.imageSmoothingEnabled = false; ctx.drawImage(this.world, this.ox, this.oy, this.dw, this.dh); }
     else {
       const k = this.preK, pg = this.pre.getContext('2d'); pg.imageSmoothingEnabled = false; pg.drawImage(this.world, 0, 0, LW * k, LH * k);
@@ -981,7 +991,7 @@ class OfficeTown {
     // room labels on the dark wall caps
     const lfs = Math.max(9, Math.min(15, Math.round(u * 5)));
     for (const rm of ROOMS) {
-      if (rm.id === 'corridor') continue;
+      if (rm.id === 'corridor' || this.night) continue;   // the Stonic look has no room captions
       const top = rm.y < 10, ly = top ? 8 : 22 * TILE + 16, lx = rm.x * TILE + 3;
       ctx.font = this._font(lfs, 700); const label = rm.name.toUpperCase();
       ctx.fillStyle = rm.accent; ctx.fillRect(this._sx(lx), this._sy(ly) - lfs * 0.32, Math.round(lfs * 0.6), Math.round(lfs * 0.6));
@@ -1094,6 +1104,14 @@ class OfficeTown {
     for (const d of Object.values(WORKER_DEFS)) for (const b of spots) { if (!findPath(d.idle[0], d.idle[1], b[0], b[1]) && !(d.idle[0] === b[0] && d.idle[1] === b[1])) bad.push(`no route ${d.name} -> ${b}`); }
     if (bad.length) console.error('OfficeTown self-check:', bad);
     return bad;
+  }
+  // head-and-shoulders picture of a worker (the same pixel sprite), for the chips above the office
+  portrait(id, px = 44) {
+    const d = WORKER_DEFS[id]; if (!d) return '';
+    const s = mk(20, 28); drawStanding(s.getContext('2d'), d, 10, 26, 'down', 0, {});
+    const c = mk(px, px), g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+    g.drawImage(s, 2, 2, 16, 16, 0, 0, px, px);
+    return c.toDataURL();
   }
   resize() {
     if (!this.canvas) return;

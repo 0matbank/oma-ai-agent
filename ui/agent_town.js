@@ -17,6 +17,25 @@ class AgentTown {
     this.activeTab = 'agents';
     this.updateChipsBar();
     this.wireTownTabs();
+    document.getElementById('tfChat')?.addEventListener('click', () => {
+      document.querySelector('.feed-tab[data-ftab="voice"]')?.click();
+      document.getElementById('homeChatInput')?.focus();
+    });
+    this.footer();
+    setInterval(() => this.footer(), 1500);
+  }
+
+  // footer chips, all from what the page already shows: engine state, last model, workers seated
+  footer() {
+    if (document.hidden) return;
+    const $ = id => document.getElementById(id), set = (id, t) => { const e = $(id); if (e && e.textContent !== t) e.textContent = t; };
+    const core = ($('telemCore')?.textContent || '').trim(), ok = core === 'READY';
+    set('tfOnline', ok ? 'Online' : core && !core.startsWith('checking') ? core.charAt(0) + core.slice(1).toLowerCase() : 'Checking');
+    $('tfDot')?.classList.toggle('on', ok);
+    const m = ($('telemActiveModel')?.textContent || '').trim();
+    set('tfModel', !m || m === 'none yet' ? 'No model yet' : m);
+    const ch = this.office?.charList || [];
+    set('tfSeat', `${ch.filter(c => c.mode === 'seated').length}/${ch.length || 5} seat`);
   }
 
   resize() { this.office?.resize(); }
@@ -39,12 +58,13 @@ class AgentTown {
     const box = document.getElementById('agent-chips-container');
     if (!box) return;
     const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const DOT = { IDLE: '#38bdf8', COMPLETED: '#22c55e', FAILED: '#ef4444', CANCELLED: '#9ca3af', WAITING: '#facc15' };
     box.innerHTML = Object.values(this.agents).map(a => {
       const busy = ['WORKING', 'ASSIGNED', 'VERIFYING', 'WAITING'].includes(a.state);
-      return `<div class="agent-chip ${busy ? 'working' : ''}" data-agent="${a.id}" style="--chip-color:${a.color}" title="${esc(a.step || a.role)}">
-        <div class="chip-status-square" style="background:${a.color}"></div>
-        <div><div class="chip-name">${a.icon} ${a.name}</div>
-        <div class="chip-role" style="color:${busy ? 'var(--neon-green)' : 'var(--text-muted)'}">${a.state === 'IDLE' ? 'Idle' : '● ' + esc(a.state)}</div></div></div>`;
+      a.face ??= this.office?.portrait?.(a.id) || '';
+      return `<div class="agent-chip ${busy ? 'working' : ''}" data-agent="${a.id}" style="--chip-color:${a.color}" title="${esc(a.role)} · ${esc(a.state === 'IDLE' ? 'Idle' : a.state)}${a.step ? ' · ' + esc(a.step) : ''}">
+        ${a.face ? `<img class="chip-face" src="${a.face}" alt="">` : ''}<span class="chip-name">${a.name}</span>
+        <i class="chip-dot" style="background:${DOT[a.state] || '#f59e0b'};box-shadow:0 0 6px ${DOT[a.state] || '#f59e0b'}"></i></div>`;
     }).join('');
     box.querySelectorAll('.agent-chip').forEach(ch => ch.onclick = () => {   // the same detail panel as clicking the worker
       const o = this.office; if (!o) return;

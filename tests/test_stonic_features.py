@@ -41,6 +41,15 @@ class Player(unittest.TestCase):
         self.assertEqual(atticus.label('Bash', {'command': c}), 'Playing in the Oma player: lofi music')
         self.assertEqual(worker_for('Bash', {'command': c}), 'eve')
 
+    def test_songs_go_to_the_player_without_a_model(self):   # the user's own requests from the chat
+        m = atticus.media_request
+        self.assertEqual(m('youtube a ja kono gan play koro'), 'bangla song')
+        self.assertEqual(m('amii tmk bolasii youtube akta gan play koro gan name hossa Amii tomakai bola dibo'), 'amii tomakai bola dibo')
+        self.assertEqual(m('clam music play koro'), 'clam music')
+        self.assertEqual(m('1 min music band karo'), '<stop>')
+        for not_media in ('play koro nai keno', 'youtube kholo', 'open notepad', 'play my chill playlist on spotify'):
+            self.assertIsNone(m(not_media), not_media)
+
     def test_player_hands_off_through_the_ask_folder(self):
         d = _tf.mkdtemp(prefix='atticus-ask-')
         with patch.dict(os.environ, {'ATTICUS_ASK': d}):

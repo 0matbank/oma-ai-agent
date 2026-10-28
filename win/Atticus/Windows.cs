@@ -101,6 +101,7 @@ sealed class SettingsWindow : PageWindow
     public void StartListening(bool isClick)
     {
         if (Prefs.Bool("paused")) return;
+        if (Prefs.Bool("muted")) { if (web == null) Open(); else Raise(); Js("st.mutedNudge?.()"); return; }   // the orb's mic button muted the voice assistant
         Voice.Shush();
         if (web == null) Open();
         else Raise();
@@ -379,6 +380,7 @@ sealed class SettingsWindow : PageWindow
     {
         Prefs.Set(k, v);
         if (k == "speak" && v is false) Voice.Shush();
+        if (k == "muted" && v is true) { Voice.Shush(); if (voiceRecording) CancelListening(); }
         if (k == "menuIcon") Program.Tray.Visible = v is true;
         if (k == "paused" && v is true) Program.Box.Close(false);
         if (k == "safe") Program.Box.js("mode", v is true);
@@ -689,7 +691,7 @@ sealed class SettingsWindow : PageWindow
                 if (!string.IsNullOrWhiteSpace(replyText))
                 {
                     if (Prefs.Bool("autoCopy")) { var t = replyText; Program.Post(() => { try { Clipboard.SetText(t); } catch { } }); }
-                    if (isVoice || Prefs.Bool("speak")) { var t = replyText; Program.Post(() => { Js("holoOrb?.setState('speaking')"); Voice.Say(t, () => Js("holoOrb?.setState('idle')")); }); }
+                    if ((isVoice || Prefs.Bool("speak")) && !Prefs.Bool("muted")) { var t = replyText; Program.Post(() => { Js("holoOrb?.setState('speaking')"); Voice.Say(t, () => Js("holoOrb?.setState('idle')")); }); }
                 }
             }
         }
