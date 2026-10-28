@@ -495,6 +495,7 @@ sealed class SettingsWindow : PageWindow
                 if (S("id") is { } ptId) {
                     Task.Run(() => {
                         var r = Py.Run(new[] { "--provider-test", ptId });
+                        if (!r.TrimStart().StartsWith("{")) r = Web.Json(new { id = ptId, ok = false, status = "ERROR", message = "The test did not answer (timed out or failed)." });
                         Program.Post(() => Js($"st.providerTestResult({r})"));
                     });
                 }
@@ -760,7 +761,7 @@ sealed class OnboardingWindow : PageWindow
 {
     System.Windows.Forms.Timer timer;
     bool downloading;
-    public OnboardingWindow() : base("onboarding.html", "ob", "Welcome to Atticus", 640, 640)
+    public OnboardingWindow() : base("onboarding.html", "ob", "Welcome to Oma AI", 640, 640)
     {
         FormClosing += (_, e) => { if (e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); timer?.Stop(); } };
     }

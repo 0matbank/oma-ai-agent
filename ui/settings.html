@@ -614,6 +614,14 @@ body {
 .om-row small { color:var(--text-muted); } .om-empty { color:var(--text-muted); font-size:12px; padding:4px 0; } .om-l { display:block; font-size:11px; color:var(--text-muted); margin:8px 0 3px; }
 .wcard { padding:10px; }
 .whead { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; font:700 10.5px var(--font-mono, Consolas); letter-spacing:1.5px; color:var(--neon-cyan); }
+.whead > span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.whead > .wtitle { display:flex; align-items:baseline; gap:6px; }
+.whead > .wtitle > b { font-weight:inherit; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.whead > .wtitle > i { flex-shrink:0; }   /* the time stays whole; the title gives way */
+/* a question card whose request has ended: the buttons can no longer be used, so they no longer look usable */
+.ask-card button:disabled { opacity:.4; cursor:default; filter:grayscale(.7); box-shadow:none; }
+.ask-card button.chosen:disabled { opacity:1; filter:none; }
+.ask-card .expired { margin-top:6px; font-size:11px; color:var(--text-muted); }
 .wbtn { all:unset; cursor:pointer; padding:1px 6px; margin-left:2px; border:1px solid var(--border-subtle); border-radius:4px; font-size:11px; color:var(--text-secondary); }
 .wbtn:hover { border-color:var(--neon-cyan); color:var(--neon-cyan); }
 /* ---- one layout from big monitors down to laptops, tablets and phone-width windows (inline sizes need !important) */
@@ -1622,7 +1630,7 @@ body {
       </div>
     </div>
     <div class="cyber-card wcard" style="flex:1; min-height:160px; display:flex; flex-direction:column;">
-      <div class="whead"><span>● TODAY HEADLINES <i id="headlineStamp" style="font-style:normal; color:var(--text-muted);"></i></span><button class="wbtn" id="headlineRefresh" title="Refresh">↻</button></div>
+      <div class="whead"><span class="wtitle"><b>● TODAY HEADLINES</b><i id="headlineStamp" style="font-style:normal; color:var(--text-muted);"></i></span><button class="wbtn" id="headlineRefresh" title="Refresh">↻</button></div>
       <div id="headlineList" style="flex:1; overflow-y:auto;"><div class="hl">Loading…</div></div>
     </div>
   </aside>
@@ -2023,8 +2031,8 @@ body {
           <label class="sw"><input type="checkbox" data-k="aiFallback" checked></label>
         </div>
         <div class="row">
-          <div class="t"><b>Custom fallback order</b><span>Provider IDs, comma separated, e.g. <code>gemini,ollama</code>. Empty = Auto: local first, then cloud.</span></div>
-          <input class="field" id="fallbackOrder" data-k="aiFallbackOrder" placeholder="ollama,gemini" spellcheck="false" style="max-width:220px">
+          <div class="t"><b>Custom fallback order</b><span>Provider IDs, comma separated, e.g. <code>gemini,codex_cli,ollama</code>. Empty = Auto: your cloud accounts first, local models (Ollama) last.</span></div>
+          <input class="field" id="fallbackOrder" data-k="aiFallbackOrder" placeholder="gemini,codex_cli,ollama" spellcheck="false" style="max-width:220px">
         </div>
         <div class="row">
           <div class="t"><b>Fallback Notification</b><span>Show a notification badge whenever model switching occurs.</span></div>
@@ -2347,10 +2355,14 @@ body {
   document.addEventListener('pointerdown', e => { if (!e.target.closest('#change')) cancelRecord(); });
 
   let SOUNDS = ['None', 'Speech On', 'Speech Off', 'Windows Notify System Generic', 'Windows Ding', 'chimes', 'notify', 'tada'];
-  document.querySelectorAll('select[data-k^=sound]').forEach(s => {
-    s.innerHTML = SOUNDS.map(n => `<option>${n}</option>`).join('');
-    s.onchange = () => { set(s.dataset.k, s.value); if (s.value !== 'None') post({ do: 'preview', sound: s.value }); };
-  });
+  function fillSounds() {   // the host sends the sounds this PC has; the built-in list is only the first paint
+    document.querySelectorAll('select[data-k^=sound]').forEach(s => {
+      s.innerHTML = SOUNDS.map(n => `<option>${escapeHtml(n)}</option>`).join('');
+      if (P && P[s.dataset.k]) s.value = P[s.dataset.k];
+      s.onchange = () => { set(s.dataset.k, s.value); if (s.value !== 'None') post({ do: 'preview', sound: s.value }); };
+    });
+  }
+  fillSounds();
 
   const set = (k, v) => { P[k] = v; post({ do: 'set', k, v }); paint(); };
   // the orb's mic button: muted = no listening (button, hotkey, START AI) and no spoken replies; typing still works
@@ -2430,7 +2442,7 @@ body {
         <div class="provider-card" data-pid="${p.id}">
           <div class="provider-header">
             <div class="provider-title">
-              <span>${p.name}</span>
+              <span>${escapeHtml(p.name)}</span>
               ${p.local ? '<span class="pill ok">Local GPU</span>' : '<span class="pill" style="background:rgba(var(--accent-rgb),0.15);color:var(--neon-cyan);">Cloud</span>'}
             </div>
             <span class="pill ${p.badge || 'wait'}">${p.status || 'Offline'}</span>
@@ -2444,7 +2456,7 @@ body {
           </div>
           ${p.auth_type === 'API Key' ? `
             <div class="provider-key-box" style="display:none;">
-              <input type="password" class="field key-input" placeholder="Enter API key for ${p.name}..." autocomplete="off">
+              <input type="password" class="field key-input" placeholder="Enter API key for ${escapeHtml(p.name)}..." autocomplete="off">
               <button class="btn blue save-key-btn" data-id="${p.id}">Save to Credential Manager</button>
             </div>
           ` : ''}
@@ -2727,7 +2739,7 @@ body {
     }
     function event(ev) {
       if (!cur || cur.id !== ev.task_id) cur = { id: ev.task_id, status: ev.status };
-      cur.status = ev.status; cur.stage = ev.stage; cur.model = ev.active_model; cur.workers = ev.workers;
+      cur.status = ev.status; cur.stage = ev.stage; cur.model = ev.active_model; cur.workers = ev.workers; cur.last = ev;
       const [head, text] = describe(ev);
       if (ev.kind === 'step') stepChip(ev);   // the chat shows each step as one module chip (Stonic style); the Agent tab keeps every event
       // The chat stays short: your message is already a bubble (no RECEIVED copy) and Dave's checks sit in the reply card.
@@ -2761,6 +2773,18 @@ body {
       ['homeFeedStream', 'fullFeedStream'].forEach(id => { const el = $(id); if (el) { el.insertAdjacentHTML('beforeend', html); el.scrollTop = el.scrollHeight; } });
       holoOrb?.setState(status === 'COMPLETED' ? 'completed' : status === 'FAILED' ? 'error' : status === 'PARTIAL' ? 'partial' : 'idle');
       if (rep.diagram) window.omaVisualHub?.show(rep.diagram, rep.reply || '');
+      // The app stopped the engine (Stop, timeout, crash) before its own final event: settle the town so no worker
+      // keeps "Waiting for your OK" and the footer shows this task, not the one before.
+      if (cur && cur.last && !['COMPLETED', 'PARTIAL', 'FAILED', 'CANCELLED'].includes(cur.status) && BADGE[status]) {
+        const end = status === 'CANCELLED' ? 'CANCELLED' : status === 'FAILED' ? 'FAILED' : 'COMPLETED';
+        const workers = {};
+        for (const [k, w] of Object.entries(cur.workers || {}))
+          workers[k] = ['WORKING', 'WAITING', 'ASSIGNED', 'VERIFYING'].includes(w.state) ? { ...w, state: end } : w;
+        cur.status = status;
+        window.agentTown?.applyTask({ ...cur.last, kind: 'result', status, stage: status.toLowerCase(), workers });
+        if ($('town-last-task')) $('town-last-task').textContent = `${cur.id} ${status}`;
+        if ($('agentStreamTask')) $('agentStreamTask').textContent = `${cur.id} · ${status}`;
+      }
       window.agentTown?.applyReply(rep);
       if (!rep.task_id) {   // the app itself refused (busy / timeout / crash): no backend task exists
         const act = $('agentTownActivity'); if (act) act.innerHTML = `Status: <b style="color:${color};">${esc(status)}</b>`;
@@ -2780,6 +2804,7 @@ body {
       d.querySelectorAll('button[data-v]').forEach(b => b.onclick = () => {
         post({ do: 'answer', v: b.dataset.v });
         d.querySelectorAll('button').forEach(x => x.disabled = true);
+        b.classList.add('chosen');
         b.textContent = '✓ ' + b.textContent;
       });
     }
@@ -2802,6 +2827,10 @@ body {
       if (d) answerButtons(d);
     }
     function done() {
+      document.querySelectorAll('.ask-card').forEach(c => {   // the request ended: an unanswered card says so instead of looking clickable
+        if (!c.querySelector('button.chosen') && !c.querySelector('.expired') && c.querySelector('button:not(:disabled)'))
+          c.insertAdjacentHTML('beforeend', '<div class="expired">Expired: this request has ended.</div>');
+      });
       document.querySelectorAll('.ask-card button').forEach(b => b.disabled = true);
       setTimeout(() => { if (holoOrb && ['completed', 'error', 'partial'].includes(holoOrb.state)) holoOrb.setState('idle'); }, 4000);
     }
@@ -2818,6 +2847,17 @@ body {
   window.st = {
     load(d) {
       P = { talkMode: 'hold', ...d.prefs };
+      if (recording) {   // a shortcut was just recorded (or the window reloaded): leave recording mode
+        recording = false; $('shortcut').classList.remove('rec'); $('change').textContent = 'Change Shortcut';
+        $('schint').textContent = 'Hold it, talk, let go.';
+      }
+      currentLang = P.speechLanguage === 'en' ? 'en' : 'bn';
+      if ($('current-lang-label')) $('current-lang-label').textContent = currentLang === 'bn' ? 'বাংলা' : 'English';
+      if (d.sounds?.length) {
+        SOUNDS = ['None', ...d.sounds.filter(n => n && n !== 'None')];
+        fillSounds();
+      }
+      if ($('upstatus') && d.update) $('upstatus').textContent = d.update;
       if (d.version) if ($('aboutver')) $('aboutver').textContent = 'Oma AI • Version ' + d.version; if ($('ver')) $('ver').textContent = 'Oma AI • Version ' + d.version;
       paint();
       window.omaApplyTheme?.(P.theme || 'stonic');
@@ -2863,7 +2903,10 @@ body {
       $('npClose').onclick = () => { $('npFrame').src = 'about:blank'; $('neuralPlayer').style.display = 'none'; };
     },
     brief(b) { if (b && b.text) appendFeedMessage('oma', 'OMA AI', b.text); },
+    rec(m) { if (recording) showCaps(m || '', m ? '' : 'Recording — press your shortcut'); },   // modifiers held so far
+    openSettings(t) { $('settings-drawer')?.classList.add('open'); if (t) document.querySelector(`.nav-btn[data-s="${t}"]`)?.click(); },
     providerTestResult(res) {
+      res = res || { ok: false, status: 'ERROR', message: 'no answer from the test' };
       const card = document.querySelector(`.provider-card[data-pid="${res.id || ''}"]`);
       if (card) {
         const lbl = card.querySelector('.test-result-label');
@@ -2876,6 +2919,11 @@ body {
       }
     },
     providerSaveResult(res) {
+      const t = String(res || '').trim();
+      if ($('cpResult')) {
+        $('cpResult').textContent = t ? t.split('\n').slice(-1)[0].slice(0, 200) : 'Saved.';
+        $('cpResult').style.color = /error|fail|invalid|traceback/i.test(t) ? '#ff453a' : 'var(--neon-green)';
+      }
       post({ do: 'providers' });
     },
     mutedNudge() { const b = $('btn-mute'); if (!b) return; b.classList.remove('nudge'); void b.offsetWidth; b.classList.add('nudge'); },
@@ -3112,16 +3160,6 @@ body {
         if (prompt) sendDirective(prompt);
       };
     });
-
-    // Language Switcher
-    const langSwitcher = $('lang-switcher');
-    const langLabel = $('current-lang-label');
-    if (langSwitcher && langLabel) {
-      langSwitcher.onclick = () => {
-        const isBn = langLabel.textContent.includes('বাংলা');
-        langLabel.textContent = isBn ? 'English' : 'বাংলা';
-      };
-    }
 
     // Top Header PC Health Button
     const btnPcHealth = $('btn-pc-health');

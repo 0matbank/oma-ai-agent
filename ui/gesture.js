@@ -9,7 +9,7 @@
 (() => {
   const VISION = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
   const MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
-  let stream = null, landmarker = null, raf = 0, sx = 0.5, sy = 0.5, last = '', lastAt = 0, scrollY = null, dragging = false;
+  let stream = null, pending = false, gen = 0, landmarker = null, raf = 0, sx = 0.5, sy = 0.5, last = '', lastAt = 0, scrollY = null, dragging = false;
   const post = m => window.webkit?.messageHandlers?.st?.postMessage(m);
   const $ = id => document.getElementById(id);
   const note = t => { const n = $('gestureNote'); if (n) n.textContent = t; };
@@ -17,14 +17,21 @@
   const up = (l, tip, pip) => l[tip].y < l[pip].y;
 
   async function start() {
-    if (stream) return;
+    if (stream || pending) return;
+    const my = ++gen;
+    pending = true;
+    let s;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+      s = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
     } catch (e) {
-      stream = null;
+      pending = false;
+      if (my !== gen) return;
       note(e.name === 'NotFoundError' ? 'No webcam found on this PC. Gesture control needs a camera.' : 'Camera not available: ' + (e.message || e.name));
       return;
     }
+    pending = false;
+    if (my !== gen) { s.getTracks().forEach(t => t.stop()); return; }   // stopped while the camera was starting
+    stream = s;
     const v = $('gestureVideo'); v.srcObject = stream; v.style.display = 'block'; await v.play();
     $('gestureBtn').textContent = '⏻ DEACTIVATE'; $('gesturePane')?.classList.add('live');
     note('Loading hand tracking…');
@@ -35,12 +42,14 @@
         landmarker = await HandLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numHands: 1 });
       }
     } catch (e) { note('Hand tracking could not load: ' + (e.message || e)); stop(); return; }
+    if (my !== gen || !stream) return;   // Esc or leaving the tab while hand tracking loaded: stay off
     post({ do: 'gesture', act: 'on' });
     note('');
     loop();
   }
 
   function stop() {
+    gen++;
     cancelAnimationFrame(raf); raf = 0;
     if (dragging) post({ do: 'gesture', act: 'up' });
     dragging = false;

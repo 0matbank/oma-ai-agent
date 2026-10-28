@@ -123,15 +123,15 @@
 <body>
 <section class="page" id="welcome">
   <div id="orbwrap" class="r"><canvas id="orb"></canvas></div>
-  <h1 class="r">Meet Atticus</h1>
+  <h1 class="r">Meet Oma AI</h1>
   <p class="sub r" id="welcome-talk">Hold the shortcut, say what you need, let go. Your PC does the rest.</p>
   <div class="keys r"><div class="key" id="k1">Ctrl</div><div class="key" id="k2">Alt</div><div class="key wide" id="k3">Space</div></div>
   <button class="btn r" data-go="perms">Get Started</button>
 </section>
 
 <section class="page" id="perms">
-  <h2 class="r">Give Atticus a hand</h2>
-  <p class="sub r">Three things, once. You can change them any time in Atticus Settings.</p>
+  <h2 class="r">Give Oma AI a hand</h2>
+  <p class="sub r">Three things, once. You can change them any time in Oma AI Settings.</p>
   <div id="list" class="r"></div>
   <div id="count" class="r"></div>
   <button class="btn quiet r" id="next" data-go="try">Skip for Now</button>
@@ -156,7 +156,7 @@
     <div class="try">“Tell me when the timer is done”<button id="timer">Start a 20 s timer</button></div>
   </div>
   <div class="tips r"><div><kbd>esc</kbd> stops an answer</div><div>Click away to close</div></div>
-  <button class="btn r" id="finish">Start Using Atticus</button>
+  <button class="btn r" id="finish">Start Using Oma AI</button>
 </section>
 
 <div id="dots"><i></i><i></i><i></i><i></i></div>
@@ -210,7 +210,7 @@
       const k = KEYS[cur];
       if (!k || $(k[2]).classList.contains('yes')) return;
       k.forEach((id, i) => setTimeout(() => { $(id).classList.remove('lit', 'down'); $(id).classList.add('yes'); }, i * 70));
-      { $('hint').textContent = 'That’s it. Atticus is listening.'; $('hint').classList.add('yes'); }
+      { $('hint').textContent = 'That’s it. Oma AI is listening.'; $('hint').classList.add('yes'); }
       setTimeout(() => go('done'), 1500);
     },
     progress(id, p) {   // the speech model downloading

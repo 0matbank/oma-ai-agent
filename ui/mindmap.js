@@ -27,6 +27,7 @@ class OmaMindMap {
 
     // Smooth, restrained pulse generator (data packet flow)
     setInterval(() => {
+      if (document.hidden || this.pulses.length > 24) return;   // rAF is paused while hidden: don't queue a burst
       const idx = Math.floor(Math.random() * this.nodes.length);
       this.pulses.push({
         nodeIndex: idx,

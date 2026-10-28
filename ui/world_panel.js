@@ -148,21 +148,27 @@
   }
 
   /* ---------------- Media Link */
-  let stream = null;
+  let stream = null, req = 0;   // req: the newest start/stop; an older pending request stops its own stream
   async function media(kind) {
     stopMedia();
+    const my = req;
+    let s;
     try {
-      stream = kind === 'screen' ? await navigator.mediaDevices.getDisplayMedia({ video: true }) : await navigator.mediaDevices.getUserMedia({ video: true });
+      s = kind === 'screen' ? await navigator.mediaDevices.getDisplayMedia({ video: true }) : await navigator.mediaDevices.getUserMedia({ video: true });
     } catch (e) {
+      if (my !== req) return;
       $('mediaNote').textContent = kind === 'camera' && e.name === 'NotFoundError' ? 'No camera found on this PC.' : `${kind === 'screen' ? 'Screen' : 'Camera'} not available: ${e.message || e.name}`;
       $('mediaNote').style.display = 'block';
       return;
     }
+    if (my !== req) { s.getTracks().forEach(t => t.stop()); return; }
+    stream = s;
     const v = $('mediaVideo'); v.srcObject = stream; v.style.display = 'block'; $('mediaNote').style.display = 'none'; await v.play();
     stream.getVideoTracks()[0].onended = stopMedia;
     $('mediaLive').style.display = 'inline-block';
   }
   function stopMedia() {
+    req++;
     if (stream) stream.getTracks().forEach(t => t.stop());
     stream = null;
     const v = $('mediaVideo'); if (v) { v.srcObject = null; v.style.display = 'none'; }
