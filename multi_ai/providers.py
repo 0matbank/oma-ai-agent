@@ -60,6 +60,14 @@ def save_custom_providers(providers: List[Dict[str, Any]]):
         json.dump(providers, f, indent=2)
 
 
+def _setting(key, default):
+    try:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f).get(key, default)
+    except Exception:
+        return default
+
+
 class ProviderManager:
     """Unified AI Provider & Model Management Engine"""
 
@@ -70,7 +78,7 @@ class ProviderManager:
             "type": "cli_oauth",
             "auth_type": "OAuth / CLI Subscription",
             "local": False,
-            "default_models": ["claude-3-5-haiku", "claude-3-7-sonnet", "claude-3-opus"],
+            "default_models": ["haiku", "sonnet", "opus"],   # CLI aliases: the CLI resolves them to the current models
             "doc_url": "https://claude.ai",
             "description": "Native Claude plan (Pro / Max) or Anthropic API subscription via Claude Code."
         },
@@ -81,7 +89,7 @@ class ProviderManager:
             "auth_type": "None (Localhost)",
             "local": True,
             "base_url": "http://localhost:11434",
-            "default_models": ["qwen3-vl:8b", "qwen3:8b", "llama3.2:latest"],
+            "default_models": [],   # discovered live from /api/tags
             "doc_url": "https://ollama.com",
             "description": "Private, zero-cost, local model execution directly on your GPU/CPU."
         },
@@ -98,12 +106,12 @@ class ProviderManager:
         },
         {
             "id": "openai",
-            "name": "OpenAI (GPT-4o / o3-mini)",
+            "name": "OpenAI",
             "type": "cloud_api",
             "auth_type": "API Key",
             "local": False,
             "base_url": "https://api.openai.com/v1",
-            "default_models": ["gpt-4o", "gpt-4o-mini", "o3-mini", "gpt-4-turbo"],
+            "default_models": [],   # discovered live from /models
             "doc_url": "https://platform.openai.com/api-keys",
             "description": "Official OpenAI state-of-the-art vision and reasoning models."
         },
@@ -114,7 +122,7 @@ class ProviderManager:
             "auth_type": "API Key",
             "local": False,
             "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
-            "default_models": ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
+            "default_models": [],   # discovered live; gemini-2.0-flash returned 404 (retired)
             "doc_url": "https://aistudio.google.com/apikey",
             "description": "Google ultra-low latency multimodal AI models."
         },
@@ -125,9 +133,9 @@ class ProviderManager:
             "auth_type": "API Key",
             "local": False,
             "base_url": "https://api.deepseek.com/v1",
-            "default_models": ["deepseek-chat", "deepseek-reasoner"],
+            "default_models": [],
             "doc_url": "https://platform.deepseek.com",
-            "description": "DeepSeek-V3 and R1 reasoning intelligence."
+            "description": "DeepSeek chat and reasoning models."
         },
         {
             "id": "groq",
@@ -136,7 +144,7 @@ class ProviderManager:
             "auth_type": "API Key",
             "local": False,
             "base_url": "https://api.groq.com/openai/v1",
-            "default_models": ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"],
+            "default_models": [],
             "doc_url": "https://console.groq.com/keys",
             "description": "Ultra-fast inference (500+ tokens/sec) for instant responses."
         }
@@ -144,6 +152,34 @@ class ProviderManager:
 
     def __init__(self):
         pass
+
+    def definition(self, p_id: str) -> Optional[Dict[str, Any]]:
+        d = next((p for p in self.BUILTIN_PROVIDERS if p["id"] == p_id), None)
+        if d:
+            return d
+        c = next((c for c in load_custom_providers() if c["id"] == p_id), None)
+        return {**c, "custom": True} if c else None
+
+    def _claude_models(self):
+        from multi_ai.model_catalog import CLAUDE_ALIASES, claude_resolved
+        return [f"{a} ({claude_resolved(a)})" if claude_resolved(a) else a for a in CLAUDE_ALIASES]
+
+    def customs(self) -> List[Dict[str, Any]]:
+        return load_custom_providers()
+
+    def live_models(self, p_id: str, limit: int = 8) -> List[str]:
+        """Models this provider really offers to this account now (cloud: listed, minus ones known gone/busy)."""
+        from multi_ai.model_catalog import cloud_candidates, ollama_pick, CLAUDE_ALIASES
+        if p_id == "claude_code":
+            return list(CLAUDE_ALIASES)
+        if p_id == "ollama":
+            return ollama_pick()
+        d = self.definition(p_id) or {}
+        key = get_secret(f"ai_key_{p_id}")
+        if not key or not d.get("base_url"):
+            return []
+        mids, _ = cloud_candidates(p_id, d["base_url"], key, d.get("preferred_models", ()), limit=limit)
+        return mids
 
     def discover_local_ollama_models(self) -> List[Dict[str, Any]]:
         """Queries local Ollama runtime on port 11434 for installed models."""
@@ -202,7 +238,7 @@ class ProviderManager:
                         "ok": logged_in,
                         "badge": "ok" if logged_in else "no",
                         "detail": f"Signed in ({sub})" if logged_in else "Run 'claude login'",
-                        "models": ["claude-3-5-haiku", "claude-3-7-sonnet", "claude-3-opus"]
+                        "models": self._claude_models()
                     }
             except Exception:
                 pass
@@ -275,40 +311,36 @@ class ProviderManager:
             "status": "Configured",
             "ok": True,
             "badge": "ok",
-            "detail": f"Key stored in Credential Manager (••••{secret_key[-4:] if len(secret_key) >= 4 else '••'})",
+            "detail": "Key stored in Windows Credential Manager (never shown)",
             "has_key": True,
-            "models": p_def.get("default_models", [])
+            "models": self.live_models(p_id, 6)
         }
 
     def test_provider_connection(self, p_id: str) -> Dict[str, Any]:
         """Tests live latency and auth for a given provider."""
         t0 = time.time()
 
-        if p_id == "claude_code":
-            import subprocess
-            try:
-                res = subprocess.run(["claude", "auth", "status"], capture_output=True, text=True, timeout=5)
-                ms = int((time.time() - t0) * 1000)
-                if res.returncode == 0:
-                    data = json.loads(res.stdout)
-                    if data.get("loggedIn"):
-                        return {"ok": True, "status": "Ready", "message": f"Claude CLI connected ({data.get('subscriptionType', 'Paid')})", "latency_ms": ms}
-                return {"ok": False, "status": "Not Logged In", "message": "Please log in to Claude in your terminal.", "latency_ms": ms}
-            except Exception as e:
-                return {"ok": False, "status": "Failed", "message": str(e), "latency_ms": -1}
+        if p_id == "claude_code":   # a real tiny request with the user's chosen alias, so a retired/unavailable model shows here
+            from multi_ai.adapters.claude_code import ClaudeCodeAdapter
+            alias = _setting("model", "haiku")
+            r = ClaudeCodeAdapter(timeout=60).generate(alias, "Reply with exactly: OK")
+            ms = int((time.time() - t0) * 1000)
+            if r.get("success"):
+                return {"ok": True, "status": "Ready", "message": f"Claude {alias} answered via {r.get('resolved_model') or alias} ({ms} ms)", "latency_ms": ms, "models": self._claude_models()}
+            return {"ok": False, "status": r.get("error_type", "Failed"), "message": r.get("error", "")[:200], "latency_ms": ms}
 
         if p_id == "ollama":
             models = self.discover_local_ollama_models()
             ms = int((time.time() - t0) * 1000)
             if models:
-                names = [m["name"] for m in models]
-                return {
-                    "ok": True,
-                    "status": "Ready",
-                    "message": f"Ollama running on localhost:11434. Models: {', '.join(names)}",
-                    "latency_ms": ms,
-                    "models": names
-                }
+                from multi_ai.model_catalog import ollama_pick
+                from multi_ai.adapters.ollama import OllamaAdapter
+                names = ollama_pick()
+                r = OllamaAdapter(timeout=90).generate(names[0], "Reply with exactly: OK")
+                ms = int((time.time() - t0) * 1000)
+                if r.get("success"):
+                    return {"ok": True, "status": "Ready", "message": f"{names[0]} answered in {ms} ms. Installed: {', '.join(names)}", "latency_ms": ms, "models": names}
+                return {"ok": False, "status": r.get("error_type", "Failed"), "message": f"{names[0]}: {r.get('error', '')[:160]}", "latency_ms": ms, "models": names}
             return {"ok": False, "status": "Offline", "message": "Ollama service unreachable on http://localhost:11434", "latency_ms": -1}
 
         if p_id == "lm_studio":
@@ -332,36 +364,23 @@ class ProviderManager:
         if not api_key:
             return {"ok": False, "status": "No Key", "message": "Please enter an API Key first.", "latency_ms": -1}
 
+        from multi_ai.model_catalog import cloud_candidates, probe
         base_url = p_def.get("base_url", "").rstrip("/")
-        try:
-            req = urllib.request.Request(f"{base_url}/models", headers={"Authorization": f"Bearer {api_key}", "User-Agent": "Oma-AI"})
-            with urllib.request.urlopen(req, timeout=8.0) as res:
+        mids, listed = cloud_candidates(p_id, base_url, api_key, p_def.get("preferred_models", ()), limit=3)
+        if not mids and p_def.get("custom"):
+            mids = p_def.get("default_models", [])[:1]
+        if not mids:
+            return {"ok": False, "status": "No Models", "message": "The provider listed no usable chat models for this key (or the key is invalid).", "latency_ms": int((time.time() - t0) * 1000)}
+        tried = []
+        for mid in mids:
+            state, detail = probe(base_url, api_key, p_id, mid)
+            tried.append(f"{mid}: {state}")
+            if state == "ok":
                 ms = int((time.time() - t0) * 1000)
-                if res.status == 200:
-                    data = json.loads(res.read().decode("utf-8"))
-                    avail_models = [m.get("id", "") for m in data.get("data", [])][:10]
-                    return {
-                        "ok": True,
-                        "status": "Ready",
-                        "message": f"Successfully authenticated! ({ms}ms)",
-                        "latency_ms": ms,
-                        "models": avail_models or p_def.get("default_models", [])
-                    }
-        except urllib.error.HTTPError as e:
-            ms = int((time.time() - t0) * 1000)
-            body = e.read().decode("utf-8", errors="ignore")
-            if e.code in (401, 403):
-                return {"ok": False, "status": "Auth Error", "message": "Invalid API Key or unauthorized.", "latency_ms": ms}
-            if e.code == 429:
-                return {"ok": False, "status": "Rate Limited", "message": f"Rate limit reached (HTTP 429) ({ms}ms).", "latency_ms": ms}
-            if e.code >= 500:
-                return {"ok": False, "status": "Server Error", "message": f"Remote server error (HTTP {e.code}) ({ms}ms).", "latency_ms": ms}
-            if e.code in (404, 405):
-                # Many providers might not support GET /models but work fine for completions
-                return {"ok": True, "status": "Endpoint Reachable", "message": f"Server responded (HTTP {e.code}) in {ms}ms", "latency_ms": ms}
-            return {"ok": False, "status": f"HTTP {e.code}", "message": f"HTTP {e.code}: {body[:100]}", "latency_ms": ms}
-        except Exception as e:
-            return {"ok": False, "status": "Failed", "message": str(e), "latency_ms": -1}
+                return {"ok": True, "status": "Ready", "message": f"{mid} answered ({ms} ms). {listed} models listed.", "latency_ms": ms, "models": mids}
+            if state == "auth":
+                break
+        return {"ok": False, "status": "Unavailable", "message": "; ".join(tried)[:240], "latency_ms": int((time.time() - t0) * 1000), "models": mids}
 
     def get_full_overview(self) -> Dict[str, Any]:
         """Returns complete list of providers, local models, and routing configs."""
@@ -394,7 +413,7 @@ class ProviderManager:
 
         # Compile list of all available models for select dropdown
         all_models = [
-            {"id": "auto", "name": "Auto (Smart Fallback: Claude -> Local Ollama)"},
+            {"id": "auto", "name": "Auto (Atticus engine on Claude; text fallback: local, then cloud)"},
             {"id": "local_only", "name": "Local AI Only (Privacy Mode)"}
         ]
         for m in local_ollama:
@@ -407,16 +426,15 @@ class ProviderManager:
                 "id": f"lm_studio/{m['name']}",
                 "name": f"LM Studio: {m['name']}"
             })
-        all_models.extend([
-            {"id": "claude/haiku", "name": "Claude 3.5 Haiku (Fastest)"},
-            {"id": "claude/sonnet", "name": "Claude 3.7 Sonnet (Advanced)"},
-            {"id": "openai/gpt-4o", "name": "OpenAI: GPT-4o"},
-            {"id": "openai/gpt-4o-mini", "name": "OpenAI: GPT-4o-mini"},
-            {"id": "gemini/gemini-2.0-flash", "name": "Google: Gemini 2.0 Flash"},
-            {"id": "deepseek/deepseek-chat", "name": "DeepSeek: DeepSeek-V3"},
-            {"id": "deepseek/deepseek-reasoner", "name": "DeepSeek: R1 Reasoner"},
-            {"id": "groq/llama-3.3-70b-versatile", "name": "Groq: Llama 3.3 70B (Fast)"}
-        ])
+        for alias in ("haiku", "sonnet", "opus"):
+            from multi_ai.model_catalog import claude_resolved
+            r = claude_resolved(alias)
+            all_models.append({"id": f"claude/{alias}", "name": f"Claude {alias.title()}" + (f" ({r})" if r else " (resolved by Claude Code)")})
+        for p in providers:
+            if p.get("id") in ("claude_code", "ollama", "lm_studio") or not p.get("has_key"):
+                continue
+            for mid in self.live_models(p["id"], limit=4):
+                all_models.append({"id": f"{p['id']}/{mid}", "name": f"{p.get('name', p['id'])}: {mid}"})
 
         return {
             "ai_mode": ai_mode,

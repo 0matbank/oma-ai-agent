@@ -138,8 +138,13 @@ class BrainTests(unittest.TestCase):
             p = unittest.mock.Mock()
             p.stdin = io.StringIO()
             p.stdout = [json.dumps(row) + '\n' for row in stream]
-            p.ask = ''; p.returncode = 0
-            reply, _, _ = atticus.run('test', p)
+            p.ask = ''; p.returncode = 0; p.errors = io.StringIO(); p.model = 'haiku'
+            def no_fallback(task, why):   # a text-only fallback that also fails: offline test, no real model call
+                atticus.run.ok = False
+                return '', 0, []
+            with patch.object(atticus, 'text_only', side_effect=no_fallback) as fb:
+                reply, _, _ = atticus.run('test', p)
+            self.assertEqual(fb.called, expected != 'Found it.')   # nothing ran yet: the fallback is tried
             self.assertEqual(reply, expected)
             self.assertEqual(atticus.run.cmds, [])
             self.assertEqual(atticus.run.ok, expected == 'Found it.')

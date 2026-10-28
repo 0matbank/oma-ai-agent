@@ -115,7 +115,8 @@ os.environ['PATH'] = os.pathsep.join([os.path.join(HOME, '.local', 'bin'), os.pa
 APP = os.environ.get('ATTICUS_APP') or os.path.join(os.environ.get('LOCALAPPDATA', HOME), 'Programs', 'Atticus', 'Atticus.exe')   # set by Atticus.exe
 FIND, CLIP, MEDIA, TRASH, NOTE, WINDOWS, UI, KEYS, JOPLIN, INT = (ME + f' --{c}' for c in ('find', 'clip', 'media', 'trash', 'note', 'windows', 'ui', 'keys', 'joplin', 'int'))
 
-SYSTEM = f"""You are Atticus, a Windows PC helper. The user holds a hotkey, talks, lets go; your reply shows in a small box on the user's screen.
+SYSTEM = f"""You are Oma AI (built on Atticus), a Windows PC helper. The user holds a hotkey or types; your reply shows in the Oma window.
+Reply in the user's language: Bangla script -> Bangla, Banglish -> Bangla, English -> English.
 Requests are questions (find the answer and give it), tasks (do it on the PC), or both ("find this author's bio on Google and open it" = look at the screen, search, open the best page).
 Speed matters; every extra round costs the user a second. Answer stable facts without a tool. For current facts (news, prices, schedules, weather), search once and prefer a dated primary source. Never invent details missing from the screen or search results. Do the whole task in ONE Bash call when you can (chain steps that depend on each other with &&, others with ;). Never say an action or a send worked without checking its result. Need several things? Ask for them all in the same turn, not one after another.
 Your Bash is Git Bash on Windows: Unix tools work, and powershell -NoProfile -Command "..." reaches Windows itself. Paths look like C:/Users/... or ~/...
@@ -593,7 +594,7 @@ def proc_of(app):
 def plain(text):
     """Spoken request -> its core words: "Hey Oma, can you open Spotify please?" -> "open spotify"."""
     t = re.sub(r'[,;!?]|:(?!//)|(?<!\w)\.|\.(?!\w)', '', text.lower().strip(' .!?')).strip()   # keep domain dots; normalize punctuation before spoken prefixes
-    t = re.sub(r"^(hey |ok |okay )?(atticus|oma),?\s*(please |can you |could you |would you )?", '', t)
+    t = re.sub(r"^(hey |ok |okay )?((?:atticus|oma),?\s*)?(please |can you |could you |would you )?", '', t)
     t = re.sub(r'^(also |and |now |then )+', '', re.sub(r'\s+(please|for me|now)$', '', t))
     return t
 
@@ -828,29 +829,28 @@ def fast(text):
     Returns a reply, or None to hand the request to Haiku. fast.cmds: the commands that did it, so "When I say X, …" can save them."""
     fast.cmds = []
     raw_str = text.strip()
-    bn_open = re.search(r'(?:খোলো|খুলুন|চালু করো|চালু করুন|ওপেন করো|অন করো)\s+(.+)', raw_str, re.I)
-    if not bn_open:
-        bn_open = re.search(r'(.+?)\s*(?:খোলো|খুলুন|চালু করো|চালু করুন|ওপেন করো|অন করো)', raw_str, re.I)
+    verbs = r'(?:খোলো|খুলুন|খুলো|চালু করো|চালু করুন|ওপেন করো|অন করো|kholo|kolo|khulo|khulun|open koro|chalu koro|on koro)'
+    bn_open = re.search(verbs + r'\s+(.+)', raw_str, re.I) or re.fullmatch(r'(.+?)[\s,]*' + verbs + r'[\s.!?।]*', raw_str, re.I)
     if bn_open:
-        bn_target = bn_open.group(1).strip()
         bn_mapping = {
-            'নোটপ্যাড': 'notepad',
-            'ক্যালকুলেটর': 'calc',
-            'ক্রোম': 'chrome',
-            'ব্রাউজার': 'chrome',
-            'টার্মিনাল': 'cmd',
-            'ফাইল এক্সপ্লোরার': 'explorer',
-            'পেইন্ট': 'mspaint',
-            'ভিএস কোড': 'code',
-            'কোড': 'code',
-            'স্পটিফাই': 'spotify',
-            'সেটিংস': 'ms-settings:'
+            'নোটপ্যাড': 'notepad', 'notepad': 'notepad',
+            'ক্যালকুলেটর': 'calc', 'calculator': 'calc', 'calc': 'calc',
+            'ক্রোম': 'chrome', 'chrome': 'chrome', 'ব্রাউজার': 'chrome', 'browser': 'chrome',
+            'টার্মিনাল': 'cmd', 'terminal': 'cmd',
+            'ফাইল এক্সপ্লোরার': 'explorer', 'file explorer': 'explorer', 'explorer': 'explorer',
+            'পেইন্ট': 'mspaint', 'paint': 'mspaint',
+            'ভিএস কোড': 'code', 'vs code': 'code', 'কোড': 'code',
+            'স্পটিফাই': 'spotify', 'spotify': 'spotify',
+            'সেটিংস': 'ms-settings:', 'settings': 'ms-settings:',
         }
-        app_target = bn_mapping.get(bn_target.lower(), bn_target)
-        res = show(app_target)
-        if res and not res.startswith(('no app', 'could not')):
-            fast.cmds = [f'{SHOW} {shlex.quote(app_target)}']
-            return f"Opened {bn_target}."
+        bn_target = ' '.join(re.sub(r'[,.!?।]', ' ', bn_open.group(1)).split())
+        words = [w for w in bn_target.lower().split() if w not in ('ta', 'টা', 'টি', 'app', 'অ্যাপ', 'please', 'plz')]
+        app_target = bn_mapping.get(' '.join(words)) or next((bn_mapping[w] for w in words if w in bn_mapping), None) or ' '.join(words)
+        if app_target and not MORE.search(bn_target):   # "Chrome kholo and search X" is two steps: the AI does both
+            res = show(app_target)
+            if res and not res.startswith(('no app', 'could not')):
+                fast.cmds = [f'{SHOW} {shlex.quote(app_target)}']
+                return f"Opened {bn_target}."
     named = NAMED.match(text.strip())
     if named and pref('learn', True):   # "When I say work mode, open Spotify": do it now, no AI, and save the words
         if os.environ.get('ATTICUS_LIVE') == '1': return None
@@ -1235,7 +1235,18 @@ def report(task, reply, ran, secs, why):
                                 'secs': round(secs, 1), 'model': pref('model', 'haiku'), 'windows': platform.version()})
 
 
+TRACK = None   # multi_ai.taskstate.TaskTracker while serving the Oma window (--oma-ask): structured events instead of overlay lines
+
+
 def say(tag, text):
+    if TRACK is not None:   # the Oma window reads §EVENT§ lines; notes become events, the final answer is in §REPLY§
+        if tag in ('·', '—,'):
+            TRACK.note(' '.join(text.split()))
+        elif tag == 'i':
+            TRACK.note('Tip: ' + ' '.join(text.split()))
+        elif tag == '!' and text == 'setup':
+            print('! setup', flush=True)   # the app opens its setup window (Claude not installed / signed out)
+        return
     print(f'{tag} {" ".join(text.split())}', flush=True)
 
 
@@ -1360,7 +1371,7 @@ def start_claude(mcp=None, model=None):
                           '--setting-sources', '', '--no-session-persistence', '--strict-mcp-config', *(['--mcp-config', mp] if mcp else []), '--disable-slash-commands', '--output-format', 'stream-json', '--verbose'],
                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errors, text=True, encoding='utf-8', errors='replace', cwd=tempfile.gettempdir(),
                          env={**shim_env(), 'ATTICUS_ASK': ask})
-    p.ask, p.errors = ask, errors
+    p.ask, p.errors, p.model = ask, errors, model or pref('model', 'haiku')
     atexit.register(errors.close)
     atexit.register(stop_claude, p)
     signal.signal(signal.SIGTERM, lambda *_: (stop_claude(p), stop_workers()))
@@ -1375,6 +1386,9 @@ def relay(p):
             j = json.load(open(q))
             os.remove(q)
             a = os.path.join(p.ask, 'a')
+            if TRACK is not None and 'set' not in j:
+                TRACK.waiting(j.get('q') or j.get('pick') or 'Waiting for your answer')
+                threading.Thread(target=_resume_when_answered, args=(os.path.join(p.ask, 'a'),), daemon=True).start()
             if 'set' in j:   # "⚙ <key> <true|false>": the app flips it, so the Settings window and the app agree
                 if os.environ.get('ATTICUS_UI') == '1':
                     print(f"⚙ {j['set']} {j['value'] if isinstance(j['value'], str) else 'true' if j['value'] else 'false'}", flush=True)
@@ -1396,44 +1410,81 @@ def relay(p):
         time.sleep(0.1)
 
 
+ACTION_WORDS = re.compile(r'\b(open|launch|start|close|quit|click|type|press|play|pause|search|google|find|move|snap|send|delete|download|upload|install|go to|navigate|browse|write|save|record)\b|'
+                          r'খোল|খুল|চালু|বন্ধ|সার্চ|খুঁজ|খোঁজ|চালাও|টাইপ|ক্লিক|পাঠাও|ডাউনলোড|লেখো|সেভ|\b(kholo|kolo|khulo|chalu|bondho|khojo|khujo)\b', re.I)
+CLAUDE_ERRORS = (('quota_exhausted', ('weekly limit', 'hit your limit', 'usage limit', 'quota')),
+                 ('rate_limited', ('rate limit', 'too many requests', '429', 'overloaded')),
+                 ('model_unavailable', ('issue with the selected model', 'may not exist', 'not have access to it', 'model not found', 'retired')),
+                 ('auth_error', ('not logged in', 'please run /login', 'invalid api key', 'authentication', 'oauth')),
+                 ('network_error', ('econnreset', 'enotfound', 'network', 'timed out', 'timeout')))
+
+
+def claude_error_type(text, returncode=0):
+    t = (text or '').lower()
+    for kind, words in CLAUDE_ERRORS:
+        if any(w in t for w in words):
+            return kind
+    return f'exit_code_{returncode}' if returncode else 'no_result'
+
+
+def _resume_when_answered(path):
+    for _ in range(1500):   # the gate waits 60 s, a pick 110 s
+        if os.path.exists(path):
+            break
+        time.sleep(0.1)
+    if TRACK is not None:
+        TRACK.resumed()
+
+
+def text_only(task, why):
+    """Claude Code (the Atticus engine) could not run and nothing was executed: answer with the Multi-AI router as text.
+    The router never runs PC actions, so permissions and the safety gate are never bypassed by switching providers.
+    -> (reply, cost, steps); sets run.ok / run.text_only / run.model."""
+    from multi_ai.router import clean_user_prompt, router
+    run.text_only = True
+    if TRACK is not None:
+        TRACK.text_only = True
+        TRACK.set_stage('fallback', f'Atticus engine unavailable ({why}). Text-only answer from the Multi-AI router; no PC actions will run.')
+    try:
+        res = router.execute(clean_user_prompt(task), exclude_providers=['claude_code'], tracker=TRACK)
+    except Exception as e:
+        res = {'success': False, 'reply': f'Fallback failed: {e}', 'error': str(e)}
+    run.fallback = res
+    if res.get('success') and (res.get('reply') or '').strip():
+        run.ok = True
+        run.ran = ['<multi_ai_text_only>']
+        run.model = f"{res.get('provider_used')}/{res.get('model_used')}"
+        return res['reply'].strip(), 0, [f"Text-only answer via {res.get('provider_used')} ({res.get('model_used')})"]
+    run.ok = False
+    return res.get('reply') or res.get('error') or 'No AI provider could answer.', 0, []
+
+
 def run(task, p=None, shots=()):
-    """One request through `claude -p --model haiku` (the user's plan), streaming notes and steps. shots: [(path, label)] sent with it."""
+    """One request through `claude -p --model <alias>` (the user's plan), streaming notes and steps. shots: [(path, label)] sent with it.
+    run.ok is True only for a real terminal result with no error. A text-only fallback happens only when Claude failed
+    before running any tool, so a half-done action is never reported as done by another model."""
     run.cmds = run.ran = []
     run.ok = False
-    ai_mode = pref('aiMode', 'auto')
-    if ai_mode == 'local_only':
-        try:
-            from multi_ai.router import clean_user_prompt, router
-            clean_task = clean_user_prompt(task)
-            res = router.execute(clean_task, exclude_providers=['claude_code'])
-            if res.get('success'):
-                run.ok = True
-                run.ran = ['<multi_ai_local>']
-                return res.get('reply', ''), 0, ["Completed via " + str(res.get('provider_used')) + " (" + str(res.get('model_used')) + ")"]
-            elif res.get('reply'):
-                return res.get('reply'), 0, []
-        except Exception as e:
-            return f"Error executing local model: {e}", 0, []
-
+    run.text_only = False
+    run.model = ''
+    run.fallback = None
+    alias = getattr(p, 'model', '') or pref('model', 'haiku')
+    if pref('aiMode', 'auto') == 'local_only':
+        if p:
+            stop_claude(p)
+        return text_only(task, 'Local Only mode is on')
     p = p or start_claude()
     if not p:
-        if pref('aiFallback', True) and not getattr(run, 'fallback_attempted', False):
-            run.fallback_attempted = True
-            try:
-                from multi_ai.router import clean_user_prompt, router
-                clean_task = clean_user_prompt(task)
-                say('—,', 'Claude not available. Falling back to local Ollama...')
-                fallback_res = router.execute(clean_task, exclude_providers=['claude_code'])
-                if fallback_res.get('success'):
-                    run.ok = True
-                    run.ran = ['<multi_ai_fallback>']
-                    return fallback_res.get('reply', ''), 0, ["Completed via " + str(fallback_res.get('provider_used')) + " (" + str(fallback_res.get('model_used')) + ")"]
-                elif fallback_res.get('reply'):
-                    return fallback_res.get('reply'), 0, []
-            except Exception:
-                pass
+        c = plan()
+        if TRACK is not None:
+            TRACK.model_attempt('claude_code', alias, False, 'not_available', c['text'])
+        if pref('aiFallback', True):
+            r = text_only(task, c['text'])
+            if run.ok:
+                return r
         say('!', 'setup')   # Atticus.app opens its setup window
-        return plan()['text'] + ' Atticus setup is open to fix it.', 0, []
+        return c['text'] + ' Oma setup is open to fix it.', 0, []
+    alias = getattr(p, 'model', '') or alias
     content = [b for path, label in shots if os.path.exists(path) for b in ({'type': 'text', 'text': label}, {'type': 'image', 'source': {
         'type': 'base64', 'media_type': 'image/jpeg', 'data': base64.b64encode(open(path, 'rb').read()).decode()}})] + [{'type': 'text', 'text': task}]
     p.stdin.write(json.dumps({'type': 'user', 'message': {'role': 'user', 'content': content}}) + '\n')
@@ -1441,12 +1492,17 @@ def run(task, p=None, shots=()):
     if getattr(p, 'ask', ''):
         threading.Thread(target=relay, args=(p,), daemon=True).start()
     reply, cost, steps, cmds, last_failed, completed, result_error, ids, bad = '', 0, [], [], False, False, False, {}, set()
+    resolved = ''
     for line in p.stdout:
         try:
             j = json.loads(line)
         except ValueError:
             continue
-        if j.get('type') == 'assistant':
+        if j.get('type') == 'system' and j.get('subtype') == 'init':
+            resolved = j.get('model') or ''
+            if TRACK is not None:
+                TRACK.model_active('claude_code', alias, resolved)
+        elif j.get('type') == 'assistant':
             blocks = j['message'].get('content', [])
             if any(b.get('type') == 'tool_use' for b in blocks):   # notes before a tool call; the final text comes as result
                 for b in blocks:
@@ -1455,6 +1511,8 @@ def run(task, p=None, shots=()):
                     elif b.get('type') == 'tool_use':
                         steps.append(label(b['name'], b.get('input', {})))
                         say('▸', steps[-1])
+                        if TRACK is not None:
+                            TRACK.step_start(b.get('id'), b['name'], b.get('input', {}), steps[-1])
                         ids[b.get('id')] = len(cmds)
                         cmds.append(b.get('input', {}).get('command') or f"<{b['name']}>")   # non-Bash tools block learning
         elif j.get('type') == 'user':   # tool results
@@ -1462,38 +1520,40 @@ def run(task, p=None, shots=()):
             if results:
                 last_failed = any(b.get('is_error') for b in results)
                 bad |= {ids.get(b.get('tool_use_id')) for b in results if b.get('is_error')}
+                if TRACK is not None:
+                    for b in results:
+                        out = b.get('content')
+                        if isinstance(out, list):
+                            out = ' '.join(x.get('text', '') for x in out if isinstance(x, dict))
+                        TRACK.step_end(b.get('tool_use_id'), not b.get('is_error'), clean(out or ''))
         elif j.get('type') == 'result':
             completed = True
             result_error = bool(j.get('is_error'))
             reply, cost = (j.get('result') or '').strip(), j.get('total_cost_usd', 0)
+            resolved = next(iter(j.get('modelUsage') or {}), resolved)
     p.wait()
     run.ran = cmds   # the exact commands, for the ask log
-    # Multi-AI Automatic Fallback
-    if (not reply or not completed or (p and p.returncode)) and pref('aiFallback', True) and not getattr(run, 'fallback_attempted', False):
-        run.fallback_attempted = True
-        try:
-            from multi_ai.router import clean_user_prompt, router
-            clean_task = clean_user_prompt(task)
-            say('—,', 'Claude quota limit reached. Falling back to local Ollama (qwen3-vl:8b)...')
-            fallback_res = router.execute(clean_task, exclude_providers=['claude_code'])
-            if fallback_res.get('success'):
-                run.ok = True
-                run.ran = ['<multi_ai_fallback>']
-                run.cmds = []
-                reply = fallback_res.get('reply', '')
-                steps.append("Completed via " + str(fallback_res.get('provider_used')) + " (" + str(fallback_res.get('model_used')) + ")")
-                return reply, 0, steps
-            elif fallback_res.get('reply'):
-                reply = fallback_res.get('reply')
-        except Exception:
-            pass
+    run.model = f'claude_code/{resolved or alias}'
+    if not reply or not completed or result_error or p.returncode:
+        p.errors.seek(0)
+        err_msg = p.errors.read(400).strip()
+        kind = claude_error_type(f'{reply} {err_msg}', p.returncode)
+        if TRACK is not None:
+            TRACK.model_attempt('claude_code', alias, False, kind, (reply or err_msg)[:300], resolved)
+        if not cmds and pref('aiFallback', True):   # nothing ran yet: another model may answer, as text only
+            r = text_only(task, kind)
+            if run.ok:
+                return r
+            reply = (reply + ' ' if reply else '') + r[0]
+    elif TRACK is not None:
+        TRACK.model_attempt('claude_code', alias, True, resolved=resolved)
     if not reply and p.returncode:
         c = plan()   # the usual cause: not installed, signed out, or no paid plan
         if not c['ok']:
             say('!', 'setup')
         p.errors.seek(0)
         err_msg = p.errors.read(200).strip()
-        reply = c['text'] + ' Atticus setup is open to fix it.' if not c['ok'] else f'Claude failed: {err_msg}'
+        reply = c['text'] + ' Oma setup is open to fix it.' if not c['ok'] else f'Claude failed: {err_msg}'
     # a step that failed and was then done another way is dropped, so the way that worked can still be learned
     run.cmds = [] if last_failed or result_error or p.returncode or not completed or not reply else [c for i, c in enumerate(cmds) if i not in bad]
     run.ok = bool(completed and reply and not result_error and not p.returncode and not last_failed)
@@ -1846,8 +1906,8 @@ def main():
         from multi_ai.providers import provider_mgr
         return print(json.dumps(provider_mgr.remove_custom_provider(args[1])))
     if args[:1] == ['--workers-status']:
-        from multi_ai.orchestrator import orchestrator
-        return print(json.dumps(orchestrator.get_all_workers_status()))
+        from multi_ai.taskstate import last_state   # same data as --task-state: worker lanes from the last real task
+        return print(json.dumps(last_state(), ensure_ascii=False))
     if args[:1] == ['--pc-health']:
         from multi_ai.telemetry import get_complete_pc_health
         return print(json.dumps(get_complete_pc_health()))
@@ -1867,74 +1927,12 @@ def main():
     if args[:1] == ['--notes-delete'] and len(args) > 1:
         from multi_ai.orchestrator import delete_note
         return print(json.dumps(delete_note(args[1])))
-    if args[:1] == ['--oma-ask'] and len(args) > 1:
-        t_start = time.time()
-        from multi_ai.router import clean_user_prompt
-        from multi_ai.orchestrator import orchestrator, get_all_notes
-        user_task = ' '.join(args[1:])
-        prompt = clean_user_prompt(user_task)
-
-        # Check instant / fast commands (Learned shortcuts, window positioning, app launching)
-        if pref('instant', True):
-            try:
-                fast_reply = fast(prompt)
-                if fast_reply:
-                    remember_turn(prompt, fast_reply)
-                    log_turn(prompt, fast_reply, t_start)
-                    print("§EVENT§" + json.dumps({"stage": "completed", "detail": fast_reply, "pct": 100}), flush=True)
-                    res = {
-                        "success": True,
-                        "reply": fast_reply,
-                        "provider_used": "Fast Engine",
-                        "model_used": "Instant",
-                        "fallback_occurred": False
-                    }
-                    return print("§REPLY§" + json.dumps(res), flush=True)
-            except Exception as e:
-                sys.stderr.write(f"[Fast Engine Notice] {e}\n")
-        
-        # Build Atticus memory, workflow, notes, and recent turns context (F12)
-        mem = relevant_rules(prompt) if 'relevant_rules' in dir() or callable(globals().get('relevant_rules')) else ''
-        procedure = workflows(prompt) if pref('learn', True) else ''
-        turns = recent()
-        turns = [r for r in turns if time.time() - r.get('t', 0) < 600][-3:]
-        earlier = earlier_chat(turns)
-        
-        # Add authorized context notes
-        notes_ctx = []
-        try:
-            for n in get_all_notes():
-                if n.get('use_as_context'):
-                    notes_ctx.append(f"• {n.get('title')}: {n.get('content')}")
-        except Exception:
-            pass
-        notes_str = "\n".join(notes_ctx)
-
-        sys_context_parts = [
-            "You are Oma AI (PC 2070 Agent), a personal desktop AI assistant. When the user asks to open an app or execute a desktop action, be polite, helpful, and concise. To perform an action, you may emit [ACTION: open_app(\"app_name\")]."
-        ]
-        if mem:
-            sys_context_parts.append(f"Memory / User Rules:\n{mem}")
-        if procedure:
-            sys_context_parts.append(f"Saved Procedure:\n{procedure}")
-        if notes_str:
-            sys_context_parts.append(f"User Notes Context:\n{notes_str}")
-        if earlier:
-            sys_context_parts.append(f"Recent Conversation:\n{earlier}")
-        
-        system_context = "\n\n".join(sys_context_parts) if sys_context_parts else None
-
-        def on_event(ev):
-            print("§EVENT§" + json.dumps(ev), flush=True)
-            
-        res = orchestrator.execute_directive(prompt, system_context=system_context, event_callback=on_event)
-        
-        if res.get('success'):
-            reply_text = res.get('reply', '')
-            remember_turn(prompt, reply_text)
-            log_turn(prompt, reply_text, t_start)
-            
-        return print("§REPLY§" + json.dumps(res))
+    if args[:1] == ['--oma-ask'] and len(args) > 1:   # the Oma window: one request through the Atticus pipeline, as §EVENT§/§REPLY§ lines
+        src = 'voice' if os.environ.get('OMA_SOURCE') == 'voice' else 'typed'
+        return oma_ask(' '.join(args[1:]), src)
+    if args == ['--task-state']:   # the Oma window when it opens: the last real task and the worker lanes (never a fake "working")
+        from multi_ai.taskstate import last_state
+        return print(json.dumps(last_state(), ensure_ascii=False))
     if args[:1] == ['--me'] and len(args) > 1:   # --me name|about|add|drop "<text>"
         return me_set(args[1], ' '.join(args[2:]))
     if args[:1] == ['--shortcut']:   # the user asked for it, so it skips learn()'s checks, not the safety one
@@ -1984,15 +1982,90 @@ def main():
             return say('✓', activate(key[1]))
         os.startfile(BUY)
         return say('✓', f'Atticus is $5, once. Buy a key on the page that just opened, then type: key <your key>')
+    return serve(task, warm, snap)
+
+
+def _app_of(cmd):
+    """The app a `atticus --show <app>` command opened ('' for a website or anything else)."""
+    if not cmd.startswith(SHOW):
+        return ''
+    try:
+        target = shlex.split(cmd[len(SHOW):])[0]
+    except (ValueError, IndexError):
+        return ''
+    if '://' in target or target.endswith(':'):
+        return ''
+    return app_named(target) or target
+
+
+def _window_check(app, before=frozenset()):
+    """Dave: is a window of <app> really on screen now? before: window handles that existed before the request, so an
+    already-open window is reported as such instead of as proof that something new opened."""
+    def check():
+        for _ in range(20):
+            ws = winctl.find(app)
+            if ws:
+                new = [w for w in ws if w['hwnd'] not in before]
+                w = (new or ws)[0]
+                how = 'new window' if new else 'window was already open'
+                return True, f"{how}: {w['app']} - {w['title'][:60]}"
+            time.sleep(0.2)
+        return None, f'no visible window of {app} detected within 4 s'
+    return check
+
+
+def _hwnds():
+    try:
+        return frozenset(w['hwnd'] for w in winctl.windows())
+    except Exception:
+        return frozenset()
+
+
+def verification_checks(task, reply, cmds, tracker, before=frozenset()):
+    """Real checks for what the engine claims it did. Empty list: nothing to verify (a plain answer)."""
+    checks = []
+    for app in dict.fromkeys(a for a in map(_app_of, cmds) if a):
+        checks.append((f'{app} opened', _window_check(app, before)))
+    if tracker is not None:
+        research = [s for s in tracker.steps if s['worker'] == 'alice']
+        if research:
+            done = [s for s in research if s['status'] == 'DONE']
+            checks.append(('Sources retrieved', lambda done=done, n=len(research): (bool(done), f'{len(done)} of {n} research steps returned content')))
+        failed = [s for s in tracker.steps if s['status'] == 'FAILED']
+        if failed:
+            checks.append(('Tool errors', lambda failed=failed: (None, f"{len(failed)} step(s) failed: {failed[-1]['label']}")))
+    if FAILED.search(reply or ''):
+        checks.append(('Answer', lambda: (False, 'the answer itself says it could not be done')))
+    return checks
+
+
+def serve(task, warm=None, snap=None):
+    """One request through the original Atticus pipeline: instant commands, then Claude Code with Atticus's tools,
+    memory, learned workflows and the safety gate. Used by the overlay (--wait) and by the Oma window (--oma-ask).
+    -> (status, reply): status is COMPLETED / PARTIAL / FAILED (only meaningful with a tracker)."""
     t = time.time()
     commit = os.environ.get('ATTICUS_COMMIT')
+    before = _hwnds() if TRACK is not None else frozenset()
+    if TRACK is not None:
+        TRACK.set_stage('analyzing', 'Checking instant commands and learned shortcuts')
     quick = (not commit or os.path.exists(commit)) and pref('instant', True) and fast(task)
     if quick:
         if warm:
             stop_claude(warm)
         remember_turn(task, quick)
         log_turn(task, quick, t)
-        return say('✓', quick)
+        status = 'COMPLETED'
+        if TRACK is not None:
+            TRACK.model_active('fast_engine', 'instant command (no AI)')
+            cmd = fast.cmds[0] if fast.cmds else ''
+            TRACK.step_start('fast-1', 'Bash', {'command': cmd}, label('Bash', {'command': cmd}) if cmd else quick)
+            TRACK.step_end('fast-1', True, quick)
+            verdict = TRACK.verify(verification_checks(task, quick, fast.cmds, TRACK, before))
+            status = 'COMPLETED' if verdict == 'ok' else 'PARTIAL'
+        say('✓', quick)
+        return status, quick
+    if TRACK is not None:
+        TRACK.set_stage('planning', 'Not an instant command: preparing the Atticus engine with your memory and context')
     app, win = front()   # before anything else takes focus, so "this window" still means the user's window
     ws = winctl.find(app) if app else []
     fx = winctl.frame(ws[0]['hwnd'])[0] + 50 if ws else None
@@ -2014,7 +2087,7 @@ def main():
     turns = recent()
     turns = [r for r in turns if time.time() - r['t'] < 600][-3:]   # this chat only (Atticus.app clears it for a new one); 10 min cap for typed asks
     earlier = earlier_chat(turns)
-    images = screen_for(task, snap, fx)
+    images = screen_for(task, snap, fx) if snap is not None else None
     if images == []:
         ctx += ' Screen capture unavailable. Do not guess screen contents; explain how to enable Screen Recording for Atticus.'
     helping.join(4)
@@ -2025,16 +2098,18 @@ def main():
               (f'Saved workflow (historical guidance):\n{procedure}\n' if procedure else '') + f'Request: {clean_task}')
     reply, cost, steps = run(prompt, warm, images or ())
     if not wait_commit():
-        return
+        return 'CANCELLED', ''
     if not run.ok:   # Try again (same model) or Try Sonnet, from a card in the box
         is_quota = any(q in (reply or '').lower() for q in ('weekly limit', 'rate limit', 'hit your limit', 'quota'))
-        if not getattr(run, 'fallback_attempted', False) and not is_quota:
+        if getattr(run, 'text_only', False) is not True and not is_quota:
             model = pref('model', 'haiku')
             sonnet = pref('escalate', True) and model == 'haiku'
             answer = 'y' if sonnet and pref('escalateAuto', False) else retry_offer(sonnet)
             if answer in ('r', 'y'):
                 next_model = model if answer == 'r' else 'sonnet'
                 say('▸', 'Trying again with ' + next_model.capitalize())
+                if TRACK is not None:
+                    TRACK.set_stage('retry', f'Trying again with {next_model}')
                 previous = run.ran[:]
                 context = '\nPrior attempted actions (check their effects before repeating):\n' + '\n'.join(previous)[-1800:] if previous else ''
                 again, more, extra = run(prompt + f'\nA previous try failed: {reply[:400]}' + context, start_claude(servers, next_model), images or ())
@@ -2061,7 +2136,15 @@ def main():
     remember_turn(task, reply)
     log_turn(task, reply, t, cost, steps, run.ran, len(images or ()))
     # clicks inside an app pull it forward; give the user back the app the user was in unless the user asked to go somewhere
-    restore_focus(app, task, run.ran)
+    if TRACK is None:
+        restore_focus(app, task, run.ran)
+    status = 'COMPLETED' if run.ok else 'FAILED'
+    if TRACK is not None and run.ok:
+        if run.text_only:
+            status = 'PARTIAL' if ACTION_WORDS.search(task) else 'COMPLETED'
+        else:
+            verdict = TRACK.verify(verification_checks(task, reply, run.ran, TRACK, before))
+            status = 'COMPLETED' if verdict == 'ok' else 'PARTIAL'
     say('✓' if run.ok else '!', reply)
     learned = [r for c in run.ran for r in re.findall(r'--remember\s+["\']([^"\']+)', c)]   # it taught itself: say so, so the user sees it improve
     # "When I say focus mode, …" saved: a green Learned pill, like a remembered rule
@@ -2071,8 +2154,45 @@ def main():
     if run.ok and not FAILED.search(reply) and POSTHOG_KEY and not pref('improveAsked', False) and os.environ.get('ATTICUS_UI') == '1' \
             and not (os.path.exists(asked) and open(asked).read() == time.strftime('%Y-%m-%d')):
         open(asked, 'w').write(time.strftime('%Y-%m-%d')); say('!', 'improve')
-    if os.environ.get('ATTICUS_UI') != '1':   # typed from the menu bar: no overlay, so a notification
+    if os.environ.get('ATTICUS_UI') != '1' and TRACK is None:   # typed from the menu bar: no overlay, so a notification
         notify(reply)
+    return status, reply
+
+
+def oma_ask(task, source='typed'):
+    """The Oma window's request: the same Atticus pipeline as the overlay, reported as §EVENT§ lines and one §REPLY§."""
+    global TRACK
+    from multi_ai.taskstate import TaskTracker
+    TRACK = TaskTracker(task, source)
+    TRACK.start()
+    status, reply = 'FAILED', ''
+    shots = []
+    try:
+        snap = threading.Thread(target=lambda: shots.extend(look()), daemon=True)   # only sent if the words are about the screen
+        snap.shots = shots
+        atexit.register(lambda: [os.remove(p) for p, _ in shots if os.path.exists(p)])
+        snap.start()
+        ping()
+        status, reply = serve(task, None, snap)
+    except Exception as e:   # never a silent success: the error is the result
+        reply = f'Internal error: {e}'
+        status = 'FAILED'
+        sys.stderr.write(f'oma_ask: {e!r}\n')
+    if status == 'PARTIAL':
+        why = '; '.join(e['evidence'] for e in TRACK.evidence if e['ok'] is not True)
+        if TRACK.text_only and ACTION_WORDS.search(task):
+            why = 'No PC action was performed: the Atticus engine (Claude Code) was unavailable, so this is a text-only answer.' + (f' {why}' if why else '')
+        TRACK.error = why
+    TRACK.finish(status, reply, TRACK.error if status != 'COMPLETED' else '')
+    m = TRACK.model or {}
+    print('§REPLY§' + json.dumps({
+        'success': status == 'COMPLETED', 'status': status, 'reply': reply, 'task_id': TRACK.id,
+        'provider_used': m.get('provider', ''), 'model_used': m.get('resolved') or m.get('model', ''),
+        'fallback_occurred': len([a for a in TRACK.models_tried if not a['ok']]) > 0 and bool(m),
+        'text_only': TRACK.text_only, 'error': TRACK.error if status != 'COMPLETED' else '',
+        'models_tried': TRACK.models_tried, 'evidence': TRACK.evidence,
+    }, ensure_ascii=False), flush=True)
+    return status
 
 
 if __name__ == '__main__':

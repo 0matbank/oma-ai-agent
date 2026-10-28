@@ -125,22 +125,13 @@ def tool_place_window(app: str, position: str = "full", screen: str = "current")
     return f"Window control not available on this platform."
 
 def tool_web_search(query: str) -> str:
-    """Free web search using DuckDuckGo HTML parser."""
+    """Free web search through the original Atticus search() (DuckDuckGo with a full browser User-Agent and real result
+    URLs). The short User-Agent used before got DuckDuckGo's 202 bot-check page, so every "research" ran with no sources."""
     try:
-        url = 'https://html.duckduckgo.com/html/?q=' + urllib.parse.quote(query)
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-        with urllib.request.urlopen(req, timeout=6) as res:
-            page = res.read().decode('utf-8', errors='ignore')
-        results = []
-        for u, t, sn in re.findall(r'class="result__a" href="([^"]+)">(.*?)</a>.*?class="result__snippet"[^>]*>(.*?)</a>', page, re.S)[:4]:
-            t_clean = re.sub(r'<[^>]+>', '', t).strip()
-            sn_clean = re.sub(r'<[^>]+>', '', sn).strip()
-            results.append(f"• {t_clean}\n  {sn_clean}")
-        if results:
-            return "\n\n".join(results)
-    except Exception:
-        pass
-    return f"Search completed for '{query}'. No direct web page snippet returned."
+        import atticus
+        return atticus.search(query)
+    except Exception as e:
+        return f"Error: web search failed: {e}"
 
 def tool_read_screen() -> str:
     """Takes a screenshot of the active screen and identifies the focused application (F15)."""

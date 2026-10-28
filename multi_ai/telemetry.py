@@ -1,7 +1,8 @@
 """
 Multi-AI Architecture: Live PC Health & Hardware Telemetry Provider
 Provides genuine hardware measurements via Windows Win32 APIs and NVIDIA SMI.
-Never uses hardcoded or fabricated values.
+Never uses hardcoded or fabricated values. The Oma window now measures natively in Atticus.exe (win/Atticus/Health.cs);
+this module remains for the --pc-health command line.
 """
 import ctypes
 from ctypes import wintypes
@@ -39,6 +40,16 @@ class FILETIME(ctypes.Structure):
 def _ft_to_uint(ft: FILETIME) -> int:
     return (ft.dwHighDateTime << 32) | ft.dwLowDateTime
 
+def _cpu_name() -> str:
+    """The real CPU name from the registry (was a hardcoded string)."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0') as k:
+            return str(winreg.QueryValueEx(k, 'ProcessorNameString')[0]).strip()
+    except Exception:
+        return ''
+
+
 def get_cpu_telemetry() -> Dict[str, Any]:
     global _last_idle_time, _last_kernel_time, _last_user_time
     idle = FILETIME()
@@ -67,7 +78,7 @@ def get_cpu_telemetry() -> Dict[str, Any]:
     return {
         "utilization_pct": round(cpu_pct, 1),
         "cores": cores,
-        "model": "AMD Ryzen 7 7700 (8-Core, 16-Thread)"
+        "model": _cpu_name()
     }
 
 def get_ram_telemetry() -> Dict[str, Any]:

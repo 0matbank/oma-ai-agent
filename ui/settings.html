@@ -1431,10 +1431,10 @@ body {
     </div>
     <div class="telem-chip">
       <div class="status-pulse"></div>
-      <span>CORE: <b style="color:var(--neon-cyan);">ONLINE</b></span>
+      <span>ENGINE: <b id="telemCore" style="color:var(--text-muted);" title="Claude Code sign-in state (atticus.py --check)">checking…</b></span>
     </div>
     <div class="telem-chip">
-      <span>MODEL: <b id="telemActiveModel" class="model-tag">Google: Gemini 2.0 Flash</b></span>
+      <span>MODEL: <b id="telemActiveModel" class="model-tag" title="The model that answered the last request">none yet</b></span>
     </div>
   </div>
 
@@ -1522,7 +1522,7 @@ body {
         </div>
 
         <div style="font-size:11px; color:var(--text-muted); display:flex; gap:10px;">
-          <span>Units: <b>Alice, Bob, Carol, Dave</b></span>
+          <span>Units: <b>Alice, Bob, Carol, Dave, Eve</b></span>
           <span id="agentTownActivity">Status: <b>Idle</b></span>
         </div>
       </div>
@@ -1540,12 +1540,11 @@ body {
       <!-- Town Footer Telemetry -->
       <div class="town-footer" style="margin-top:6px; border-radius:6px; border:1px solid var(--border-subtle);">
         <div class="town-stats">
-          <span>CTX: <b>42%</b></span>
-          <span>SEATS: <b>4/7</b></span>
-          <span id="town-busy-stat"><b>0/4 busy</b></span>
+          <span>LAST TASK: <b id="town-last-task">none</b></span>
+          <span id="town-busy-stat"><b>0/5 busy</b></span>
         </div>
         <div style="font-size:10.5px; color:var(--text-muted);">
-          Oma Virtual Workplace Simulation // Active
+          Workers are lanes of the one Atticus engine; they move only on real task events
         </div>
       </div>
     </div>
@@ -1600,12 +1599,12 @@ body {
     <div class="feed-view-pane" id="feedAgentView" style="flex:1; display:none; flex-direction:column; min-height:0; overflow:hidden;">
       <div style="padding:10px 14px; background:rgba(0,229,255,0.06); border-bottom:1px solid var(--line); font-size:11.5px; display:flex; justify-content:space-between;">
         <span>Multi-Agent Task Stream</span>
-        <b style="color:var(--neon-green);">OMA Coordinator Active</b>
+        <b id="agentStreamTask" style="color:var(--text-muted);">no task yet</b>
       </div>
       <div id="agentCoordStream" style="flex:1; padding:12px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;">
         <div class="feed-card event">
           <div class="feed-meta"><span>COORDINATOR</span><span>OMA</span></div>
-          <div class="feed-text">Registered Workers: <b>Alice</b> (Research), <b>Bob</b> (Browser), <b>Carol</b> (Desktop), <b>Dave</b> (Verification). Ready for delegation.</div>
+          <div class="feed-text">Worker lanes of the shared Atticus engine: <b>Alice</b> (research tools), <b>Bob</b> (browser), <b>Carol</b> (desktop), <b>Dave</b> (verification checks), <b>Eve</b> (YouTube tools). Each becomes active only when the engine really runs one of its tools.</div>
         </div>
       </div>
     </div>
@@ -1659,8 +1658,8 @@ body {
       <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px;">
         <span style="color:var(--text-muted); font-size:11px; text-transform:uppercase; font-weight:bold;">CPU Performance</span>
         <div style="font-size:24px; font-weight:bold; color:#fff; margin:4px 0;" id="pch-cpu-pct">--%</div>
-        <div style="color:var(--neon-cyan); font-size:11.5px;" id="pch-cpu-model">AMD Ryzen 7 7700</div>
-        <div style="color:var(--text-muted); font-size:10.5px;" id="pch-cpu-cores">16 Threads</div>
+        <div style="color:var(--neon-cyan); font-size:11.5px;" id="pch-cpu-model">--</div>
+        <div style="color:var(--text-muted); font-size:10.5px;" id="pch-cpu-cores">--</div>
       </div>
       <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px;">
         <span style="color:var(--text-muted); font-size:11px; text-transform:uppercase; font-weight:bold;">System RAM</span>
@@ -1674,7 +1673,7 @@ body {
     <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(0,229,255,0.2); border-radius:8px; padding:12px;">
       <span style="color:var(--neon-cyan); font-size:11px; text-transform:uppercase; font-weight:bold;">NVIDIA GPU Telemetry (NVML / SMI)</span>
       <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:8px;">
-        <div><span style="color:var(--text-muted);">GPU Model:</span> <b style="display:block; color:#fff;" id="pch-gpu-name">RTX 5060 Ti</b></div>
+        <div><span style="color:var(--text-muted);">GPU Model:</span> <b style="display:block; color:#fff;" id="pch-gpu-name">--</b></div>
         <div><span style="color:var(--text-muted);">GPU Core Load:</span> <b style="display:block; color:#00e5ff;" id="pch-gpu-pct">--%</b></div>
         <div><span style="color:var(--text-muted);">GPU Temp:</span> <b style="display:block; color:#ffb300;" id="pch-gpu-temp">--°C</b></div>
       </div>
@@ -1796,7 +1795,8 @@ body {
         <div class="row">
           <div class="t"><b>Routing mode</b><span>How Oma AI selects models for incoming requests.</span></div>
           <div class="seg" data-k="aiMode">
-            <button data-v="auto" class="on">Auto (Smart Fallback)</button>
+            <button data-v="auto" class="on">Auto</button>
+            <button data-v="cloud">Cloud Preferred</button>
             <button data-v="local">Local Only</button>
             <button data-v="manual">Manual</button>
           </div>
@@ -1808,8 +1808,12 @@ body {
           </select>
         </div>
         <div class="row">
-          <div class="t"><b>Automatic Quota Fallback</b><span>If Claude hits weekly rate limits or quota exhaustion, switch instantly to local Ollama (qwen3-vl:8b) without failing the task.</span></div>
+          <div class="t"><b>Automatic Fallback</b><span>PC actions always run on the Atticus engine (Claude Code) with your permissions. If Claude cannot start or fails before doing anything (quota, retired model, sign-in, network), another model gives a text-only answer and the task is marked PARTIAL when an action was asked for. Local Only and Manual non-Claude models are text-only too.</span></div>
           <label class="sw"><input type="checkbox" data-k="aiFallback" checked></label>
+        </div>
+        <div class="row">
+          <div class="t"><b>Custom fallback order</b><span>Provider IDs, comma separated, e.g. <code>gemini,ollama</code>. Empty = Auto: local first, then cloud.</span></div>
+          <input class="field" id="fallbackOrder" data-k="aiFallbackOrder" placeholder="ollama,gemini" spellcheck="false" style="max-width:220px">
         </div>
         <div class="row">
           <div class="t"><b>Fallback Notification</b><span>Show a notification badge whenever model switching occurs.</span></div>
@@ -1854,8 +1858,7 @@ body {
       <h3>Model</h3>
       <div class="group">
         <div class="row">
-          <div class="t"><b>Claude model</b><span id="modelwhy"></span></div>
-          <div class="seg" data-k="model"><button data-v="haiku">Haiku</button><button data-v="sonnet">Sonnet</button><button data-v="opus">Opus</button></div>
+          <div class="t"><b>Claude model</b><span id="modelwhy"></span></div><div class="seg" data-k="model"><button data-v="haiku">Haiku</button><button data-v="sonnet">Sonnet</button><button data-v="opus">Opus</button></div>
         </div>
         <div class="row">
           <div class="t"><b>Offer Sonnet when stuck</b><span>If a task fails on Haiku, Oma asks to try that one task again with Sonnet. Your other asks stay on Haiku.</span></div>
@@ -1866,7 +1869,7 @@ body {
           <label class="sw"><input type="checkbox" data-k="escalateAuto"></label>
         </div>
         <div class="row">
-          <div class="t"><b>Multi-AI Failover to Local Models</b><span>When your Claude plan hits its weekly limit, seamlessly continue with local Ollama (<b style="color:var(--neon-green);" id="brainLocalModelTag">qwen3-vl:8b</b>).</span></div>
+          <div class="t"><b>Multi-AI Failover to Local Models</b><span>When Claude cannot run, a local model (<b style="color:var(--neon-green);" id="brainLocalModelTag">detected live</b>) or a configured cloud model gives a text-only answer.</span></div>
           <label class="sw"><input type="checkbox" data-k="aiFallback" checked></label>
         </div>
         <div class="row">
@@ -1905,6 +1908,20 @@ body {
         <div class="row"><div class="t"><b>Start Oma AI at login</b><span>Ready when you sit down. Uses almost no memory until you use it.</span></div><label class="sw"><input type="checkbox" data-k="login"></label></div>
         <div class="row"><div class="t"><b>Pause Oma AI</b><span>Ignores its shortcut while paused. Voice and typing will not start.</span></div><label class="sw"><input type="checkbox" data-k="paused"></label></div>
         <div class="row"><div class="t"><b>Show icon in system tray</b><span>Top of the taskbar corner. Left-click opens Oma AI; right-click pauses or quits.</span></div><label class="sw"><input type="checkbox" data-k="menuIcon"></label></div>
+      </div>
+
+      <h3>Answers</h3>
+      <div class="group">
+        <div class="row"><div class="t"><b>Read answers aloud</b><span>In Windows’ voice. Esc stops it. Voice requests are always read aloud.</span></div><label class="sw"><input type="checkbox" data-k="speak"></label></div>
+        <div class="row"><div class="t"><b>Copy answers automatically</b><span>Every answer lands on your clipboard, ready to paste.</span></div><label class="sw"><input type="checkbox" data-k="autoCopy"></label></div>
+        <div class="row"><div class="t"><b>Tips</b><span>Once in a while, a small tip under the answer. After a miss, how to teach Oma to do it right.</span></div><label class="sw"><input type="checkbox" data-k="tips"></label></div>
+        <div class="row"><div class="t"><b>Ask me when unsure</b><span>When more than one thing fits, Oma shows you the choices instead of guessing.</span></div><label class="sw"><input type="checkbox" data-k="askMe"></label></div>
+      </div>
+
+      <h3>Compact answer box (classic Atticus overlay)</h3>
+      <div class="group">
+        <div class="row"><div class="t"><b>Position</b><span>Where the classic compact box appears. The Oma window shows answers in its own chat.</span></div><div class="seg" data-k="corner"><button data-v="top-left">Top left</button><button data-v="top-right">Top right</button></div></div>
+        <div class="row"><div class="t"><b>Keep answers on screen</b><span>How long an answer stays in the classic compact box before it fades.</span></div><div class="seg" data-k="linger"><button data-v="short">Short</button><button data-v="normal">Normal</button><button data-v="long">Long</button></div></div>
       </div>
     </div>
   </section>
@@ -1983,7 +2000,13 @@ body {
       <p class="lede">Windows permissions, speech recognition model, and app control.</p>
       <div class="group">
         <div class="row"><div class="t"><b>Microphone Access</b><span>Needed for holding Ctrl+Alt+Space to talk.</span></div><span class="pill ok" id="micPill">Allowed</span></div>
-        <div class="row"><div class="t"><b>Speech Recognition (Whisper.net)</b><span>Runs entirely on your PC GPU/CPU with zero latency.</span></div><span class="pill ok">Ready</span></div>
+        <div class="row"><div class="t"><b>Speech Recognition (Whisper.net)</b><span id="speechWhy">Runs on this PC. English-only models (.en) cannot understand Bangla.</span></div><span class="pill" id="speechPill">Checking…</span></div>
+      </div>
+      <h3>Safety &amp; Privacy</h3>
+      <div class="group">
+        <div class="row"><div class="t"><b>Safe mode</b><span>Deletes, sends, purchases, file changes and system commands wait for your Allow. (Windows has no sandbox for Claude Code, so this check is the whole of safe mode.)</span></div><label class="sw"><input type="checkbox" data-k="safe"></label></div>
+        <div class="row"><div class="t"><b>Count me as a user</b><span>Once a day, sends a random ID so the maker knows how many people use the app. Never your name, your asks or your screen. (This custom build has no analytics key, so nothing is sent.)</span></div><label class="sw"><input type="checkbox" data-k="stats"></label></div>
+        <div class="row"><div class="t"><b>Help improve Atticus</b><span>When a task fails, sends what you asked, the steps it took and why, cleaned of emails, numbers and paths. (This custom build has no analytics key, so nothing is sent.)</span></div><label class="sw"><input type="checkbox" data-k="improve"></label></div>
       </div>
       <h3>Oma AI Control</h3>
       <div class="group">
@@ -2014,6 +2037,7 @@ body {
       <h3>Updates</h3>
       <div class="group">
         <div class="row"><div class="t"><b>Update Protection</b><span>Auto-updates are locked to preserve your custom Multi-AI and Agent Town build.</span></div><span class="pill ok">Custom Build Locked</span></div>
+        <div class="row"><div class="t"><b>Update automatically</b><span>The original Atticus setting. Upstream Atticus updates are disabled in this custom build so they cannot overwrite Oma; this switch is kept with your saved value and has no effect while the build is locked.</span></div><label class="sw"><input type="checkbox" data-k="autoUpdate" disabled></label></div>
         <div class="row"><div class="t"><b>Update Status</b><span id="upstatus">Oma AI Multi-AI Custom Build (Protected from overwrite)</span></div><button class="btn" data-do="checkUpdate">Check Now</button></div>
       </div>
 
@@ -2087,6 +2111,7 @@ body {
   const set = (k, v) => { P[k] = v; post({ do: 'set', k, v }); paint(); };
   document.querySelectorAll('.seg[data-k]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => set(g.dataset.k, b.dataset.v)));
   document.querySelectorAll('.sw input[data-k]').forEach(i => i.onchange = () => set(i.dataset.k, i.checked));
+  document.querySelectorAll('input.field[data-k]').forEach(i => i.onchange = () => set(i.dataset.k, i.value.trim()));
   document.querySelectorAll('input[type=range]').forEach(r => {
     r.oninput = () => { P[r.dataset.k] = +r.value; paint(); };
     r.onchange = () => { set(r.dataset.k, +r.value); if (r.dataset.k === 'volume') post({ do: 'preview', sound: P.soundDone || 'Windows Ding' }); };
@@ -2101,6 +2126,7 @@ body {
     }));
     document.querySelectorAll('.sw input[data-k]').forEach(i => i.checked = !!P[i.dataset.k]);
     document.querySelectorAll('select[data-k]').forEach(s => s.value = P[s.dataset.k]);
+    document.querySelectorAll('input.field[data-k]').forEach(i => { if (document.activeElement !== i) i.value = P[i.dataset.k] || ''; });
     document.querySelectorAll('input[type=range]').forEach(r => r.value = P[r.dataset.k]);
     $('volv').textContent = Math.round((P.volume || 0.3) / .6 * 100) + '%';
     $('delayv').textContent = (+P.aheadDelay || 0.9).toFixed(1) + ' s';
@@ -2254,10 +2280,10 @@ body {
     const stream = $('homeFeedStream');
     const safeStage = escapeHtml(stage);
     const safeDetail = escapeHtml(detail);
-    const safePct = escapeHtml(pct || '');
+    const safePct = '';   // no percentages: the engine reports steps, not fractions
     const html = `
       <div class="feed-card event">
-        <div class="feed-meta"><span style="color:var(--neon-cyan);">[EXEC STAGE: ${safeStage.toUpperCase()}]</span><span>${safePct ? safePct + '%' : ''}</span></div>
+        <div class="feed-meta"><span style="color:var(--neon-cyan);">${safeStage.toUpperCase()}</span><span>${new Date().toLocaleTimeString()}</span></div>
         <div class="feed-text" style="color:var(--fg2);">${safeDetail}</div>
       </div>
     `;
@@ -2282,8 +2308,7 @@ body {
     
     // Animate visual subsystems
     holoOrb?.setState('thinking');
-    agentTown?.setAgentWorking('bob', text.trim(), 'Analyzing directive & routing models...', 20);
-    if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Processing Directive</b>';
+    if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Sent to Oma</b>';
 
     post({ do: 'ask', text: text.trim() });
   }
@@ -2314,6 +2339,7 @@ body {
 
   // State & Metrics (Usage & Rules)
   function state(s) {
+    if (s && s.plan && $('telemCore')) { $('telemCore').textContent = s.plan.ok ? 'READY' : 'SETUP NEEDED'; $('telemCore').style.color = s.plan.ok ? 'var(--neon-cyan)' : '#ff453a'; $('telemCore').title = s.plan.text || ''; }
     $('stats').innerHTML = [['Today', s.today], ['7 days', s.week], ['All time', s.all]].map(([n, u]) =>
       `<div class="stat"><small>${n}</small><b>${u.asks}</b><span>asks • ${u.usd < 1 ? (u.usd*100).toFixed(1) + '¢' : '$' + u.usd.toFixed(2)}${u.asks ? ' • ' + u.secs + 's avg' : ''}</span></div>`).join('') +
       (s.all.asks ? `<div class="stat"><small>Avg response</small><b>${s.all.secs} s</b><span>per ask, all time</span></div>` : '');
@@ -2357,6 +2383,123 @@ body {
   }
 
   // Global Bridge
+
+  // ===== One authoritative task store: chat, feed, face, OMA and Agent Town all render from backend events =====
+  const OmaTask = (() => {
+    const WN = { alice: 'Alice', bob: 'Bob', carol: 'Carol', dave: 'Dave', eve: 'Eve' };
+    const BADGE = { COMPLETED: ['✓ COMPLETED', 'var(--neon-green)'], PARTIAL: ['⚠ PARTIAL', '#ffb300'], FAILED: ['✕ FAILED', '#ff453a'], CANCELLED: ['■ CANCELLED', '#94a3b8'] };
+    let cur = null;
+    const orbFor = ev => {
+      if (ev.status === 'WAITING') return 'waiting';
+      if (ev.status === 'COMPLETED') return 'completed';
+      if (ev.status === 'FAILED') return 'error';
+      if (ev.status === 'PARTIAL') return 'partial';
+      if (ev.status === 'CANCELLED') return 'active';
+      return ({ analyzing: 'thinking', planning: 'planning', executing: 'executing', verifying: 'verifying', fallback: 'thinking', retry: 'planning', permission: 'waiting' })[ev.stage] || 'thinking';
+    };
+    const modelText = m => m ? `${m.provider} · ${m.resolved || m.model}` : '';
+    function describe(ev) {
+      switch (ev.kind) {
+        case 'task': return ['RECEIVED', ev.detail];
+        case 'stage': return [ev.stage, ev.detail];
+        case 'model': return [ev.attempt && !ev.attempt.ok ? 'MODEL FAILED' : 'MODEL', ev.detail];
+        case 'step': return [`${WN[ev.worker] || ev.worker} · ${ev.step.status}`, ev.detail + (ev.step.status === 'FAILED' && ev.step.error ? ' — ' + ev.step.error : '')];
+        case 'worker': return [`${WN[ev.worker] || ev.worker} · VERIFYING`, ev.detail];
+        case 'evidence': return [`Dave · ${ev.ok === true ? 'OK' : ev.ok === false ? 'CONTRADICTED' : 'UNVERIFIED'}`, ev.detail];
+        case 'permission': return ['WAITING FOR YOU', ev.detail];
+        case 'note': return ['OMA', ev.detail];
+        case 'result': return [ev.status, ev.detail];
+      }
+      return [ev.kind, ev.detail || ''];
+    }
+    function agentLine(ev, head, text) {
+      const box = $('agentCoordStream');
+      if (!box) return;
+      const card = document.createElement('div');
+      card.className = 'feed-card event';
+      card.innerHTML = `<div class="feed-meta"><span>${esc(head)}</span><span>${esc(ev.task_id)} · ${new Date(ev.ts * 1000).toLocaleTimeString()}</span></div><div class="feed-text">${esc(text)}</div>`;
+      box.appendChild(card); box.scrollTop = box.scrollHeight;
+    }
+    function event(ev) {
+      if (!cur || cur.id !== ev.task_id) cur = { id: ev.task_id, status: ev.status };
+      cur.status = ev.status; cur.stage = ev.stage; cur.model = ev.active_model; cur.workers = ev.workers;
+      const [head, text] = describe(ev);
+      if (ev.kind !== 'result') appendFeedEvent(head, text);
+      agentLine(ev, head, text);
+      if ($('agentStreamTask')) $('agentStreamTask').textContent = `${ev.task_id} · ${ev.status}`;
+      const act = $('agentTownActivity');
+      if (act) act.innerHTML = `Status: <b style="color:var(--neon-cyan);">${esc(ev.status)}</b> — ${esc(ev.stage)}`;
+      if (ev.active_model && $('telemActiveModel')) $('telemActiveModel').textContent = modelText(ev.active_model);
+      holoOrb?.setState(orbFor(ev));
+      window.agentTown?.applyTask(ev);
+      if (ev.kind === 'result' && $('town-last-task')) $('town-last-task').textContent = `${ev.task_id} ${ev.status}`;
+    }
+    function reply(rep) {
+      const status = rep.status || (rep.success ? 'COMPLETED' : 'FAILED');
+      const [label, color] = BADGE[status] || BADGE.FAILED;
+      const model = rep.provider_used ? `${rep.provider_used} · ${rep.model_used}` : '';
+      const tried = (rep.models_tried || []).filter(a => !a.ok).map(a => `${a.provider} ${a.model}: ${a.error_type}`).join('; ');
+      const ev = (rep.evidence || []).map(e => `${e.ok === true ? '✓' : e.ok === false ? '✕' : '?'} ${e.check}: ${e.evidence}`);
+      let body = escapeHtml(rep.reply || '').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+      if (rep.error && status !== 'COMPLETED') body += `<div style="margin-top:6px;color:${color};font-size:11.5px;">Reason: ${esc(rep.error)}</div>`;
+      if (ev.length) body += `<div style="margin-top:6px;color:var(--text-muted);font-size:11px;">Verification:<br>${ev.map(esc).join('<br>')}</div>`;
+      if (tried) body += `<div style="margin-top:4px;color:var(--text-muted);font-size:11px;">Model attempts that failed: ${esc(tried)}</div>`;
+      const html = `<div class="feed-card oma" style="border-left:3px solid ${color};"><div class="feed-meta"><span>OMA AI <b style="color:${color};">${label}</b></span>${model ? `<span class="model-tag ${rep.fallback_occurred ? 'fallback' : ''}">${esc(model)}${rep.text_only ? ' · text only' : ''}</span>` : ''}</div><div class="feed-text">${body}</div></div>`;
+      ['homeFeedStream', 'fullFeedStream'].forEach(id => { const el = $(id); if (el) { el.insertAdjacentHTML('beforeend', html); el.scrollTop = el.scrollHeight; } });
+      holoOrb?.setState(status === 'COMPLETED' ? 'completed' : status === 'FAILED' ? 'error' : status === 'PARTIAL' ? 'partial' : 'active');
+      if (!rep.task_id) {   // the app itself refused (busy / timeout / crash): no backend task exists
+        const act = $('agentTownActivity'); if (act) act.innerHTML = `Status: <b style="color:${color};">${esc(status)}</b>`;
+      }
+    }
+    function card(html) {
+      const el = $('homeFeedStream');
+      if (!el) return null;
+      const d = document.createElement('div');
+      d.className = 'feed-card event ask-card';
+      d.style.cssText = 'border-left:3px solid #ffb300;background:rgba(255,179,0,0.08);';
+      d.innerHTML = html;
+      el.appendChild(d); el.scrollTop = el.scrollHeight;
+      return d;
+    }
+    function answerButtons(d) {
+      d.querySelectorAll('button[data-v]').forEach(b => b.onclick = () => {
+        post({ do: 'answer', v: b.dataset.v });
+        d.querySelectorAll('button').forEach(x => x.disabled = true);
+        b.textContent = '✓ ' + b.textContent;
+      });
+    }
+    function ask(q) {   // safety gate (Allow / Don't Allow) or the retry card
+      holoOrb?.setState('waiting');
+      const retry = q.kind === 'retry';
+      const btns = retry
+        ? `<button class="btn blue" data-v="r">Try again</button>${q.escalate ? '<button class="btn" data-v="y">Try Sonnet</button>' : ''}<button class="btn" data-v="">Not now</button>`
+        : `<button class="btn blue" data-v="y">Allow</button><button class="btn red" data-v="n">Don't Allow</button>`;
+      const d = card(`<div class="feed-meta"><span style="color:#ffb300;font-weight:700;">${retry ? 'COULDN’T FINISH' : 'PERMISSION NEEDED'}</span><span>${retry ? '' : 'Safe mode'}</span></div>
+        <div class="feed-text"><b>${esc(q.q)}</b>${q.cmd ? `<pre style="white-space:pre-wrap;font-size:11px;background:rgba(0,0,0,.35);padding:6px;border-radius:6px;margin:6px 0;">${esc(q.cmd)}</pre>` : ''}</div>
+        <div style="display:flex;gap:6px;margin-top:4px;">${btns}</div>`);
+      if (d) answerButtons(d);
+    }
+    function pick(q) {
+      holoOrb?.setState('waiting');
+      const opts = (q.options || []).map((o, i) => `<button class="btn" data-v="${i}" style="text-align:left;">${esc(typeof o === 'string' ? o : (o.label || o.title || JSON.stringify(o)))}</button>`).join('');
+      const d = card(`<div class="feed-meta"><span style="color:#ffb300;font-weight:700;">WHICH ONE?</span></div><div class="feed-text"><b>${esc(q.q)}</b></div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px;">${opts}<button class="btn" data-v="">None of these</button></div>`);
+      if (d) answerButtons(d);
+    }
+    function done() {
+      document.querySelectorAll('.ask-card button').forEach(b => b.disabled = true);
+      setTimeout(() => { if (holoOrb && ['completed', 'error', 'partial'].includes(holoOrb.state)) holoOrb.setState('active'); }, 4000);
+    }
+    function restore(snap) {
+      const t = snap && snap.task;
+      if (t && $('town-last-task')) $('town-last-task').textContent = `${t.task_id} ${t.status}`;
+      if (t && t.model && $('telemActiveModel')) $('telemActiveModel').textContent = modelText(t.model);
+      if (snap && snap.workers) window.agentTown?.updateFromBackendStatus(snap);
+    }
+    return { event, reply, ask, pick, done, restore, get current() { return cur; } };
+  })();
+  window.OmaTask = OmaTask;
+
   window.st = {
     load(d) {
       P = { talkMode: 'hold', ...d.prefs };
@@ -2367,7 +2510,16 @@ body {
     },
     state,
     perms(p) {
-      if ($('micPill')) $('micPill').className = p.mic ? 'pill ok' : 'pill no';
+      if ($('micPill')) { $('micPill').className = p.mic ? 'pill ok' : 'pill no'; $('micPill').textContent = p.mic ? 'Allowed' : 'Blocked'; }
+      const sp = $('speechPill');
+      if (sp) {
+        const m = P.speechModel || '';
+        sp.className = p.speech ? 'pill ok' : 'pill no';
+        sp.textContent = p.speech ? `Ready (${m})` : `Model ${m} not installed`;
+        if ($('speechWhy')) $('speechWhy').textContent = m.endsWith('.en')
+          ? `Model ${m} is English-only: Bangla voice commands cannot be understood with it.`
+          : `Model ${m}: multilingual (English and Bangla). Runs on this PC.`;
+      }
     },
     providers: renderProviders,
     providerTestResult(res) {
@@ -2455,8 +2607,7 @@ body {
       if (finalText && finalText.trim()) {
         appendFeedMessage('user', 'You', finalText.trim());
         holoOrb?.setState('thinking');
-        agentTown?.setAgentWorking('bob', finalText.trim(), 'Analyzing directive & routing models...', 25);
-        if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Processing Directive</b>';
+        if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b style="color:var(--neon-cyan);">Voice command sent</b>';
       } else {
         holoOrb?.setState('active');
         if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b>Idle</b>';
@@ -2464,87 +2615,43 @@ body {
     },
     feedLine(line) {
       if (!line) return;
-      if (line.startsWith('§AGENT_EVENT§') || line.startsWith('§EVENT§')) {
-        try {
-          const isAgent = line.startsWith('§AGENT_EVENT§');
-          const ev = JSON.parse(line.slice(isAgent ? 13 : 7));
-          appendFeedEvent(ev.stage || ev.state, ev.detail || ev.task_name, ev.pct || 50);
-
-          // Add to Agent Tab stream
-          const agentStream = $('agentCoordStream');
-          if (agentStream) {
-            const card = document.createElement('div');
-            card.className = 'feed-card event';
-            card.innerHTML = `
-              <div class="feed-meta"><span>${ev.agent ? ev.agent.toUpperCase() : 'COORDINATOR'}</span><span>${ev.state || ev.stage || 'ACTIVE'}</span></div>
-              <div class="feed-text">${esc(ev.task_name || ev.detail || '')}</div>
-            `;
-            agentStream.appendChild(card);
-            agentStream.scrollTop = agentStream.scrollHeight;
-          }
-
-          if (window.agentTown && window.agentTown.onTaskEvent) {
-            window.agentTown.onTaskEvent(ev.state || ev.stage, ev.task_name || ev.detail);
-          }
-        } catch (_) {}
-      } else if (line.startsWith('§REPLY§')) {
-        try {
-          const rep = JSON.parse(line.slice(7));
-          appendFeedMessage('oma', 'Oma AI', rep.reply, `${rep.provider_used || 'Auto'} (${rep.model_used || 'Fast'})`, rep.fallback_occurred);
-          holoOrb?.setState('completed');
-          setTimeout(() => holoOrb?.setState('active'), 3000);
-        } catch (_) {}
-      } else if (line.startsWith('—, ')) {
-        const step = line.slice(3);
-        appendFeedEvent('tool', step, 75);
-        holoOrb?.setState('executing');
-        agentTown?.onTaskEvent('executing', step);
-      } else if (line.startsWith('— ')) {
-        const answer = line.slice(2);
-        appendFeedMessage('oma', 'Oma AI', answer, 'Auto');
-        holoOrb?.setState('completed');
-        setTimeout(() => holoOrb?.setState('active'), 2500);
-      }
+      if (line.startsWith('§EVENT§')) { try { OmaTask.event(JSON.parse(line.slice(7))); } catch (e) { console.error(e); } return; }
+      if (line.startsWith('§REPLY§')) { try { OmaTask.reply(JSON.parse(line.slice(7))); } catch (e) { console.error(e); } return; }
+      // other engine lines are not shown: the §EVENT§ stream carries the same facts with their real status
     },
-    feedDone() {
-      setTimeout(() => {
-        holoOrb?.setState('active');
-        if ($('agentTownActivity')) $('agentTownActivity').innerHTML = 'Status: <b>Idle</b>';
-      }, 1500);
-    },
+    feedDone() { OmaTask.done(); },
+    askCard(q) { OmaTask.ask(q); },
+    pickCard(q) { OmaTask.pick(q); },
+    taskState(snap) { OmaTask.restore(snap); },
     pcHealth(data) {
       if (!data) return;
-      // Header chip update
+      const pct = v => (typeof v === 'number' && v >= 0) ? `${v}%` : '--';
+      const g = data.gpu || {};
       const valEl = $('header-pchealth-val');
-      if (valEl && data.cpu && data.ram) {
-        valEl.textContent = `${data.cpu.utilization_pct}% CPU | ${data.ram.utilization_pct}% RAM | ${data.gpu && data.gpu.available ? data.gpu.name.replace('NVIDIA GeForce ', '') : 'RTX 5060 Ti'}`;
-      }
-
-      // Modal updates
+      if (valEl && data.cpu && data.ram) valEl.textContent = `${pct(data.cpu.utilization_pct)} CPU | ${pct(data.ram.utilization_pct)} RAM | ${g.available ? 'GPU ' + pct(g.utilization_pct) : 'GPU n/a'}`;
       if (data.cpu) {
-        if ($('pch-cpu-pct')) $('pch-cpu-pct').textContent = `${data.cpu.utilization_pct}%`;
-        if ($('pch-cpu-model')) $('pch-cpu-model').textContent = data.cpu.model || 'AMD Ryzen 7 7700';
-        if ($('pch-cpu-cores')) $('pch-cpu-cores').textContent = `${data.cpu.cores || 16} Hardware Threads`;
+        if ($('pch-cpu-pct')) $('pch-cpu-pct').textContent = pct(data.cpu.utilization_pct);
+        if ($('pch-cpu-model')) $('pch-cpu-model').textContent = data.cpu.model || 'unknown CPU';
+        if ($('pch-cpu-cores')) $('pch-cpu-cores').textContent = `${data.cpu.cores} logical processors`;
       }
       if (data.ram) {
-        if ($('pch-ram-pct')) $('pch-ram-pct').textContent = `${data.ram.utilization_pct}%`;
+        if ($('pch-ram-pct')) $('pch-ram-pct').textContent = pct(data.ram.utilization_pct);
         if ($('pch-ram-used')) $('pch-ram-used').textContent = `${data.ram.used_gb} GB Used`;
         if ($('pch-ram-avail')) $('pch-ram-avail').textContent = `${data.ram.total_gb} GB Total (${data.ram.avail_gb} GB Avail)`;
       }
-      if (data.gpu) {
-        if ($('pch-gpu-name')) $('pch-gpu-name').textContent = data.gpu.name || 'NVIDIA GeForce RTX 5060 Ti';
-        if ($('pch-gpu-pct')) $('pch-gpu-pct').textContent = `${data.gpu.utilization_pct}%`;
-        if ($('pch-gpu-temp')) $('pch-gpu-temp').textContent = `${data.gpu.temperature_c}°C`;
-        if ($('pch-gpu-vram')) $('pch-gpu-vram').textContent = `${data.gpu.vram_used_gb} GB / ${data.gpu.vram_total_gb} GB`;
-        if ($('pch-gpu-vram-pct')) $('pch-gpu-vram-pct').textContent = `${data.gpu.vram_pct}%`;
-      }
+      if ($('pch-gpu-name')) $('pch-gpu-name').textContent = g.available ? g.name : `not measured (${g.source || 'no NVIDIA tool'})`;
+      if ($('pch-gpu-pct')) $('pch-gpu-pct').textContent = g.available ? pct(g.utilization_pct) : '--';
+      if ($('pch-gpu-temp')) $('pch-gpu-temp').textContent = g.available ? `${g.temperature_c}°C` : '--';
+      if ($('pch-gpu-vram')) $('pch-gpu-vram').textContent = g.available ? `${g.vram_used_gb} GB / ${g.vram_total_gb} GB` : '--';
+      if ($('pch-gpu-vram-pct')) $('pch-gpu-vram-pct').textContent = g.available ? pct(g.vram_pct) : '--';
       if (data.process_tree) {
-        const pt = data.process_tree;
-        if ($('pch-tree-total')) $('pch-tree-total').textContent = `Total Stack: ${pt.total_oma_ecosystem_gb} GB (${pt.total_oma_ecosystem_mb} MB)`;
-        if ($('pch-proc-atticus')) $('pch-proc-atticus').textContent = `${pt.atticus_app_mb} MB`;
-        if ($('pch-proc-webview')) $('pch-proc-webview').textContent = `${pt.webview2_cluster_mb} MB (${pt.webview2_instances} inst)`;
-        if ($('pch-proc-python')) $('pch-proc-python').textContent = `${pt.python_backend_mb} MB (${pt.python_instances} inst)`;
-        if ($('pch-proc-ollama')) $('pch-proc-ollama').textContent = `${pt.ollama_inference_mb} MB (${pt.ollama_instances} inst)`;
+        const pt = data.process_tree, gr = pt.groups || {};
+        const c = k => gr[k] ? ` · CPU ${gr[k].cpu_pct}%` : '';
+        if ($('pch-tree-total')) { $('pch-tree-total').textContent = `Oma total: ${pt.total_oma_ecosystem_mb} MB (excl. Ollama)`; $('pch-tree-total').title = pt.note || ''; }
+        if ($('pch-proc-atticus')) $('pch-proc-atticus').textContent = `${pt.atticus_app_mb} MB${c('app')}`;
+        if ($('pch-proc-webview')) $('pch-proc-webview').textContent = `${pt.webview2_cluster_mb} MB (${pt.webview2_instances})${c('webview2')}`;
+        if ($('pch-proc-python')) $('pch-proc-python').textContent = `${pt.python_backend_mb} MB (${pt.python_instances})`;
+        if ($('pch-proc-ollama')) $('pch-proc-ollama').textContent = `${pt.ollama_inference_mb} MB (${pt.ollama_instances})${c('ollama')}`;
       }
     },
     workersStatus(data) {
@@ -2783,11 +2890,7 @@ body {
     if (btnTerminate) {
       btnTerminate.onclick = () => {
         post({ do: 'voiceCancel' });
-        if (window.holoOrb) window.holoOrb.setState('active');
-        if (window.agentTown) {
-          Object.values(window.agentTown.agents).forEach(a => { a.state = 'IDLE'; a.speechBubble = null; });
-          window.agentTown.updateChipsBar();
-        }
+        post({ do: 'cancelTask' });   // the backend reports CANCELLED; worker states follow its event
       };
     }
   });

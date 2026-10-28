@@ -217,16 +217,23 @@ sealed class SettingsWindow : PageWindow
         CancelCurrentTask();
     }
 
+    string askFile = "";
+    bool cancelled;
+
+    void Answer(string v)   // whole, or the waiting side reads it half-written
+    {
+        var f = askFile; askFile = "";
+        if (f == "" || !Path.GetFileName(Path.GetDirectoryName(f) ?? "").StartsWith("atticus-")) return;   // only an answer file the engine made
+        try { File.WriteAllText(f + ".tmp", v); File.Move(f + ".tmp", f, true); } catch (Exception ex) { Program.Err("Answer: " + ex.Message); }
+    }
+
     void CancelCurrentTask()
     {
-        if (currentProc != null)
-        {
-            try { currentProc.Kill(true); } catch { }
-            currentProc = null;
-            Js("st.feedLine('§EVENT§' + JSON.stringify({ stage: 'completed', detail: 'Directive cancelled by user.', pct: 100 }));");
-            Js("st.feedDone();");
-            Sound.Cue("soundStop");
-        }
+        if (currentProc == null) return;
+        cancelled = true;
+        try { currentProc.Kill(true); } catch { }
+        askFile = "";
+        Sound.Cue("soundStop");
     }
 
     static string Hints()
@@ -273,17 +280,15 @@ sealed class SettingsWindow : PageWindow
     }
     void TelemetryTick(object s, EventArgs e)
     {
-        if (!Visible) return;
+        if (!Visible || WindowState == FormWindowState.Minimized) return;
         Task.Run(TelemetryTickCore);
     }
     void TelemetryTickCore()
     {
         try {
-            var h = Py.Run(new[] { "--pc-health" });
-            if (h.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.pcHealth({h})"));
-            var w = Py.Run(new[] { "--workers-status" });
-            if (w.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.workersStatus({w})"));
-        } catch { }
+            var h = Health.Json();   // native: no Python/PowerShell process per tick
+            Program.Post(() => { if (Visible && WindowState != FormWindowState.Minimized) Js($"st.pcHealth({h})"); });
+        } catch (Exception ex) { Program.Err("Health: " + ex.Message); }
     }
 
     protected override void Loaded() {
@@ -292,6 +297,12 @@ sealed class SettingsWindow : PageWindow
         BringToFront();
         Push(); Refresh2(); Send("st.perms", OnboardingWindow.Perms()); if (tab != "") { Js($"st.tab('{tab}')"); tab = ""; }
         StartTelemetryTimer();
+        Task.Run(() => {
+            try {
+                var ts = Py.Run(new[] { "--task-state" });
+                if (ts.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.taskState({ts})"));
+            } catch { }
+        });
         Task.Run(() => {
             try {
                 var notes = Py.Run(new[] { "--notes-list" });
@@ -470,15 +481,18 @@ sealed class SettingsWindow : PageWindow
                 break;
             case "workersStatus":
                 Task.Run(() => {
-                    var j = Py.Run(new[] { "--workers-status" });
-                    if (j.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.workersStatus({j})"));
+                    var j = Py.Run(new[] { "--task-state" });
+                    if (j.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.taskState({j})"));
                 });
                 break;
             case "pcHealth":
-                Task.Run(() => {
-                    var j = Py.Run(new[] { "--pc-health" });
-                    if (j.TrimStart().StartsWith("{")) Program.Post(() => Js($"st.pcHealth({j})"));
-                });
+                Task.Run(() => { var j = Health.Json(); Program.Post(() => Js($"st.pcHealth({j})")); });
+                break;
+            case "answer":   // the user's answer to the safety gate, the retry card or a "which one?" card
+                if (askFile != "" && b.TryGetProperty("v", out var av)) Answer(av.ValueKind == JsonValueKind.String ? av.GetString() ?? "" : av.ToString());
+                break;
+            case "cancelTask":
+                Program.Post(CancelCurrentTask);
                 break;
             case "notesList":
                 Task.Run(() => {
@@ -512,32 +526,28 @@ sealed class SettingsWindow : PageWindow
         }
     }
 
+    static string ReplyJson(string status, string reply, string error, string reqId) =>
+        "§REPLY§" + JsonSerializer.Serialize(new { success = status == "COMPLETED", status, reply, error, req_id = reqId });
+
+    // One request from the Oma window through the original Atticus pipeline (atticus.py --oma-ask). Every line it prints
+    // is a real engine event; the final §REPLY§ carries COMPLETED / PARTIAL / FAILED. Safety-gate questions, "which one?"
+    // choices and setting changes are answered here, exactly like the classic overlay.
     public async Task ExecuteDirective(string askText, bool isVoice)
     {
         if (string.IsNullOrWhiteSpace(askText)) return;
         var reqId = Guid.NewGuid().ToString("N")[..8];
         if (!await askLock.WaitAsync(100))
         {
-            var busyMsg = "§REPLY§" + JsonSerializer.Serialize(new {
-                success = false,
-                reply = "Oma AI is currently processing another directive. Please wait a moment.",
-                error = "concurrency_busy",
-                req_id = reqId
-            });
-            Program.Post(() => {
-                Js($"st.feedLine({Web.Json(busyMsg)})");
-                Js("st.feedDone()");
-            });
+            var busy = ReplyJson("FAILED", "Oma is still working on the previous request. Wait for it to finish or press TERMINATE.", "busy", reqId);
+            Program.Post(() => Js($"st.feedLine({Web.Json(busy)})"));
             return;
         }
-
         Process p = null;
+        cancelled = false;
         try
         {
-            bool gotReply = false;
-            string replyTextToSpeak = null;
-
-            p = Py.Start(new[] { "--oma-ask", askText });
+            string status = null, replyText = null;
+            p = Py.Start(new[] { "--oma-ask", askText }, new() { ["ATTICUS_UI"] = "1", ["ATTICUS_FRONT"] = Hooks.Mine ?? "", ["OMA_SOURCE"] = isVoice ? "voice" : "typed" });
             currentProc = p;
             var errTask = p.StandardError.ReadToEndAsync();
             var lineTask = Task.Run(async () =>
@@ -547,85 +557,100 @@ sealed class SettingsWindow : PageWindow
                     var l = line;
                     if (l.StartsWith("§REPLY§"))
                     {
-                        gotReply = true;
                         try
                         {
                             var rep = JsonDocument.Parse(l[7..]).RootElement;
-                            if (rep.TryGetProperty("reply", out var rVal))
-                                replyTextToSpeak = rVal.GetString();
+                            status = rep.TryGetProperty("status", out var st) ? st.GetString() : null;
+                            replyText = rep.TryGetProperty("reply", out var rv) ? rv.GetString() : null;
                         }
                         catch { }
                     }
-                    else if (l.StartsWith("— "))
-                    {
-                        gotReply = true;
-                        replyTextToSpeak = l[2..];
-                    }
-                    Program.Post(() => Js($"st.feedLine({Web.Json(l)})"));
+                    Program.Post(() => OnEngineLine(l));
                 }
             });
-
-            var completed = await Task.WhenAny(lineTask, Task.Delay(90000));
+            // a task may wait up to 60 s for an Allow and run long tools: 5 minutes, then it is stopped and reported
+            var completed = await Task.WhenAny(lineTask, Task.Delay(TimeSpan.FromMinutes(5)));
             if (completed != lineTask)
             {
                 try { p.Kill(true); } catch { }
-                var timeoutMsg = "§REPLY§" + JsonSerializer.Serialize(new {
-                    success = false,
-                    reply = "Request timed out after 90 seconds. The process was stopped.",
-                    error = "timeout",
-                    req_id = reqId
-                });
-                Program.Post(() => Js($"st.feedLine({Web.Json(timeoutMsg)})"));
+                Program.Post(() => Js($"st.feedLine({Web.Json(ReplyJson("FAILED", "Stopped after 5 minutes without a result.", "timeout", reqId))})"));
+                return;
+            }
+            await p.WaitForExitAsync();
+            string errOutput = "";
+            try { errOutput = await errTask; } catch { }
+            if (cancelled)
+                Program.Post(() => Js($"st.feedLine({Web.Json(ReplyJson("CANCELLED", "You stopped this request.", "cancelled by user", reqId))})"));
+            else if (status == null)
+            {
+                var why = SanitizeError(errOutput);
+                if (string.IsNullOrWhiteSpace(why)) why = p.ExitCode != 0 ? $"atticus.py exited with code {p.ExitCode}" : "The engine ended without a result.";
+                Program.Err($"Ask {reqId} ended without a reply: {why}");
+                Program.Post(() => Js($"st.feedLine({Web.Json(ReplyJson("FAILED", "The request ended without a result.", why, reqId))})"));
             }
             else
             {
-                await p.WaitForExitAsync();
-                string errOutput = "";
-                try { errOutput = await errTask; } catch { }
-
-                if (!gotReply || p.ExitCode != 0)
+                Sound.Cue(status == "COMPLETED" ? "soundDone" : "soundStop");
+                if (!string.IsNullOrWhiteSpace(replyText))
                 {
-                    string cleanErr = SanitizeError(errOutput);
-                    if (string.IsNullOrWhiteSpace(cleanErr))
-                    {
-                        cleanErr = p.ExitCode != 0 ? $"Process exited with code {p.ExitCode}" : "No response generated by model.";
-                    }
-                    var failMsg = "§REPLY§" + JsonSerializer.Serialize(new {
-                        success = false,
-                        reply = $"Execution failed: {cleanErr}",
-                        error = cleanErr,
-                        req_id = reqId
-                    });
-                    Program.Post(() => Js($"st.feedLine({Web.Json(failMsg)})"));
-                }
-                else
-                {
-                    Sound.Cue("soundDone");
-                    if ((isVoice || Prefs.Bool("speak")) && !string.IsNullOrWhiteSpace(replyTextToSpeak))
-                    {
-                        Voice.Say(replyTextToSpeak, () => {});
-                    }
+                    if (Prefs.Bool("autoCopy")) { var t = replyText; Program.Post(() => { try { Clipboard.SetText(t); } catch { } }); }
+                    if (isVoice || Prefs.Bool("speak")) { var t = replyText; Program.Post(() => { Js("holoOrb?.setState('speaking')"); Voice.Say(t, () => Js("holoOrb?.setState('active')")); }); }
                 }
             }
         }
         catch (Exception ex)
         {
             Program.Err($"Ask exception ({reqId}): {ex.Message}");
-            var exMsg = "§REPLY§" + JsonSerializer.Serialize(new {
-                success = false,
-                reply = $"Internal system error: {ex.Message}",
-                error = ex.Message,
-                req_id = reqId
-            });
-            Program.Post(() => Js($"st.feedLine({Web.Json(exMsg)})"));
+            Program.Post(() => Js($"st.feedLine({Web.Json(ReplyJson("FAILED", "Internal error in the Oma app.", ex.Message, reqId))})"));
         }
         finally
         {
             if (currentProc == p) currentProc = null;
             p?.Dispose();
+            askFile = "";
             askLock.Release();
             Program.Post(() => Js("st.feedDone()"));
         }
+    }
+
+    // Lines from the engine, on the UI thread.
+    void OnEngineLine(string line)
+    {
+        if (line == "! setup") { Program.Onboarding.Open(); return; }   // Claude not installed, signed out or no plan
+        if (line.StartsWith("@ ")) { Ring.At(line); return; }   // experimental "show me where"
+        if (line.StartsWith("? "))   // "? <question>\t<command>\t<answer file>[\t<escalate>[\tretry]]"
+        {
+            var q = line[2..].Split('\t');
+            if (q.Length is < 3 or > 5) return;
+            askFile = q[2];
+            var retry = q.Length == 5 && q[4] == "retry";
+            Js($"st.askCard({Web.Json(new { q = q[0], cmd = retry ? "" : q[1], kind = retry ? "retry" : "permission", escalate = q.Length >= 4 && q[3] == "escalate" })})");
+            if (!Visible || WindowState == FormWindowState.Minimized) Raise();
+            return;
+        }
+        if (line.StartsWith("◇ "))   // "which one?"
+        {
+            try
+            {
+                using var d = JsonDocument.Parse(line[2..]);
+                askFile = d.RootElement.GetProperty("a").GetString() ?? "";
+                Js($"st.pickCard({Web.Json(new { q = d.RootElement.GetProperty("q").GetString(), options = d.RootElement.GetProperty("options") })})");
+            }
+            catch { }
+            return;
+        }
+        if (line.StartsWith("⚙ "))   // the AI changes one of the settings; never pause, and Safe mode only on
+        {
+            var q = line.Split(' ');
+            if (q.Length != 3 || q[1] == "paused") return;
+            var def = Prefs.Defaults.GetValueOrDefault(q[1]);
+            if (def is bool && (q[1] != "safe" || q[2] == "true")) Apply(q[1], q[2] == "true");
+            else if (def is string) Apply(q[1], q[2]);
+            else return;
+            Push();
+            return;
+        }
+        Js($"st.feedLine({Web.Json(line)})");
     }
 }
 

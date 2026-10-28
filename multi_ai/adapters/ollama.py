@@ -1,144 +1,66 @@
 """
-Multi-AI Architecture: Ollama Local Provider Adapter
-Directly integrates with local Ollama runtime on localhost:11434.
+Multi-AI Architecture: Ollama local provider adapter (text only).
+
+Root cause of the "Ollama returned an empty response" failures: qwen3 / qwen3-vl are thinking models. Through
+/api/generate their reasoning goes to the separate `thinking` field; qwen3-vl ignores think=false and, when it never
+closes its reasoning, `response` comes back empty. This adapter uses /api/chat with think=false, prefers a non-vision
+model for text (router), and reports an empty answer as error_type 'empty_output' (never as success).
+It never performs PC actions: those belong to the Atticus engine and its safety gate.
 """
 import json
-import urllib.request
+import time
 import urllib.error
-from typing import Dict, Any, List, Optional
+import urllib.request
+from typing import Any, Dict, List
+
 from multi_ai.models import ModelInfo
-from multi_ai.tools import get_openai_tool_definitions, execute_tool_call
+
 
 class OllamaAdapter:
-    def __init__(self, base_url: str = "http://localhost:11434"):
+    def __init__(self, base_url: str = "http://localhost:11434", timeout: float = 120.0):
         self.base_url = base_url.rstrip('/')
+        self.timeout = timeout
 
     def discover_models(self) -> List[ModelInfo]:
-        """Discovers locally installed models in Ollama."""
-        models = []
-        try:
-            req = urllib.request.Request(f"{self.base_url}/api/tags")
-            with urllib.request.urlopen(req, timeout=3) as res:
-                data = json.loads(res.read().decode('utf-8'))
-                for m in data.get('models', []):
-                    name = m.get('name', '')
-                    is_vl = 'vl' in name.lower() or 'vision' in name.lower()
-                    models.append(ModelInfo(
-                        model_id=name,
-                        provider_id="ollama",
-                        display_name=f"Ollama: {name}",
-                        supports_tools=True,
-                        supports_vision=is_vl,
-                        local=True,
-                        context_limit=32768
-                    ))
-        except Exception:
-            pass
-        return models
+        from multi_ai.model_catalog import ollama_models
+        return [ModelInfo(model_id=m['name'], provider_id='ollama', display_name=f"Ollama: {m['name']}", supports_tools=m['tools'],
+                          supports_vision=m['vision'], local=True, context_limit=32768) for m in ollama_models()]
 
     def is_available(self) -> bool:
         try:
-            req = urllib.request.Request(f"{self.base_url}/api/tags")
-            with urllib.request.urlopen(req, timeout=2) as res:
+            with urllib.request.urlopen(f"{self.base_url}/api/tags", timeout=2) as res:
                 return res.status == 200
         except Exception:
             return False
 
-    def generate(self, model_id: str, prompt: str, system_prompt: str = "") -> Dict[str, Any]:
-        """
-        Executes a prompt through Ollama with automatic tool assistance if needed.
-        """
-        # First check if the prompt requires a tool call
-        p_lower = prompt.lower()
-        tool_executed = False
-        tool_output = ""
-
-        if any(w in p_lower for w in ['open', 'launch', 'ক্যালকুলেটর', 'নোটপ্যাড', 'ক্রোম', 'খুলো']):
-            if 'calc' in p_lower or 'ক্যালকুলেটর' in p_lower:
-                tool_output = execute_tool_call('open_app', {'app_name': 'calculator'})
-                tool_executed = True
-            elif 'notepad' in p_lower or 'নোটপ্যাড' in p_lower:
-                tool_output = execute_tool_call('open_app', {'app_name': 'notepad'})
-                tool_executed = True
-            elif 'chrome' in p_lower or 'ক্রোম' in p_lower:
-                tool_output = execute_tool_call('open_app', {'app_name': 'chrome'})
-                tool_executed = True
-
-        if tool_executed:
-            is_err = tool_output.startswith("Error") or "failed" in tool_output.lower()
-            return {
-                'success': not is_err,
-                'reply': tool_output,
-                'tool_called': True,
-                'error': tool_output if is_err else None,
-                'model': model_id,
-                'provider': 'ollama'
-            }
-
-        # Check if vision model and screen prompt (F08)
-        images = []
-        is_vision = any(v in model_id.lower() for v in ('vl', 'vision', 'llava', 'bakllava'))
-        if is_vision and any(w in p_lower for w in ('screen', 'display', 'see', 'look', 'read screen', 'what is on', 'স্ক্রিন', 'দেখো')):
-            try:
-                try:
-                    import winctl
-                except ImportError:
-                    winctl = None
-                if winctl and hasattr(winctl, 'monitors') and hasattr(winctl, 'capture'):
-                    mons = winctl.monitors()
-                    if mons:
-                        import tempfile, base64
-                        fd, tmp_path = tempfile.mkstemp(prefix='oma-ollama-vis-', suffix='.jpg')
-                        os.close(fd)
-                        try:
-                            winctl.capture(mons[0], tmp_path)
-                            if os.path.exists(tmp_path):
-                                with open(tmp_path, 'rb') as img_f:
-                                    images.append(base64.b64encode(img_f.read()).decode('utf-8'))
-                        finally:
-                            if os.path.exists(tmp_path):
-                                os.remove(tmp_path)
-            except Exception:
-                pass
-
-        # Standard Ollama generation
-        payload = {
-            'model': model_id,
-            'prompt': prompt,
-            'stream': False
-        }
-        if images:
-            payload['images'] = images
+    def generate(self, model_id: str, prompt: str, system_prompt: str = "", images: List[str] = None) -> Dict[str, Any]:
+        messages = []
         if system_prompt:
-            payload['system'] = system_prompt
-
+            messages.append({'role': 'system', 'content': system_prompt})
+        msg = {'role': 'user', 'content': prompt}
+        if images:
+            msg['images'] = images
+        messages.append(msg)
+        payload = {'model': model_id, 'messages': messages, 'stream': False, 'think': False, 'keep_alive': '10m'}
+        t0 = time.time()
         try:
-            req = urllib.request.Request(
-                f"{self.base_url}/api/generate",
-                data=json.dumps(payload).encode('utf-8'),
-                headers={'Content-Type': 'application/json'},
-                method='POST'
-            )
-            with urllib.request.urlopen(req, timeout=75) as res:
+            req = urllib.request.Request(f"{self.base_url}/api/chat", data=json.dumps(payload).encode('utf-8'),
+                                         headers={'Content-Type': 'application/json'}, method='POST')
+            with urllib.request.urlopen(req, timeout=self.timeout) as res:
                 data = json.loads(res.read().decode('utf-8'))
-                reply = data.get('response', '').strip()
-                if not reply:
-                    return {
-                        'success': False,
-                        'error': 'Ollama returned an empty response',
-                        'model': model_id,
-                        'provider': 'ollama'
-                    }
-                return {
-                    'success': True,
-                    'reply': reply,
-                    'model': model_id,
-                    'provider': 'ollama'
-                }
+        except urllib.error.HTTPError as e:
+            body = e.read().decode('utf-8', 'ignore')[:300]
+            kind = 'model_unavailable' if e.code == 404 else 'http_error'
+            return {'success': False, 'error_type': kind, 'error': f'HTTP {e.code}: {body}', 'model': model_id, 'provider': 'ollama'}
         except Exception as e:
-            return {
-                'success': False,
-                'error': str(e),
-                'model': model_id,
-                'provider': 'ollama'
-            }
+            kind = 'timeout' if 'timed out' in str(e).lower() else 'network_error'
+            return {'success': False, 'error_type': kind, 'error': str(e), 'model': model_id, 'provider': 'ollama'}
+        m = data.get('message') or {}
+        reply = (m.get('content') or '').strip()
+        secs = round(time.time() - t0, 1)
+        if not reply:
+            thinking = len(m.get('thinking') or '')
+            return {'success': False, 'error_type': 'empty_output', 'model': model_id, 'provider': 'ollama',
+                    'error': f"empty answer after {secs}s (done_reason={data.get('done_reason')}, reasoning chars={thinking})"}
+        return {'success': True, 'reply': reply, 'model': model_id, 'provider': 'ollama', 'secs': secs,
+                'eval_count': data.get('eval_count')}

@@ -380,6 +380,8 @@ class OmaHoloFace {
     else if (newState === 'speaking') badgeText.textContent = 'SPEAKING ...';
     else if (newState === 'completed') badgeText.textContent = 'COMPLETED';
     else if (newState === 'error') badgeText.textContent = 'ERROR / INTERRUPT';
+    else if (newState === 'waiting') badgeText.textContent = 'WAITING FOR YOU';
+    else if (newState === 'partial') badgeText.textContent = 'PARTIAL RESULT';
     else badgeText.textContent = 'SYSTEM ACTIVE';
   }
 

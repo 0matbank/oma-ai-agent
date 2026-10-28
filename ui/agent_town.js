@@ -29,7 +29,7 @@ class AgentTown {
     this.desks = [
       { id: 'desk_alice', col: 0, row: 0, x: 7, y: 7, agentId: 'alice', label: 'Alice (Research)' },
       { id: 'desk_bob', col: 1, row: 0, x: 13, y: 7, agentId: 'bob', label: 'Bob (Browser)' },
-      { id: 'desk_extra1', col: 2, row: 0, x: 19, y: 7, agentId: null, label: 'Workstation 03' },
+      { id: 'desk_eve', col: 2, row: 0, x: 19, y: 7, agentId: 'eve', label: 'Eve (YouTube)' },
       { id: 'desk_carol', col: 0, row: 1, x: 7, y: 11, agentId: 'carol', label: 'Carol (Desktop)' },
       { id: 'desk_dave', col: 1, row: 1, x: 13, y: 11, agentId: 'dave', label: 'Dave (Verification)' },
       { id: 'desk_extra2', col: 2, row: 1, x: 19, y: 11, agentId: null, label: 'Workstation 06' },
@@ -57,10 +57,10 @@ class AgentTown {
         direction: 'up',
         walkFrame: 0,
         task: '',
-        taskId: 'T-101',
+        taskId: '',
         assignedBy: 'OMA',
-        activeModel: 'Auto (Gemini / Claude)',
-        currentTool: 'tool_web_search',
+        activeModel: '',
+        currentTool: '',
         startTime: 0,
         completedSteps: [],
         pendingSteps: [],
@@ -89,10 +89,10 @@ class AgentTown {
         direction: 'up',
         walkFrame: 0,
         task: '',
-        taskId: 'T-102',
+        taskId: '',
         assignedBy: 'OMA',
-        activeModel: 'Auto (Chrome Automation)',
-        currentTool: 'tool_open_app("chrome")',
+        activeModel: '',
+        currentTool: '',
         startTime: 0,
         completedSteps: [],
         pendingSteps: [],
@@ -121,10 +121,10 @@ class AgentTown {
         direction: 'up',
         walkFrame: 0,
         task: '',
-        taskId: 'T-103',
+        taskId: '',
         assignedBy: 'OMA',
-        activeModel: 'Windows Native Action',
-        currentTool: 'tool_open_app',
+        activeModel: '',
+        currentTool: '',
         startTime: 0,
         completedSteps: [],
         pendingSteps: [],
@@ -153,10 +153,10 @@ class AgentTown {
         direction: 'up',
         walkFrame: 0,
         task: '',
-        taskId: 'T-104',
+        taskId: '',
         assignedBy: 'OMA',
-        activeModel: 'Process Verifier',
-        currentTool: 'tool_get_windows',
+        activeModel: '',
+        currentTool: '',
         startTime: 0,
         completedSteps: [],
         pendingSteps: [],
@@ -166,6 +166,14 @@ class AgentTown {
         bubbleTimer: 0,
         thoughtIcon: null,
         thoughtTimer: 0
+      },
+      eve: {
+        id: 'eve', name: 'Eve', role: 'YouTube Worker', icon: '▶️', color: '#ff4d6d',
+        hairColor: '#2b2b2b', shirtColor: '#ff4d6d', skirtColor: '#3a1020',
+        x: 19 * 16, y: 8 * 16, targetX: 19 * 16, targetY: 8 * 16, deskId: 'desk_eve',
+        state: 'IDLE', direction: 'up', walkFrame: 0, task: '', taskId: '', assignedBy: 'OMA', activeModel: '', currentTool: '',
+        startTime: 0, completedSteps: [], pendingSteps: [], errorDetails: '', actualOutput: '',
+        speechBubble: null, bubbleTimer: 0, thoughtIcon: null, thoughtTimer: 0
       }
     };
 
@@ -262,9 +270,9 @@ class AgentTown {
   }
 
   updateMetrics() {
-    const busy = Object.values(this.agents).filter(a => a.state === 'WORKING' || a.state === 'VERIFYING').length;
+    const busy = Object.values(this.agents).filter(a => ['WORKING', 'VERIFYING', 'WAITING'].includes(a.state)).length;
     const el = document.getElementById('town-busy-stat');
-    if (el) el.textContent = `${busy}/4 busy`;
+    if (el) el.textContent = `${busy}/${Object.keys(this.agents).length} busy`;
     const act = document.getElementById('agentTownActivity');
     if (act) act.innerHTML = busy > 0 ? `Status: <b style="color:var(--neon-green);">Coordinating (${busy} active)</b>` : `Status: <b>Idle</b>`;
   }
@@ -316,13 +324,14 @@ class AgentTown {
       document.body.appendChild(modal);
     }
 
-    const elapsed = agent.startTime > 0 ? Math.round(time.now ? (time.now() - agent.startTime) : (Date.now() / 1000 - agent.startTime)) : 0;
+    const E = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const elapsed = agent.startTime > 0 ? Math.round(Date.now() / 1000 - agent.startTime) : 0;
     const completedList = (agent.completedSteps && agent.completedSteps.length > 0)
-      ? agent.completedSteps.map(s => `<li style="margin-bottom:3px; color:var(--neon-green);">✓ ${s}</li>`).join('')
+      ? agent.completedSteps.map(s => `<li style="margin-bottom:3px; color:var(--neon-green);">✓ ${E(s)}</li>`).join('')
       : '<li style="color:var(--text-muted);">None yet</li>';
 
     const pendingList = (agent.pendingSteps && agent.pendingSteps.length > 0)
-      ? agent.pendingSteps.map(s => `<li style="margin-bottom:3px; color:var(--text-secondary);">⏳ ${s}</li>`).join('')
+      ? agent.pendingSteps.map(s => `<li style="margin-bottom:3px; color:var(--text-secondary);">⏳ ${E(s)}</li>`).join('')
       : '<li style="color:var(--text-muted);">None</li>';
 
     modal.innerHTML = `
@@ -331,7 +340,7 @@ class AgentTown {
           <span style="font-size:22px;">${agent.icon}</span>
           <div>
             <b style="font-family:'Orbitron', sans-serif; font-size:14px; color:#fff;">${agent.name} // ${agent.role}</b>
-            <div style="font-size:10.5px; color:var(--neon-cyan);">Assigned-by: <b>${agent.assignedBy}</b> | Task ID: <b>${agent.taskId}</b></div>
+            <div style="font-size:10.5px; color:var(--neon-cyan);">Assigned-by: <b>${E(agent.assignedBy)}</b> | Task ID: <b>${E(agent.taskId || 'none')}</b></div>
           </div>
         </div>
         <button id="btn-close-agent-modal" style="all:unset; cursor:pointer; width:28px; height:28px; border-radius:6px; background:rgba(255,255,255,0.08); display:grid; place-items:center; color:#fff; font-size:14px;">✕</button>
@@ -339,16 +348,16 @@ class AgentTown {
 
       <div style="padding: 16px 18px; overflow-y: auto; font-size: 12px; display: flex; flex-direction: column; gap: 12px;">
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px;">
-          <div><span style="color:var(--text-muted);">Current Status:</span> <b style="color:${agent.state === 'WORKING' ? 'var(--neon-amber)' : (agent.state === 'COMPLETED' ? 'var(--neon-green)' : '#fff')};">${agent.state}</b></div>
+          <div><span style="color:var(--text-muted);">Current Status:</span> <b style="color:${agent.state === 'WORKING' ? 'var(--neon-amber)' : (agent.state === 'COMPLETED' ? 'var(--neon-green)' : '#fff')};">${E(agent.state)}</b></div>
           <div><span style="color:var(--text-muted);">Elapsed Time:</span> <b>${elapsed}s</b></div>
-          <div><span style="color:var(--text-muted);">AI Provider/Model:</span> <b style="color:var(--neon-cyan);">${agent.activeModel}</b></div>
-          <div><span style="color:var(--text-muted);">Active Tool:</span> <code style="color:#ffb300; font-size:11px;">${agent.currentTool || 'N/A'}</code></div>
+          <div><span style="color:var(--text-muted);">AI Provider/Model:</span> <b style="color:var(--neon-cyan);">${E(agent.activeModel || 'none yet')}</b></div>
+          <div><span style="color:var(--text-muted);">Active Tool:</span> <code style="color:#ffb300; font-size:11px;">${E(agent.currentTool || 'none')}</code></div>
         </div>
 
         <div>
           <span style="font-weight:600; color:#fff; display:block; margin-bottom:4px;">Current Objective / Task:</span>
           <div style="background:rgba(0,0,0,0.3); padding:8px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.06); color:#f0f4fc;">
-            ${agent.task || 'Worker is currently in IDLE standing state.'}
+            ${E(agent.task || 'No task assigned. This worker is a lane of the shared Atticus engine; it works only when the engine runs one of its tools.')}
           </div>
         </div>
 
@@ -364,9 +373,9 @@ class AgentTown {
 
         ${agent.actualOutput ? `
         <div>
-          <span style="font-weight:600; color:var(--neon-cyan); display:block; margin-bottom:4px;">Actual Verified Task Output:</span>
+          <span style="font-weight:600; color:var(--neon-cyan); display:block; margin-bottom:4px;">Last tool output:</span>
           <div style="background:rgba(0,229,255,0.05); border:1px solid rgba(0,229,255,0.25); padding:8px 12px; border-radius:6px; font-family:monospace; font-size:11px; max-height:120px; overflow-y:auto; white-space:pre-wrap;">
-            ${agent.actualOutput}
+            ${E(agent.actualOutput)}
           </div>
         </div>` : ''}
 
@@ -374,7 +383,7 @@ class AgentTown {
         <div>
           <span style="font-weight:600; color:var(--neon-crimson); display:block; margin-bottom:4px;">Error Details:</span>
           <div style="background:rgba(255,42,95,0.1); border:1px solid var(--neon-crimson); padding:8px 12px; border-radius:6px; color:#ff8099; font-size:11px;">
-            ${agent.errorDetails}
+            ${E(agent.errorDetails)}
           </div>
         </div>` : ''}
       </div>
@@ -389,115 +398,6 @@ class AgentTown {
   openResearchLibraryModal() {
     this.openAgentModal(this.agents.alice);
   }
-
-  /**
-   * Called by OmaController when real backend events arrive.
-   */
-  onTaskEvent(state, detail) {
-    if (state === 'planning') {
-      const alice = this.agents.alice;
-      alice.thoughtIcon = '💡';
-      alice.thoughtTimer = 160;
-      alice.speechBubble = 'Planning execution with OMA...';
-      alice.bubbleTimer = 180;
-    } else if (state === 'executing' || state === 'working') {
-      // Determine which worker was assigned
-      let target = this.agents.carol;
-      const dLower = (detail || '').toLowerCase();
-
-      if (dLower.includes('research') || dLower.includes('alice') || dLower.includes('knowledge') || dLower.includes('search') || dLower.includes('রিসার্চ')) {
-        target = this.agents.alice;
-        // Alice physically moves to the Research Library workstation!
-        target.targetX = 29 * 16;
-        target.targetY = 8 * 16;
-        target.state = 'WORKING';
-        this.libraryData.isScanning = true;
-        this.libraryData.activeQuery = detail || "Researching web topics...";
-        this.libraryData.sourcesGathered++;
-      } else if (dLower.includes('chrome') || dLower.includes('bob') || dLower.includes('browser') || dLower.includes('ক্রোম')) {
-        target = this.agents.bob;
-        target.targetX = 13 * 16;
-        target.targetY = 8 * 16;
-        target.state = 'WORKING';
-      } else if (dLower.includes('dave') || dLower.includes('verify') || dLower.includes('যাচাই')) {
-        target = this.agents.dave;
-        target.state = 'VERIFYING';
-      } else {
-        target = this.agents.carol;
-        target.state = 'WORKING';
-      }
-
-      target.task = detail || 'Executing task...';
-      target.thoughtIcon = '⚙️';
-      target.thoughtTimer = 220;
-      target.speechBubble = detail ? (detail.length > 44 ? detail.slice(0, 42) + '...' : detail) : 'Working...';
-      target.bubbleTimer = 260;
-
-      this.drone.targetX = target.x + 20;
-      this.drone.targetY = target.y - 18;
-      this.updateChipsBar();
-    } else if (state === 'completed') {
-      this.libraryData.isScanning = false;
-      Object.values(this.agents).forEach(a => {
-        if (a.state === 'WORKING' || a.state === 'VERIFYING' || a.state === 'ASSIGNED') {
-          a.state = 'COMPLETED';
-          a.thoughtIcon = '✓';
-          a.thoughtTimer = 140;
-          a.speechBubble = 'Verified complete!';
-          a.bubbleTimer = 140;
-
-          // Return to home desk
-          const desk = this.desks.find(d => d.id === a.deskId);
-          if (desk) {
-            a.targetX = desk.x * 16;
-            a.targetY = (desk.y + 1) * 16;
-          }
-          setTimeout(() => {
-            a.state = 'IDLE';
-            a.speechBubble = null;
-            this.updateChipsBar();
-          }, 3200);
-        }
-      });
-      this.updateChipsBar();
-    }
-  }
-
-  /**
-   * Updates workers from genuine backend `--workers-status` query
-   */
-  updateFromBackendStatus(data) {
-    if (!data || !data.workers) return;
-    Object.entries(data.workers).forEach(([id, w]) => {
-      const a = this.agents[id];
-      if (a) {
-        a.state = w.state || 'IDLE';
-        a.task = w.current_task || '';
-        a.taskId = w.task_id || a.taskId;
-        a.assignedBy = w.assigned_by || 'OMA';
-        a.activeModel = w.active_model || a.activeModel;
-        a.currentTool = w.current_tool || '';
-        a.startTime = w.start_time || a.startTime;
-        a.completedSteps = w.completed_steps || [];
-        a.pendingSteps = w.pending_steps || [];
-        a.actualOutput = w.actual_output || '';
-        a.errorDetails = w.error_details || '';
-
-        if (w.state === 'WORKING') {
-          if (id === 'alice' && w.room === 'library') {
-            a.targetX = 29 * 16;
-            a.targetY = 8 * 16;
-            this.libraryData.isScanning = true;
-          }
-          a.thoughtIcon = '⚙️';
-          a.speechBubble = w.current_task || 'Working...';
-          a.bubbleTimer = 120;
-        }
-      }
-    });
-    this.updateChipsBar();
-  }
-
   ambientIdle() {
     const idles = Object.values(this.agents).filter(a => a.state === 'IDLE');
     if (idles.length === 0) return;
@@ -1094,97 +994,71 @@ class AgentTown {
     this.ctx.fillText('Mouse and Touch 3D manipulation are permanently active with zero latency.', W / 2, cardY + 205);
   }
 
-  setAgentWorking(agentId, task, detail, pct) {
-    const ag = this.agents[agentId];
-    if (!ag) return;
-    ag.state = 'WORKING';
-    ag.task = task || ag.task;
-    ag.speechBubble = (detail || 'Executing...').slice(0, 24);
-    ag.bubbleTimer = 120;
-    this.updateChipsBar();
-    this.updateMetrics();
-  }
-
-  onTaskEvent(stage, detail) {
-    const s = (stage || '').toLowerCase();
-    const act = document.getElementById('agentTownActivity');
-    if (act) {
-      act.innerHTML = `Status: <b style="color:var(--neon-cyan);">${(stage || 'Working').toUpperCase()}</b> — ${detail || ''}`;
+  /**
+   * The only way worker state changes: one authoritative backend task event (multi_ai/taskstate.py).
+   * Movement is visual only; the state shown is exactly the backend's.
+   */
+  applyTask(ev) {
+    if (!ev || !ev.workers) return;
+    const nowS = Date.now() / 1000;
+    if (ev.kind === 'task') {
+      this.taskText = ev.detail || '';
+      this.libraryData.sourcesGathered = 0;
+      Object.values(this.agents).forEach(a => { a.completedSteps = []; a.pendingSteps = []; a.errorDetails = ''; a.actualOutput = ''; a.startTime = 0; a.task = ''; a.taskId = ev.task_id; });
     }
-    if (s.includes('planning') || s.includes('routing')) {
-      if (this.agents.alice) this.agents.alice.state = 'PLANNING';
-    } else if (s.includes('desktop') || s.includes('notepad') || s.includes('calc') || s.includes('app')) {
-      if (this.agents.carol) {
-        this.agents.carol.state = 'WORKING';
-        this.agents.carol.speechBubble = 'Opening App...';
-        this.agents.carol.bubbleTimer = 90;
-      }
-    } else if (s.includes('research') || s.includes('search')) {
-      if (this.agents.alice) {
-        this.agents.alice.state = 'WORKING';
-        this.agents.alice.targetX = 29 * 16;
-        this.agents.alice.targetY = 8 * 16;
-        this.agents.alice.speechBubble = 'Researching...';
-        this.agents.alice.bubbleTimer = 90;
-      }
-    } else if (s.includes('verify')) {
-      if (this.agents.dave) {
-        this.agents.dave.state = 'VERIFYING';
-        this.agents.dave.speechBubble = 'Verifying result...';
-        this.agents.dave.bubbleTimer = 90;
-      }
-    } else if (s.includes('complete')) {
-      Object.values(this.agents).forEach(a => {
-        if (a.state === 'WORKING' || a.state === 'VERIFYING') {
-          a.state = 'COMPLETED';
-          a.speechBubble = 'Done!';
-          a.bubbleTimer = 60;
-        }
-      });
-      if (this.agents.alice) {
-        this.agents.alice.targetX = 7 * 16;
-        this.agents.alice.targetY = 8 * 16;
-      }
+    const model = ev.active_model ? `${ev.active_model.provider} · ${ev.active_model.resolved || ev.active_model.model}` : '';
+    if (ev.kind === 'step' && ev.step && this.agents[ev.worker]) {
+      const a = this.agents[ev.worker], st = ev.step;
+      a.pendingSteps = (a.pendingSteps || []).filter(x => x !== st.label);
+      if (st.status === 'RUNNING') a.pendingSteps.push(st.label);
+      else if (st.status === 'DONE') { a.completedSteps.push(st.label); a.actualOutput = st.output || a.actualOutput; if (ev.worker === 'alice') this.libraryData.sourcesGathered++; }
+      else if (st.status === 'FAILED') { a.errorDetails = `${st.label}: ${st.error || 'failed'}`; }
     }
-    this.updateChipsBar();
-    this.updateMetrics();
-  }
-
-  updateFromBackendStatus(data) {
-    if (!data || !data.workers) return;
-    Object.entries(data.workers).forEach(([id, info]) => {
-      if (this.agents[id]) {
-        const ag = this.agents[id];
-        ag.state = info.state || ag.state;
-        ag.task = info.task || ag.task;
-        ag.taskId = info.task_id || ag.taskId;
-        ag.currentTool = info.current_tool || ag.currentTool;
-        ag.startTime = info.start_time || ag.startTime;
-        ag.completedSteps = info.completed_steps || ag.completedSteps;
-        ag.pendingSteps = info.pending_steps || ag.pendingSteps;
-        ag.errorDetails = info.error_details || ag.errorDetails;
-        ag.actualOutput = info.actual_output || ag.actualOutput;
-        if (info.active_model) ag.activeModel = info.active_model;
-
-        // If Alice is working on research, send her to Research Library!
-        if (id === 'alice' && (ag.state === 'WORKING' || ag.state === 'ASSIGNED')) {
-          ag.targetX = 29 * 16;
-          ag.targetY = 8 * 16;
-          ag.speechBubble = 'Researching...';
-          ag.bubbleTimer = 60;
-        } else if (id === 'alice' && ag.state === 'COMPLETED') {
-          ag.targetX = 7 * 16;
-          ag.targetY = 8 * 16;
-          ag.speechBubble = 'Research Complete!';
-          ag.bubbleTimer = 100;
-        } else if (ag.state === 'WORKING') {
-          ag.speechBubble = (ag.currentTool || 'Working...').slice(0, 20);
-          ag.bubbleTimer = 60;
-        }
+    if (ev.kind === 'evidence' && this.agents.dave) {
+      this.agents.dave.completedSteps.push(`${ev.ok === true ? '✓' : ev.ok === false ? '✕' : '?'} ${ev.detail}`);
+      this.agents.dave.actualOutput = ev.detail;
+    }
+    Object.entries(ev.workers).forEach(([id, w]) => {
+      const a = this.agents[id];
+      if (!a) return;
+      const prev = a.state;
+      a.state = w.state || 'IDLE';
+      if (a.state === 'IDLE') return;
+      a.taskId = ev.task_id; a.task = this.taskText || a.task; a.assignedBy = 'OMA';
+      a.currentTool = w.step || a.currentTool; if (model) a.activeModel = model;
+      if (!a.startTime && a.state !== 'IDLE') a.startTime = nowS;
+      const busy = ['WORKING', 'WAITING', 'VERIFYING', 'ASSIGNED'].includes(a.state);
+      if (busy) {
+        const desk = id === 'alice' ? { x: 29, y: 7 } : this.desks.find(d => d.id === a.deskId);
+        if (desk) { a.targetX = desk.x * 16; a.targetY = (desk.y + 1) * 16; }
+        a.speechBubble = (a.state === 'WAITING' ? 'Waiting for your OK…' : (w.step || 'Working…')).slice(0, 44);
+        a.bubbleTimer = 200; a.thoughtIcon = a.state === 'WAITING' ? '✋' : '⚙️'; a.thoughtTimer = 160;
+      } else if (prev !== a.state) {
+        a.speechBubble = a.state === 'COMPLETED' ? 'Done' : a.state === 'FAILED' ? 'Failed' : a.state.toLowerCase();
+        a.bubbleTimer = 120; a.thoughtIcon = a.state === 'COMPLETED' ? '✓' : '✕'; a.thoughtTimer = 120;
       }
     });
+    this.libraryData.isScanning = this.agents.alice && this.agents.alice.state === 'WORKING';
+    if (this.agents.alice && ev.kind === 'step' && ev.worker === 'alice') this.libraryData.activeQuery = ev.detail || this.libraryData.activeQuery;
+    if (ev.kind === 'result') {   // the task is over: workers walk back; their record stays in the detail panel
+      clearTimeout(this._homeTimer);
+      this._homeTimer = setTimeout(() => {
+        Object.values(this.agents).forEach(a => {
+          const desk = this.desks.find(d => d.id === a.deskId);
+          if (desk) { a.targetX = desk.x * 16; a.targetY = (desk.y + 1) * 16; }
+          if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(a.state)) a.state = 'IDLE';
+        });
+        this.updateChipsBar();
+      }, 6000);
+    }
     this.updateChipsBar();
-    this.updateMetrics();
+  }
+
+  // kept so older callers cannot invent state: they do nothing now
+  onTaskEvent() {}
+  setAgentWorking() {}
+  updateFromBackendStatus(data) {
+    if (data && data.workers) this.applyTask({ kind: 'restore', workers: Object.fromEntries(Object.entries(data.workers).map(([k, w]) => [k, { state: 'IDLE', step: '' }])) });
   }
 
   roundRect(x, y, w, h, r, fill, stroke) {
