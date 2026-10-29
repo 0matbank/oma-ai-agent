@@ -284,6 +284,32 @@ class TelegramPlayerRound(unittest.TestCase):   # the user's own Telegram voice 
         self.assertIn('--player-next', atticus.PLAYER_HINT)
 
 
+class BackgroundContent(unittest.TestCase):   # "only the status bar and tab titles is not background reading" (Oct 29)
+    def test_secrets_are_hidden(self):
+        from multi_ai import app_reader as r
+        out = r.hide_secrets('api_key = "sk-test1234567890abcdef"\npassword: hunter22\nx = 5')
+        self.assertNotIn('sk-test1234567890abcdef', out)
+        self.assertNotIn('hunter22', out)
+        self.assertIn('x = 5', out)
+
+    def test_vscode_state_becomes_text(self):
+        from multi_ai import app_reader as r
+        st = {'workspace': 'w', 'active': {'file': 'untitled:Untitled-1', 'language': 'python', 'lines': 2, 'cursorLine': 2, 'unsaved': True,
+                                           'text': 'x = "OMA_UNSAVED"', 'selection': 'x'},
+              'unsaved': [], 'open': [{'label': 'Untitled-1', 'unsaved': True, 'active': True}],
+              'diagnostics': [{'file': 'a.json', 'line': 1, 'severity': 'Error', 'message': 'Expected comma', 'source': 'json'}],
+              'terminals': [{'name': 'pwsh', 'active': True, 'output': '$ echo hi\nhi'}]}
+        out = r._vscode_text(st, 5000)
+        for want in ('UNSAVED changes', 'OMA_UNSAVED', '[Selected text]', 'Problems: 1 errors', 'Expected comma', '[Terminal "pwsh" (active)]', 'hi'):
+            self.assertIn(want, out)
+
+    def test_browser_extension_is_read_only(self):
+        root = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+        js = open(_os.path.join(root, 'integrations', 'chrome-oma-reader', 'background.js'), encoding='utf-8').read()
+        for never in ('tabs.update', 'tabs.reload', 'tabs.remove', '.value', 'cookies'):
+            self.assertNotIn(never, js)
+
+
 class LiveSpeaksTheUsersLanguage(unittest.TestCase):   # "ami boli banglay, reply dey English-e" (Oct 29)
     def test_result_is_said_in_bangla(self):
         src = open(_os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), 'multi_ai', 'live_voice.py'), encoding='utf-8').read()

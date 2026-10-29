@@ -1,0 +1,11 @@
+{
+  "name": "oma-reader",
+  "displayName": "Oma Reader",
+  "description": "Lets Oma AI on this PC read this window (open file, unsaved text, selection, problems, terminal output) without bringing it forward. Read-only, local only.",
+  "version": "0.1.1",
+  "publisher": "oma",
+  "engines": { "vscode": "^1.93.0" },
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "categories": ["Other"]
+}

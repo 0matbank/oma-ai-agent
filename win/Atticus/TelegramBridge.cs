@@ -12,7 +12,22 @@ namespace Atticus;
 // Safety: private chats only; messages that waited while Oma was off are not run; wrong pairing codes are limited.
 static class TelegramBridge
 {
-    static readonly HttpClient http = new() { Timeout = TimeSpan.FromSeconds(40) };
+    // Measured on this PC (Oct 29): IPv6 to Telegram fails at once, IPv4 takes 0.5-11 s and 3 of 5 tries timed out, while
+    // Google answers in 0.2 s. A voice note died on one "An error occurred while sending the request" and the next one was
+    // never seen. So: IPv4 only, warm connections kept 10 min, every call tried up to 3 times, failures written to app.err.
+    static readonly HttpClient http = new(new SocketsHttpHandler
+    {
+        ConnectTimeout = TimeSpan.FromSeconds(25),
+        PooledConnectionIdleTimeout = TimeSpan.FromMinutes(10),
+        ConnectCallback = async (ctx, ct) =>
+        {
+            var ips = await System.Net.Dns.GetHostAddressesAsync(ctx.DnsEndPoint.Host, System.Net.Sockets.AddressFamily.InterNetwork, ct);
+            var s = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp) { NoDelay = true };
+            try { await s.ConnectAsync(ips, ctx.DnsEndPoint.Port, ct); return new System.Net.Sockets.NetworkStream(s, true); }
+            catch { s.Dispose(); throw; }
+        }
+    }) { Timeout = TimeSpan.FromSeconds(60) };
+    static int pollFails;
     static CancellationTokenSource cts;
     static string token = "";
     static readonly HashSet<long> refused = new();
@@ -36,18 +51,38 @@ static class TelegramBridge
 
     static async Task<JsonElement?> Api(string method, object body = null, CancellationToken ct = default)
     {
-        try
+        var tries = method.StartsWith("getUpdates") ? 1 : 3;   // the poll repeats by itself
+        for (var i = 1; i <= tries; i++)
         {
-            var url = $"https://api.telegram.org/bot{token}/{method}";
-            using var r = body == null ? await http.GetAsync(url, ct)
-                                       : await http.PostAsync(url, new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json"), ct);
-            var j = JsonDocument.Parse(await r.Content.ReadAsStringAsync(ct)).RootElement;
-            if (j.TryGetProperty("ok", out var ok) && ok.GetBoolean()) return j.GetProperty("result").Clone();
-            Error = j.TryGetProperty("description", out var d) ? d.GetString() ?? "" : $"HTTP {(int)r.StatusCode}";
-            return null;
+            try
+            {
+                var url = $"https://api.telegram.org/bot{token}/{method}";
+                using var r = body == null ? await http.GetAsync(url, ct)
+                                           : await http.PostAsync(url, new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json"), ct);
+                var j = JsonDocument.Parse(await r.Content.ReadAsStringAsync(ct)).RootElement;
+                if (j.TryGetProperty("ok", out var ok) && ok.GetBoolean()) return j.GetProperty("result").Clone();
+                Error = j.TryGetProperty("description", out var d) ? d.GetString() ?? "" : $"HTTP {(int)r.StatusCode}";
+                return null;   // Telegram answered no: trying again would not help
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { return null; }
+            catch (Exception e)
+            {
+                Error = e.Message;
+                if (i < tries) { Program.Err($"Telegram: {method.Split('?')[0]} try {i} failed ({e.Message}), trying again"); await Task.Delay(1500 * i); }
+                else if (tries > 1) Program.Err($"Telegram: {method.Split('?')[0]} failed {tries} times: {e.Message}");
+            }
         }
-        catch (OperationCanceledException) { return null; }
-        catch (Exception e) { Error = e.Message; return null; }
+        return null;
+    }
+
+    // A file from Telegram (a voice note), tried up to 3 times on a slow line
+    static async Task<byte[]> Download(string path)
+    {
+        for (var i = 1; ; i++)
+        {
+            try { return await http.GetByteArrayAsync($"https://api.telegram.org/file/bot{token}/{path}"); }
+            catch (Exception e) when (i < 3) { Program.Err($"Telegram: voice note download try {i} failed ({e.Message}), trying again"); await Task.Delay(1500 * i); }
+        }
     }
 
     static async Task Loop(CancellationToken ct)
@@ -70,7 +105,15 @@ static class TelegramBridge
         while (!ct.IsCancellationRequested)
         {
             var ups = await Api($"getUpdates?timeout=25&offset={offset}", null, ct);
-            if (ups == null) { if (!ct.IsCancellationRequested) await Task.Delay(5000, ct).ContinueWith(_ => { }); continue; }
+            if (ups == null)
+            {   // was silent: a phone message then looked ignored with nothing in the log
+                if (ct.IsCancellationRequested) break;
+                if (pollFails++ % 6 == 0) Program.Err($"Telegram: cannot reach Telegram ({Error}); trying again every 3 s");
+                if (pollFails == 2) { State = "error"; Changed?.Invoke(); }
+                await Task.Delay(3000, ct).ContinueWith(_ => { });
+                continue;
+            }
+            if (pollFails > 0) { Program.Err($"Telegram: reachable again after {pollFails} failed polls"); pollFails = 0; State = "connected"; Changed?.Invoke(); }
             foreach (var u in ups.Value.EnumerateArray())
             {
                 offset = u.GetProperty("update_id").GetInt64() + 1;
@@ -133,6 +176,7 @@ static class TelegramBridge
         if (text == "")
         {
             text = await Hear(m);
+            if (text == null) { await Send(chat, "✕ Telegram থেকে voice note-টা নামানো যায়নি (এই PC-র Telegram সংযোগ এখন ধীর)। আবার পাঠান।"); return; }
             if (string.IsNullOrWhiteSpace(text)) { await Send(chat, "✕ Could not make out the voice note. Try again or send text."); return; }
             await Send(chat, "🎤 " + text);
         }
@@ -193,15 +237,23 @@ static class TelegramBridge
             {
                 try
                 {
-                    using var form = new MultipartFormDataContent { { new StringContent(chat.ToString()), "chat_id" } };
-                    if (nl > 0) form.Add(new StringContent(reply[..nl]), "caption");
                     var bytes = await File.ReadAllBytesAsync(ogg);
-                    var f = new ByteArrayContent(bytes);
-                    f.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("audio/ogg");
-                    form.Add(f, "voice", "oma.ogg");
-                    using var r = await http.PostAsync($"https://api.telegram.org/bot{token}/sendVoice", form);
-                    Program.Err($"Telegram: voice reply {bytes.Length / 1024} KB, made and sent in {(DateTime.Now - t0).TotalMilliseconds:0} ms, HTTP {(int)r.StatusCode}");
-                    if (r.IsSuccessStatusCode) return;
+                    for (var i = 1; i <= 3; i++)
+                    {
+                        try
+                        {
+                            using var form = new MultipartFormDataContent { { new StringContent(chat.ToString()), "chat_id" } };
+                            if (nl > 0) form.Add(new StringContent(reply[..nl]), "caption");
+                            var f = new ByteArrayContent(bytes);
+                            f.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("audio/ogg");
+                            form.Add(f, "voice", "oma.ogg");
+                            using var r = await http.PostAsync($"https://api.telegram.org/bot{token}/sendVoice", form);
+                            Program.Err($"Telegram: voice reply {bytes.Length / 1024} KB, made and sent in {(DateTime.Now - t0).TotalMilliseconds:0} ms, HTTP {(int)r.StatusCode}");
+                            if (r.IsSuccessStatusCode) return;
+                            break;
+                        }
+                        catch (Exception e) { Program.Err($"Telegram: voice reply try {i}: " + e.Message); if (i < 3) await Task.Delay(1500 * i); }
+                    }
                 }
                 catch (Exception e) { Program.Err("Telegram: voice reply: " + e.Message); }
                 finally { try { File.Delete(ogg); } catch { } }
@@ -227,17 +279,17 @@ static class TelegramBridge
         var fast = Program.Speech.Fast;
         if (!fast.Ready) { Program.Err("Telegram: voice note, but the GPU speech engine is not running"); return ""; }
         var f = await Api("getFile", new { file_id = v.GetProperty("file_id").GetString() });
-        if (f == null || !f.Value.TryGetProperty("file_path", out var fp)) return "";
+        if (f == null || !f.Value.TryGetProperty("file_path", out var fp)) return null;   // getFile failed (network)
         var tmp = Path.Combine(Path.GetTempPath(), $"oma-tg-{Guid.NewGuid():N}.oga");
         try
         {
             var t0 = DateTime.Now;
-            await File.WriteAllBytesAsync(tmp, await http.GetByteArrayAsync($"https://api.telegram.org/file/bot{token}/{fp.GetString()}"));
+            await File.WriteAllBytesAsync(tmp, await Download(fp.GetString()));
             var text = Speech.Clean(await fast.TranscribeFile(tmp, "") ?? "");
             Program.Err($"Telegram: voice note {secs} s -> {text.Length} chars in {(DateTime.Now - t0).TotalMilliseconds:0} ms");
             return text;
         }
-        catch (Exception e) { Program.Err("Telegram: voice note: " + e.Message); return ""; }
+        catch (Exception e) { Program.Err("Telegram: voice note: " + e.Message); return null; }   // null: not fetched (network), not "not understood"
         finally { try { File.Delete(tmp); } catch { } }
     }
 

@@ -54,6 +54,7 @@ Remove-Item $out -Recurse -Force
 Copy-Item atticus.py, winctl.py $dest -Force
 New-Item -ItemType Directory -Force "$dest\integrations" | Out-Null
 Copy-Item integrations\*.py "$dest\integrations" -Force
+Copy-Item integrations\vscode-oma-reader, integrations\chrome-oma-reader "$dest\integrations" -Recurse -Force   # the Oma Reader extensions (atticus --app-text --setup)
 Copy-Item ui\*.html, ui\*.js, ui\*.css, ui\*.png, ui\AppIcon.ico "$dest\ui" -Force   # *.png: the app icon and Oma's logo masks
 if (Test-Path ui\vendor) { Copy-Item ui\vendor "$dest\ui" -Recurse -Force }   # Mermaid for the Visual Hub (served as https://oma.ui/)
 New-Item -ItemType Directory -Force "$dest\multi_ai" | Out-Null

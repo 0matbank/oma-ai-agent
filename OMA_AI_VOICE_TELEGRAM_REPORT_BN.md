@@ -357,3 +357,54 @@
 ### Test
 
 ১৫১/১৫১ পাস।
+
+## ১০. চতুর্থ দফা: Telegram-এ উত্তর না আসা, আর background-এ আসল লেখা পড়া
+
+### Telegram-এ কোনো উত্তর আসছিল না
+
+- **Log-এর প্রমাণ:** প্রথম voice note নামাতে গিয়ে "An error occurred while sending the request"। দ্বিতীয়টার কোনো চিহ্নই নেই।
+- **এই PC থেকে মাপা যোগাযোগ:**
+
+| গন্তব্য | ফল |
+|---|---|
+| api.telegram.org, IPv6 | সাথে সাথে ব্যর্থ |
+| api.telegram.org, IPv4 | ০.৫–১১ সেকেন্ড; ৫ বারের মধ্যে ৩ বার ১৫ সেকেন্ডেও উত্তর নেই |
+| Google | ০.২ সেকেন্ড |
+
+- **সিদ্ধান্ত:** Telegram-এর সাথে যোগাযোগ ধীর আর মাঝে মাঝে ছিঁড়ে যায় (সম্ভবত ISP-এর দিকে)। Oma একবার ব্যর্থ হলেই ছেড়ে দিত, আর শোনার loop-এর ব্যর্থতা log-এও লিখত না।
+- **যা ঠিক করেছি:**
+  - শুধু IPv4 ব্যবহার করে।
+  - একবার খোলা যোগাযোগ ১০ মিনিট ধরে রাখে।
+  - প্রতিটা পাঠানো আর নামানো ৩ বার পর্যন্ত চেষ্টা করে: voice note নামানো, বার্তা আর voice reply পাঠানো।
+  - যোগাযোগ ছিঁড়লে log-এ লেখে, ফিরলে "reachable again" লেখে।
+  - Voice note নামাতে না পারলে আর ভুল করে "বুঝিনি" বলে না, বলে "সংযোগ ধীর, আবার পাঠান"।
+- **প্রমাণ:** নতুন build-এ log-এ একবার "cannot reach Telegram", পরের চেষ্টায় "reachable again"। আগে এই অবস্থায় বার্তা হারিয়ে যেত।
+- **NOT VERIFIED:** আপনার phone থেকে নতুন voice note।
+
+### Background-এ আসল লেখা পড়া
+
+- **নতুন অংশ:**
+  - **Oma Reader (VS Code):** নিজের তৈরি, শুধু-পড়ার extension, `integrations/vscode-oma-reader`।
+  - **Oma Reader (Chrome/Edge):** নিজের তৈরি extension আর native host, `integrations/chrome-oma-reader`, `multi_ai/chrome_host.py`।
+  - **কীভাবে কথা বলে:** দুটোই শুধু এই PC-র ভেতরে (127.0.0.1) গোপন token দিয়ে উত্তর দেয়। কিছু বদলায় না, কোনো tab বা window সামনে আনে না।
+- **Password ও secret:**
+  - Password field-এর মান কখনো পড়া হয় না।
+  - Code বা terminal-এ key, token বা password থাকলে AI-কে দেওয়ার আগে `[hidden]` হয়ে যায়।
+- **একই ক্ষমতা সব মাধ্যমে:** desktop chat, voice, Telegram, Live সবাই একই `atticus --app-text` ব্যবহার করে। পড়তে বললে অনুমতি চায় না।
+
+| পরীক্ষা | ফল | প্রমাণ |
+|---|---|---|
+| Chrome-এর **পেছনের tab**-এর পুরো লেখা (আলাদা লুকানো Chromium, আপনার Chrome নয়) | **PASS** | বাংলা লেখা আর marker, পাতার error "Login failed: test error 401", ০.০২–০.০৩ s; password-এর মান পড়েনি; সামনের window বদলায়নি |
+| সামনের tab (example.com) | **PASS** | পুরো লেখা, ০.০৪ s |
+| আপনার VS Code, extension দিয়ে (ঢাকা অবস্থায়) | **PASS** (যা খোলা ছিল) | workspace, Problems ০, terminal-এর তালিকা, ১.০৬ s, সামনের window বদলায়নি। তখন কোনো editor tab খোলা ছিল না |
+| VS Code-এর **unsaved code, selection, Problems-এর বিস্তারিত, terminal output** | **NOT VERIFIED (আসল ফাইলে)** | ধাপগুলোর code আছে আর unit test পাস। কিন্তু আলাদা VS Code চালাতে গেলে VS Code নিজে আটকে দেয়: "Code is currently being updated"। আপনার VS Code-এ টাইপ করিনি। |
+| Minimized terminal, পেছনের Notepad (আগের দফা) | PASS | ০.১ s |
+
+- **সীমা:**
+  - **VS Code terminal:** VS Code-এর API শুধু Oma Reader চালু হওয়ার পরে চালানো command-এর output দেয়, তার আগের পুরোনো লেখা নয়।
+  - **ঘুমন্ত Chrome tab:** Chrome "Memory Saver" দিয়ে যে tab ঘুম পাড়িয়েছে, সেটার পাতা খোলার আগে লোড হয় না। Oma সেটা স্পষ্ট বলে।
+  - **Chrome extension চালু করা:** Chrome কোনো program-কে নিজে extension বসাতে দেয় না। তাই একবার হাতে "Load unpacked" করতে হয়।
+
+### Test
+
+১৫৪/১৫৪ পাস।

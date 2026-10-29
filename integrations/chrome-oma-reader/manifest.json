@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Oma Reader",
+  "version": "0.1.0",
+  "description": "Lets Oma AI on this PC read the text of any open tab, also a tab in the background, without switching to it. Read-only; it talks only to Oma on this PC.",
+  "permissions": ["tabs", "scripting", "nativeMessaging"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAl3quALBgZ237OjcaVNprjJgirW8o4NnNKVYUSWiX4RJHuL8AA6kpcdK7uor++f1rorolQeV0bbRHeRJWD9+r5sKZD2e57DH4cQWWrdt9GkJUS5fETCuQYY9glE6NakkMFJiGEGWQDyjED4DRjDTp5WwKZPIOcRd/n9RURQffDPKOepZdmpIUZs7RnggqKkHu26TKVVCXxWCvm25ilKtuZrv9+9otJUpdoZcMj89f+aKJM6eN8Vx9HZTU7aSF7n2TJ8U/1+abiu3sz6V35qWC7myHblnwqYqsKRUMOm8OgZlCJztMfGJTdU3P4rdMaKQUC1Vy/NKXsMHlvZqY39QN9QIDAQAB"
+}
