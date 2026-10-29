@@ -3205,8 +3205,9 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
     },
     voiceDone(finalText) {
       document.querySelectorAll('.live-voice-card').forEach(c => c.remove());
-      const inp = $('homeChatInput');
-      if (inp) inp.placeholder = 'Type your command or task in plain English or Bangla...';
+      if (window.omaInputHint) window.omaInputHint();   // back to "Type to Oma (<model>)…"
+      const badge = $('sphere-status-badge'), badgeText = $('sphere-status-text');
+      if (badge && badgeText) { badge.className = 'status-badge active'; badgeText.textContent = 'SYSTEM ACTIVE'; }   // listening is over
       if (finalText && finalText.trim()) {
         appendFeedMessage('user', 'You', finalText.trim());
         holoOrb?.setState('thinking');

@@ -396,6 +396,7 @@
     const hint = () => { const t = (m?.textContent || '').trim(); const name = t && !/none yet|no model/i.test(t) ? t.split('·').pop().trim() : '';
       if (inp) inp.placeholder = name ? `Type to Oma (${name})…  English / বাংলা` : 'Type to Oma (English / বাংলা)…'; };
     if (m) new MutationObserver(hint).observe(m, { childList: true, characterData: true, subtree: true });
+    window.omaInputHint = hint;
     hint();
   });
 })();
