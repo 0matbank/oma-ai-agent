@@ -21,7 +21,7 @@ class OmaParticleOrb {
     this.burst = 0;                                      // completion / error shock ring 0..1
     this.t = 0; this.last = 0; this.hidden = false;
     this.halo = !!opts.halo;                             // Oma Halo: a 4-part ring (understand, work, check, done) instead of the tilted orbit
-    this.stepN = 0; this.stepEnd = null;
+    this.stepN = 0; this.stepEnd = null; this.haloK = 1.2;   // halo radius in orb radii: just outside the ball
     this.build(opts.count || 3000);
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -87,7 +87,7 @@ class OmaParticleOrb {
   }
 
   // The halo ring in page coordinates, so the aurora lines can end on it
-  ringAt() { const r = this.canvas.getBoundingClientRect(); return { x: r.left + this.w / 2, y: r.top + this.cy, r: this.R * 1.42 }; }
+  ringAt() { const r = this.canvas.getBoundingClientRect(); return { x: r.left + this.w / 2, y: r.top + this.cy, r: this.R * this.haloK }; }
   // n = parts lit (1 understand .. 4 done); end = COMPLETED | PARTIAL | FAILED | CANCELLED, after which the halo empties again
   setStep(n, end) {
     this.stepN = Math.max(0, Math.min(4, n | 0)); this.stepEnd = end || null;
@@ -231,7 +231,7 @@ class OmaParticleOrb {
     }
     c.globalCompositeOperation = 'source-over';
     if (this.halo) {   // 4 parts from the top, clockwise; lit = steps reached, the current one breathes
-      const rr = R * 1.42, th = (OmaParticleOrb.THEMES[this.theme] || OmaParticleOrb.THEMES.stonic).a;
+      const rr = R * this.haloK, th = (OmaParticleOrb.THEMES[this.theme] || OmaParticleOrb.THEMES.stonic).a;
       const on = this.stepEnd === 'COMPLETED' ? [0, 245, 155] : this.stepEnd === 'FAILED' || this.stepEnd === 'CANCELLED' ? [255, 64, 80] : th;
       c.lineWidth = 4; c.lineCap = 'round';
       for (let s = 0; s < 4; s++) {
@@ -240,7 +240,7 @@ class OmaParticleOrb {
         c.beginPath(); c.arc(cx, cy, rr, a0, a0 + Math.PI / 2 - 0.14); c.stroke();
       }
       c.strokeStyle = rgb(th, 0.18); c.lineWidth = 1;
-      c.beginPath(); c.arc(cx, cy, rr + 9, 0, 6.283); c.stroke();
+      c.beginPath(); c.arc(cx, cy, rr + 7, 0, 6.283); c.stroke();
     }
   }
 }
