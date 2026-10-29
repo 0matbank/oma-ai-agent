@@ -19,6 +19,38 @@ sealed class LiveVoice
     readonly SettingsWindow w;
     public bool On => proc != null;
 
+    // Telegram and the PC microphone in one room: a voice note said into the phone was also heard by the PC and done
+    // twice (Oct 29). The PC keeps when it heard speech and what Live ran; Telegram checks both (TelegramBridge).
+    readonly List<DateTime> speech = new();
+    public sealed record ToolRun(DateTime At, string Request, TaskCompletionSource<string> Result);
+    readonly List<ToolRun> runs = new();
+    DateTime pausedUntil = DateTime.MinValue, suppressUntil = DateTime.MinValue;
+
+    public bool HeardBetween(DateTime a, DateTime b) { lock (speech) return speech.Any(t => t >= a && t <= b); }
+
+    // A Live request that began from speech at or after `since`, waiting up to `wait` for one to appear.
+    public async Task<ToolRun> ToolSince(DateTime since, TimeSpan wait)
+    {
+        var end = DateTime.Now + wait;
+        while (true)
+        {
+            lock (runs) { var r = runs.LastOrDefault(x => x.At >= since); if (r != null) return r; }
+            if (DateTime.Now >= end) return null;
+            await Task.Delay(200);
+        }
+    }
+
+    // The user is talking to Oma through the phone: the PC microphone sends silence for 2 minutes (the conversation stays).
+    public void PhoneSession()
+    {
+        var first = DateTime.Now >= pausedUntil;
+        pausedUntil = DateTime.Now.AddMinutes(2);
+        if (first) Program.Post(() => w.Js("st.liveNote && st.liveNote('Telegram is in use: the PC microphone is paused for 2 minutes so nothing is done twice.')"));
+    }
+
+    // Telegram is doing it: a Live request for the same words in the next minute is not run again.
+    public void Suppress(TimeSpan span) => suppressUntil = DateTime.Now + span;
+
     public LiveVoice(SettingsWindow w) { this.w = w; }
 
     public void Start()
@@ -68,9 +100,17 @@ sealed class LiveVoice
         {
             var id = t.GetProperty("id").GetString() ?? "";
             var req = t.GetProperty("request").GetString() ?? "";
+            if (DateTime.Now < suppressUntil)
+            {
+                Program.Err("Live: run_on_pc not run: Telegram is already doing this request");
+                Send(new { tool = new { id, result = "Already being done from the user's phone (Telegram): do not do it again; just say it is handled there." } });
+                return;
+            }
             Program.Err($"Live: run_on_pc ({req.Length} chars)");
             w.Js("holoOrb?.setState('thinking')");
-            w.RemoteAsk(req, reply => Send(new { tool = new { id, result = reply } }), "live");
+            var run = new ToolRun(DateTime.Now, req, new TaskCompletionSource<string>());
+            lock (runs) { runs.Add(run); runs.RemoveAll(x => x.At < DateTime.Now.AddMinutes(-5)); }
+            w.RemoteAsk(req, reply => { run.Result.TrySetResult(reply); Send(new { tool = new { id, result = reply } }); }, "live");
             return;
         }
         if (j.TryGetProperty("closed", out var c)) { Program.Err("Live: closed: " + c.GetString()); Stop(c.GetString()); }
@@ -85,7 +125,7 @@ sealed class LiveVoice
         mic = new WaveInEvent { WaveFormat = new WaveFormat(16000, 16, 1), BufferMilliseconds = 100 };
         mic.DataAvailable += (_, e) =>
         {
-            var quiet = DateTime.Now < quietAfter;
+            var quiet = DateTime.Now < quietAfter || DateTime.Now < pausedUntil;
             var b = new byte[e.BytesRecorded];
             if (!quiet) Buffer.BlockCopy(e.Buffer, 0, b, 0, e.BytesRecorded);   // silence while Oma speaks: no echo
             else Program.Post(() => { if (DateTime.Now >= quietAfter) w.Js("holoOrb?.setState('listening')"); });
@@ -94,6 +134,7 @@ sealed class LiveVoice
                 double sum = 0;
                 for (int i = 0; i + 1 < b.Length; i += 2) { var v = BitConverter.ToInt16(b, i) / 32768.0; sum += v * v; }
                 var level = Math.Min(1, Math.Sqrt(sum / Math.Max(1, b.Length / 2)) * 14);
+                if (level > 0.25) lock (speech) { speech.Add(DateTime.Now); if (speech.Count > 4000) speech.RemoveRange(0, 1000); }   // someone is talking in the room
                 Program.Post(() => w.Js($"holoOrb?.setAudioLevel({level:0.00})"));
             }
             Send(new { a = Convert.ToBase64String(b) });

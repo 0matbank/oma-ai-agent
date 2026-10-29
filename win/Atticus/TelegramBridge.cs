@@ -136,6 +136,31 @@ static class TelegramBridge
             if (string.IsNullOrWhiteSpace(text)) { await Send(chat, "✕ Could not make out the voice note. Try again or send text."); return; }
             await Send(chat, "🎤 " + text);
         }
+        // Session isolation with the PC microphone (a Live conversation can hear the user talking into the phone)
+        var live = Program.Settings?.Live;
+        if (live?.On == true)
+        {
+            live.PhoneSession();
+            if (voice && !waiting)
+            {
+                var sent = DateTimeOffset.FromUnixTimeSeconds(m.GetProperty("date").GetInt64()).LocalDateTime;
+                var secs = m.TryGetProperty("voice", out var vv) && vv.TryGetProperty("duration", out var dd) ? dd.GetInt32() : 5;
+                var from = sent.AddSeconds(-secs - 2);
+                if (live.HeardBetween(from, sent.AddSeconds(2)))
+                {
+                    var run = await live.ToolSince(from, TimeSpan.FromSeconds(6));   // the PC may still be deciding
+                    if (run != null)
+                    {
+                        Program.Err("Telegram: the PC microphone heard this voice note too and is doing it: not run twice");
+                        var done = await Task.WhenAny(run.Result.Task, Task.Delay(TimeSpan.FromMinutes(3)));
+                        var res = done == run.Result.Task ? run.Result.Task.Result : (Bangla(text) ? "PC-তে কাজটা এখনো চলছে।" : "It is still running on the PC.");
+                        await Reply(chat, (Bangla(text) ? "✓ PC-র mic এটা আগেই শুনেছে, একবারই করা হয়েছে\n" : "✓ The PC microphone heard this too; it was done once\n") + res, voice);
+                        return;
+                    }
+                }
+                live.Suppress(TimeSpan.FromSeconds(60));   // Telegram does it: Live must not repeat it
+            }
+        }
         if (waiting)   // the answer to the Allow question, typed or said
         {
             var yn = YesNo(text);

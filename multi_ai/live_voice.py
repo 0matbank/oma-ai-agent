@@ -175,8 +175,9 @@ async def run():
             if sc.get('interrupted'):
                 emit(interrupted=True)
             if sc.get('turnComplete') or sc.get('interrupted'):
-                if heard.strip():
-                    emit(heard=heard.strip())
+                if heard.strip():   # Gemini writes spoken Bangla in Devanagari at times ("आज के की बार"): Bangla letters on screen
+                    from multi_ai.voice_server import bangla_script
+                    emit(heard=bangla_script(heard.strip()))
                 if said.strip():
                     emit(said=said.strip())
                 heard = said = ''

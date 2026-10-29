@@ -15,6 +15,8 @@ VOL = r'(?:volume|volum|valume|vol|sound|saund|awaj|awaz|aoyaj|shobdo|ভলি�
 NOT_A_COMMAND = re.compile(r'\b(keno|kno|why|how|kivabe|kemne|ki hoise|ki holo|naki)\b|কেন|কীভাবে|\?|\b(and|then|tarpor|tarpore|ar)\b|এবং|তারপর', re.I)
 SHOT = r'(?:screen ?shot|screenshot|screen shot|ss|skrinshot|স্ক্রিনশট|স্ক্রিন শট)'
 TAKE = r'(?:nao|naw|nen|nau|lo|take|capture|tolo|tulo|tolen|koro|daw|dao|নাও|নিন|তোলো|নাও তো)?'
+# a level to reach ("to 50", "50 porjonto", "৫০-এ", "50 te"), not an amount to change by ("by 3%", "3% barao")
+TARGET = re.compile(r'\bto\b|\bporjonto\b|পর্যন্ত|\d+\s*%?\s*-?(?:e|te|এ|তে|ey)\b|\b(?:set|koro|kor|করো|রাখো|rakho)\b', re.I)
 BRIGHT = r'(?:brightness|brightnes|brite|alo|আলো|ব্রাইটনেস)'
 
 
@@ -33,8 +35,14 @@ def match(text):
             return ('unmute', None)
         if re.search(r'\bmute\b|মিউট|\b(bondho|bondo|off)\b|বন্ধ', t):
             return ('mute', None)
-        if pct and re.search(r'\d', t):
-            return ('volume_set', max(0, min(100, int(pct.group(1)))))
+        n = max(0, min(100, int(pct.group(1)))) if pct else None
+        if n is not None and not TARGET.search(t):   # "increase volume by 3%" set it TO 3% and the song went silent (Oct 29)
+            if re.search(UP, t):
+                return ('volume_up', n)
+            if re.search(DOWN, t):
+                return ('volume_down', n)
+        if n is not None:
+            return ('volume_set', n)
         if re.search(UP, t):
             return ('volume_up', 10)
         if re.search(DOWN, t):
@@ -47,8 +55,11 @@ def match(text):
     if re.fullmatch(SHOT + r'\s*' + TAKE + r'(?:\s*(?:to|please|plz))?', t):
         return ('screenshot', None)
     if re.search(BRIGHT, t):
-        if pct and re.search(r'\d', t):
-            return ('brightness_set', max(0, min(100, int(pct.group(1)))))
+        n = max(0, min(100, int(pct.group(1)))) if pct else None
+        if n is not None and not TARGET.search(t) and (re.search(UP, t) or re.search(DOWN, t)):
+            return ('brightness_step', n if re.search(UP, t) else -n)
+        if n is not None:
+            return ('brightness_set', n)
         if re.search(UP, t):
             return ('brightness_step', +10)
         if re.search(DOWN, t):

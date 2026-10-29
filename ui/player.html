@@ -6,8 +6,22 @@
   const v = new URLSearchParams(location.search).get('v') || '';
   if (/^[\w-]{11}$/.test(v)) {
     const f = document.createElement('iframe');
-    f.src = `https://www.youtube-nocookie.com/embed/${v}?autoplay=1&rel=0&modestbranding=1`;
+    f.src = `https://www.youtube-nocookie.com/embed/${v}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
     f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen'; f.allowFullscreen = true;
     document.body.appendChild(f);
+    // "sound komao" while a video plays changes this video's volume, not the PC's (Oma window -> {omaVolume: {op, n}})
+    let vol = 100;
+    const yt = (func, args = []) => f.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+    window.addEventListener('message', e => {
+      if (e.data && typeof e.data === 'string' && e.data.includes('infoDelivery')) {   // YouTube tells its real volume
+        try { const i = JSON.parse(e.data).info; if (i && typeof i.volume === 'number') vol = i.volume; } catch (x) {}
+        return;
+      }
+      const o = e.data && e.data.omaVolume;
+      if (!o) return;
+      vol = Math.max(0, Math.min(100, o.op === 'set' ? o.n : o.op === 'up' ? vol + o.n : vol - o.n));
+      yt('unMute'); yt('setVolume', [vol]);
+    });
+    f.addEventListener('load', () => f.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*'));
   }
 </script></body></html>

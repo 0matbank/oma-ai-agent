@@ -100,6 +100,7 @@ sealed class SettingsWindow : PageWindow
 
     LiveVoice live;
     public bool LiveOn => live?.On == true;
+    public LiveVoice Live => live;
 
     public void StartListening(bool isClick)
     {
@@ -582,6 +583,9 @@ sealed class SettingsWindow : PageWindow
             case "skillDelete": if (S("name") is { } skn) Task.Run(() => Py.Run(new[] { "--skill-delete", skn })); break;
             case "openMonitor": MonitorWindow.Show(S("url") ?? "https://www.worldmonitor.app/"); break;
             case "talk":
+            case "playerState":   // the engine sends "sound komao" to the player while it shows (atticus.player_on)
+                try { var pf = Path.Combine(Paths.Config, "player_on"); if (b.TryGetProperty("on", out var pon) && pon.GetBoolean()) File.WriteAllText(pf, DateTime.Now.ToString("s")); else File.Delete(pf); } catch { }
+                break;
             case "micToggle":
                 Program.Post(() => {
                     if (voiceRecording && !LiveOn) StopListening();
@@ -811,7 +815,11 @@ sealed class SettingsWindow : PageWindow
     void OnEngineLine(string line)
     {
         if (line == "! setup") { Program.Onboarding.Open(); return; }
-        if (line.StartsWith("▶ {")) { Js($"st.player({line[2..]})"); return; }   // {ME} --player: the neural player   // Claude not installed, signed out or no plan
+        if (line.StartsWith("▶ {"))   // {ME} --player: the Oma player, a window of its own the user can put anywhere on the PC
+        {
+            try { using var pj = JsonDocument.Parse(line[2..]); PlayerWindow.Handle(pj.RootElement.Clone()); } catch (Exception ex) { Program.Err("Player: " + ex.Message); }
+            return;
+        }
         if (line.StartsWith("@ ")) { Ring.At(line); return; }   // experimental "show me where"
         if (line.StartsWith("? "))   // "? <question>\t<command>\t<answer file>[\t<escalate>[\tretry]]"
         {

@@ -1755,11 +1755,12 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
       <div class="town-viewport" style="flex:1; border-radius:8px; border:1px solid rgba(255,255,255,0.06); position:relative; overflow:hidden;">
         <canvas id="town-canvas"></canvas>
         <div id="neuralPlayer" style="display:none; position:absolute; left:10px; bottom:10px; width:min(360px, 60%); z-index:6; background:#05070b; border:1px solid var(--border-glow); border-radius:8px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.6);">
-          <div style="display:flex; align-items:center; gap:6px; padding:4px 8px; font:700 10px Consolas,monospace; letter-spacing:1.5px; color:var(--neon-cyan);">
+          <div id="npBar" title="Drag to move" style="cursor:move; user-select:none; touch-action:none; display:flex; align-items:center; gap:6px; padding:4px 8px; font:700 10px Consolas,monospace; letter-spacing:1.5px; color:var(--neon-cyan);">
             <span style="width:6px;height:6px;border-radius:50%;background:#ff3344;display:inline-block"></span> OMA NEURAL PLAYER
             <span id="npTitle" style="flex:1; color:var(--text-secondary); font-weight:400; letter-spacing:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
             <button class="wbtn" id="npClose" title="Stop">✕</button></div>
           <div style="aspect-ratio:16/9;"><iframe id="npFrame" style="border:0; width:100%; height:100%;" allow="autoplay; encrypted-media; fullscreen"></iframe></div>
+          <div id="npGrip" title="Drag to resize" style="position:absolute; right:0; bottom:0; width:16px; height:16px; cursor:nwse-resize; touch-action:none; background:linear-gradient(135deg, transparent 50%, var(--neon-cyan) 50%); opacity:.7;"></div>
         </div>
         <div class="town-pane" data-pane="visual hub" style="display:none; position:absolute; inset:0; flex-direction:column; background:#070b10;">
           <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; border-bottom:1px solid var(--border-subtle); font-size:11px; color:var(--text-muted);">
@@ -2722,6 +2723,61 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
   const esc = escapeHtml;
 
   // Chat Execution Feeds
+  // The Oma player: drag its bar to move it, its corner to resize it, anywhere inside the town panel; the place is kept.
+  // (It sat fixed at the bottom left: "keno dane bame nawya jai na, soto boro keno kora jai na", Oct 29.)
+  // It floats over the whole Oma window (the town panel alone left almost no room to move: "halka sore, pura ta sore na").
+  function npKeepInside() {
+    const np = $('neuralPlayer'), W = window.innerWidth, H = window.innerHeight;
+    const w = Math.min(np.offsetWidth, W - 8), h = np.offsetHeight;
+    np.style.width = w + 'px';
+    const left = Math.max(4, Math.min(np.offsetLeft, W - w - 4)), top = Math.max(4, Math.min(np.offsetTop, H - h - 4));
+    np.style.left = left + 'px'; np.style.top = top + 'px'; np.style.bottom = 'auto';
+  }
+  function npSave() {
+    const np = $('neuralPlayer');
+    try { localStorage.setItem('omaPlayerBox2', JSON.stringify({ l: np.offsetLeft, t: np.offsetTop, w: np.offsetWidth })); } catch (e) {}
+  }
+  function npMoveTo(where) {
+    const np = $('neuralPlayer'), a = { width: window.innerWidth, height: window.innerHeight }, w = np.offsetWidth, h = np.offsetHeight;
+    const x = { left: 10, right: a.width - w - 10, center: (a.width - w) / 2 }[where], y = { top: 10, bottom: a.height - h - 10, center: (a.height - h) / 2 }[where];
+    if (x !== undefined) np.style.left = Math.round(x) + 'px';
+    if (y !== undefined) { np.style.top = Math.round(y) + 'px'; np.style.bottom = 'auto'; }
+    if (where === 'center') { np.style.left = Math.round((a.width - w) / 2) + 'px'; np.style.top = Math.round((a.height - h) / 2) + 'px'; }
+    npKeepInside(); npSave();
+  }
+  function npInit() {
+    const np = $('neuralPlayer');
+    if (np.dataset.ready) return;
+    np.dataset.ready = '1';
+    document.body.appendChild(np);
+    np.style.position = 'fixed'; np.style.zIndex = '9000'; np.style.width = '360px';   // above the header too
+    let b = null;
+    try { b = JSON.parse(localStorage.getItem('omaPlayerBox2') || 'null'); } catch (e) {}   // window coordinates (the old key held town-panel ones)
+    if (b) { np.style.width = b.w + 'px'; np.style.left = b.l + 'px'; np.style.top = b.t + 'px'; np.style.bottom = 'auto'; }
+    else requestAnimationFrame(() => {   // first time: where it used to be, the bottom left of the town panel, once it has a height
+      const town = document.querySelector('.town-viewport').getBoundingClientRect();
+      np.style.left = Math.round(town.left + 10) + 'px';
+      np.style.top = Math.round(town.bottom - 10 - np.offsetHeight) + 'px'; np.style.bottom = 'auto';
+      npKeepInside();
+    });
+    const frame = $('npFrame');
+    function drag(handle, move) {
+      handle.addEventListener('pointerdown', e => {
+        if (e.target.closest('button')) return;
+        e.preventDefault(); handle.setPointerCapture(e.pointerId);
+        frame.style.pointerEvents = 'none';   // the video would swallow the pointer
+        // where the pointer holds the player, kept under the pointer (a delta from the start ran ahead of the mouse in the real window)
+        const r = np.getBoundingClientRect(), grab = { x: e.clientX - r.left, y: e.clientY - r.top, right: r.right - e.clientX };
+        const onMove = ev => { move(grab, ev.clientX, ev.clientY); npKeepInside(); };
+        const onUp = () => { handle.removeEventListener('pointermove', onMove); handle.removeEventListener('pointerup', onUp); handle.removeEventListener('lostpointercapture', onUp); frame.style.pointerEvents = ''; npSave(); };
+        handle.addEventListener('pointermove', onMove); handle.addEventListener('pointerup', onUp); handle.addEventListener('lostpointercapture', onUp);
+      });
+    }
+    drag($('npBar'), (g, x, y) => { np.style.left = (x - g.x) + 'px'; np.style.top = (y - g.y) + 'px'; np.style.bottom = 'auto'; });
+    drag($('npGrip'), (g, x) => { np.style.width = Math.max(220, x + g.right - np.getBoundingClientRect().left) + 'px'; np.dataset.size = ''; });
+    window.addEventListener('resize', () => { if (np.style.display !== 'none') npKeepInside(); });
+  }
+
   function appendFeedMessage(role, sender, text, modelTag, isFallback) {
     const stream = $('homeFeedStream');
     const fullStream = $('fullFeedStream');
@@ -3111,20 +3167,26 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
     memory(d) { window.omaPanels?.data(d); },
     skillSaved(r) { window.omaPanels?.saved(r); },
     player(it) {   // the engine's {ME} --player: a YouTube video in the Agent Town panel ({stop:true} closes it)
-      if (it && it.stop) { $('npFrame').src = 'about:blank'; $('neuralPlayer').style.display = 'none'; return; }
+      npInit();
+      if (it && it.stop) { $('npFrame').src = 'about:blank'; $('neuralPlayer').style.display = 'none'; post({ do: 'playerState', on: false }); return; }
+      if (it && ['left', 'right', 'top', 'bottom', 'center'].includes(it.size)) { npMoveTo(it.size); return; }
+      if (it && it.volume) { try { $('npFrame').contentWindow.postMessage({ omaVolume: it.volume }, '*'); } catch (e) {} return; }
       if (it && it.size) {   // "player boro / choto / full koro": 360 -> 520 -> 720 px -> the whole town panel
-        const np = $('neuralPlayer'), area = np.parentElement.getBoundingClientRect(), steps = [360, 520, 720, 'full'];
+        const np = $('neuralPlayer'), area = document.querySelector('.town-viewport').getBoundingClientRect(), steps = [360, 520, 720, 'full'];
         let i = Math.max(0, steps.indexOf(np.dataset.size === 'full' ? 'full' : +np.dataset.size || 360));
         i = it.size === 'bigger' ? Math.min(i + 1, 3) : it.size === 'smaller' ? Math.max(i - 1, 0) : it.size === 'full' ? 3 : 0;
         const w = steps[i] === 'full' ? Math.min(area.width - 20, (area.height - 20 - 26) * 16 / 9) : Math.min(steps[i], area.width - 20);
         np.dataset.size = steps[i]; np.style.width = Math.round(w) + 'px';
+        if (steps[i] === 'full') { np.style.left = Math.round(area.left + 10) + 'px'; np.style.top = Math.round(area.top + 10) + 'px'; }
+        npKeepInside(); npSave();
         return;
       }
       if (!it || !/^[\w-]{11}$/.test(it.id || '')) return;
       $('npFrame').src = 'https://oma.ui/player.html?v=' + it.id;
       $('npTitle').textContent = it.title || '';
       $('neuralPlayer').style.display = 'block';
-      $('npClose').onclick = () => { $('npFrame').src = 'about:blank'; $('neuralPlayer').style.display = 'none'; };
+      post({ do: 'playerState', on: true });   // the engine sends "sound komao" to the player while it shows
+      $('npClose').onclick = () => { $('npFrame').src = 'about:blank'; $('neuralPlayer').style.display = 'none'; post({ do: 'playerState', on: false }); };
     },
     brief(b) { if (b && b.text) appendFeedMessage('oma', 'OMA AI', b.text); },
     rec(m) { if (recording) showCaps(m || '', m ? '' : 'Recording — press your shortcut'); },   // modifiers held so far
