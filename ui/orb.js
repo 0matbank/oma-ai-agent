@@ -80,7 +80,7 @@ class OmaParticleOrb {
     this.w = Math.max(1, r.width); this.h = Math.max(1, r.height); this.dpr = dpr;
     this.canvas.width = Math.round(this.w * dpr); this.canvas.height = Math.round(this.h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.R = Math.min(this.w, this.h) * 0.3;
+    this.R = Math.min(this.w, this.h) * 0.36;   // the orb fills its panel (Stonic look)
     this.cy = this.h * (this.h > 260 ? 0.44 : 0.5);
   }
 

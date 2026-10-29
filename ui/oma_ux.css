@@ -112,3 +112,28 @@ body.lay-focus #sphere-panel { flex: 1 !important; width: auto; }
 #sphere-status-badge { white-space: nowrap; flex: none; }
 .town-stats .tf.tf-status { min-width: 92px; }
 @media (min-width: 1500px) { #settings-drawer #history .settings-container { column-count: 1; max-width: 900px !important; } }
+
+/* ===== Clean main screen (user feedback): no status chips on the orb, the orb panel never leaves an empty gap ===== */
+.core-chips[hidden] { display: none !important; }
+@media (max-width: 1280px) { #sphere-panel { flex: 1 1 auto !important; width: auto !important; } }
+/* town: chips in the header line, between the title and the tabs */
+.town-header { gap: 10px; }
+.town-header #agent-chips-container { flex: 1; min-width: 0; margin: 0 !important; padding: 0 !important; border: 0 !important; background: none !important;
+  display: flex; justify-content: center; gap: 6px; overflow: hidden; flex-wrap: nowrap; }
+@media (max-width: 1500px) { .town-header #agent-chips-container .chip-name { display: none; } .town-header #agent-chips-container .agent-chip { padding: 3px !important; } }
+/* chat: one bar, the buttons inside it */
+.input-bar-wrapper { align-items: center; border: 1px solid var(--border-subtle); border-radius: 12px; background: rgba(255,255,255,.035); padding: 4px 4px 4px 10px; gap: 4px !important; }
+.input-bar-wrapper:focus-within { border-color: rgba(var(--accent-rgb), .6); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .12); }
+.input-bar-wrapper #homeChatInput { border: 0 !important; background: transparent !important; box-shadow: none !important; padding-left: 0; }
+.input-bar-wrapper #btnAttach, .input-bar-wrapper #btnHomeMic { background: transparent !important; box-shadow: none !important; width: 30px; padding: 0; color: var(--text-secondary); }
+.input-bar-wrapper #btnAttach:hover, .input-bar-wrapper #btnHomeMic:hover { color: var(--neon-cyan); }
+.input-bar-wrapper #btnHomeSend { width: 34px; padding: 0; border-radius: 9px; }
+/* narrow windows: all five faces stay visible (never cut on the left) */
+.town-header #agent-chips-container { justify-content: safe center; }
+@media (max-width: 1500px) {
+  .town-header .town-badge { display: none; }
+  .town-header #agent-chips-container { gap: 3px; }
+  .town-header #agent-chips-container .agent-chip { gap: 3px !important; }
+  .town-header #agent-chips-container .chip-face { width: 20px; height: 20px; }
+}
+@media (max-width: 1500px) { .town-stats .tf:has(#tfModel), .town-stats .tf:has(#town-last-task) { display: none !important; } .town-stats .tf.tf-status { max-width: none; } }

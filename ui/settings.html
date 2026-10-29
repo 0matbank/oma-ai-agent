@@ -1698,7 +1698,7 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
             <span class="status-pulse"></span>
             <span id="sphere-status-text">SYSTEM ACTIVE</span>
           </div>
-          <div class="core-chips">
+          <div class="core-chips" hidden>
     <div class="telem-chip" id="lang-switcher" style="cursor:pointer; background:rgba(var(--accent-rgb),0.12); padding:3px 10px; border-radius:5px; border:1px solid rgba(var(--accent-rgb),0.3);" title="ক্লিক করে ভাষা পরিবর্তন করুন (বাংলা / English)">
       <span style="color:var(--neon-cyan);">🌐 ভয়েস:</span> <b id="current-lang-label" style="color:#fff;">বাংলা</b>
     </div>
@@ -1743,6 +1743,7 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
           <span class="town-badge">READY</span>
         </div>
 
+        <div id="agent-chips-container" class="agent-chips-bar"></div>
         <div class="town-tabs">
           <button class="town-tab active" data-tab="agents">agents</button>
           <button class="town-tab" data-tab="visual hub">visual hub</button>
@@ -1751,10 +1752,6 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
 
       </div>
 
-      <!-- Agent Status Chips Sub-Bar -->
-      <div id="agent-chips-container" class="agent-chips-bar" style="margin-bottom:6px;">
-        <!-- Populated by agent_town.js -->
-      </div>
 
       <!-- Virtual Office Canvas Viewport -->
       <div class="town-viewport" style="flex:1; border-radius:8px; border:1px solid rgba(255,255,255,0.06); position:relative; overflow:hidden;">
@@ -1850,9 +1847,9 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
       <div class="feed-input-dock" style="padding:10px; border-top:1px solid var(--line); background:rgba(0,0,0,0.25); flex:none;">
         <div id="attachTray"></div>
         <div class="input-bar-wrapper" style="display:flex; gap:6px;">
-          <button class="btn" id="btnAttach" title="Attach files or pictures (or paste / drop them here)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l9-9a3.7 3.7 0 0 1 5.2 5.2l-9 9a1.8 1.8 0 0 1-2.6-2.6l8.3-8.3"/></svg></button>
           <input type="file" id="attachInput" multiple hidden>
           <input type="text" id="homeChatInput" class="field" placeholder="Type to Oma (English / বাংলা)…" autocomplete="off" style="flex:1;">
+          <button class="btn" id="btnAttach" title="Attach files or pictures (or paste / drop them here)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l9-9a3.7 3.7 0 0 1 5.2 5.2l-9 9a1.8 1.8 0 0 1-2.6-2.6l8.3-8.3"/></svg></button>
           <button class="btn" id="btnHomeMic" title="Voice Listening (Hold or Click)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
           <button class="btn blue" id="btnHomeSend" title="Send Directive"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
         </div>
@@ -2216,6 +2213,8 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
       <h3>Look &amp; Feel</h3>
       <div class="group">
         <div class="row"><div class="t"><b>Text size</b><span>Makes everything in the Oma window bigger or smaller.</span><em class="bn-hint">Oma-র সব লেখা বড় বা ছোট করুন।</em></div><input type="range" min="80" max="130" step="5" data-k="uiScale"><span class="val" id="scalev">100%</span></div>
+        <div class="row"><div class="t"><b>Voice language</b><span>What you speak to Oma. Bangla also understands English words.</span><em class="bn-hint">আপনি কোন ভাষায় কথা বলবেন।</em></div>
+          <div class="seg" data-k="speechLanguage"><button data-v="bn">বাংলা + English</button><button data-v="en">English only</button></div></div>
         <div class="row"><div class="t"><b>English status labels</b><span>Off: the orb says what Oma is doing in Bangla (শুনছি…, কাজ করছি…).</span></div><label class="sw"><input type="checkbox" data-k="uiEnglishLabels"></label></div>
         <div class="row"><div class="t"><b>Theme</b><span>Oma Signature, Stonic, Solar and more: the 🎨 THEME button at the top.</span></div></div>
       </div>

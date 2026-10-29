@@ -298,7 +298,7 @@
   // st.load runs again after every saved setting: keep labels, mode and layout in step
   const load0 = window.st.load;
   let laidOut = false;
-  window.st.load = d => { load0(d); try { relabel(); settingsMode(P.settingsMode); if (!laidOut) { laidOut = true; layout(P.layout || 'center'); } const sc = document.querySelector('input[data-k="uiScale"]'); if (sc) { sc.value = P.uiScale || 100; if ($('scalev')) $('scalev').textContent = sc.value + '%'; } } catch (e) {} };
+  window.st.load = d => { load0(d); try { relabel(); settingsMode(P.settingsMode); if (!P.speechLanguage) document.querySelector('.seg[data-k="speechLanguage"] button[data-v="bn"]')?.classList.add('on'); if (!laidOut) { laidOut = true; layout(P.layout || 'center'); } const sc = document.querySelector('input[data-k="uiScale"]'); if (sc) { sc.value = P.uiScale || 100; if ($('scalev')) $('scalev').textContent = sc.value + '%'; } } catch (e) {} };
 })();
 
 /* Chat: attach files and pictures (button, paste, drag and drop), copy any message, the model in the input's hint. */
