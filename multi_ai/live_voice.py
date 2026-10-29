@@ -24,13 +24,15 @@ import asyncio
 import base64
 import json
 import os
+import re
 import sys
 import time
 
 MODEL = os.environ.get('OMA_LIVE_MODEL') or 'gemini-3.1-flash-live-preview'
 VOICE = os.environ.get('OMA_LIVE_VOICE') or 'Leda'   # the user picked this voice from five samples (Oct 29)
 URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key='
-IDLE_END = 120   # s with nobody speaking: the conversation ends (Live time counts against the free quota)
+BANGLISH = r'\b(ami|tumi|koro|kor|kore|dao|daw|ki|kemon|acho|bolo|chalao|kholo|bondho|gan|ekta|akta|amar|tomar|na|hobe|ache|nai|valo|bhalo)\b'   # Bangla in Latin letters
+IDLE_END = 120  # s with nobody speaking: the conversation ends (Live time counts against the free quota)
 
 TOOLS = [{'functionDeclarations': [{
     'name': 'run_on_pc',
@@ -88,6 +90,7 @@ async def run():
     last_voice = [time.time()]
     pending = {}    # run_on_pc call id -> request, until answered
     early = set()   # run_on_pc calls answered early with a question: their result comes as a message
+    spoke = ['']    # the language of the user's latest words: run_on_pc's result (English text) is to be said in it
     asking = [False]   # a card's question is out loud now: only then is a spoken answer passed on (Gemini once called answer_permission unasked)
     loop = asyncio.get_running_loop()
     lines = asyncio.Queue()
@@ -117,11 +120,13 @@ async def run():
                 if t['id'] in early:   # the call was answered with a question already: tell the result as a message
                     early.discard(t['id'])
                     await ws.send(json.dumps({'clientContent': {'turns': [{'role': 'user', 'parts': [{'text':
-                        f"[Result of the earlier PC request \"{pending.pop(t['id'], '')}\"] {t.get('result', '')}\nTell me briefly, in my language."}]}],
+                        f"[Result of the earlier PC request \"{pending.pop(t['id'], '')}\"] {t.get('result', '')}\nTell me briefly, in {spoke[0] or 'my language'}."}]}],
                         'turnComplete': True}}))
                 else:
                     pending.pop(t['id'], None)
-                    await ws.send(json.dumps({'toolResponse': {'functionResponses': [{'id': t['id'], 'name': 'run_on_pc', 'response': {'result': t.get('result', '')}}]}}))
+                    # "ami boli banglay, reply dey English-e" (Oct 29): the result is English text, so say which language to speak
+                    say = {'say_it_in': 'Bangla', 'note': 'The user spoke Bangla: tell them this result in natural spoken Bangla, not in English.'} if spoke[0] == 'Bangla' else {}
+                    await ws.send(json.dumps({'toolResponse': {'functionResponses': [{'id': t['id'], 'name': 'run_on_pc', 'response': {'result': t.get('result', ''), **say}}]}}))
                 last_voice[0] = time.time()
             elif 'ask' in j or 'pick' in j:
                 open_ids = [i for i in pending if i not in early]
@@ -166,6 +171,12 @@ async def run():
             sc = m.get('serverContent', {})
             if sc.get('inputTranscription', {}).get('text'):
                 heard += sc['inputTranscription']['text']
+                if re.search('[ऀ-৿]', heard):   # Bangla (or Bangla written in Devanagari letters)
+                    spoke[0] = 'Bangla'
+                elif re.search(BANGLISH, heard, re.I):
+                    spoke[0] = 'Bangla'
+                elif len(re.findall('[A-Za-z]', heard)) > 8:
+                    spoke[0] = 'English'
                 last_voice[0] = time.time()
             if sc.get('outputTranscription', {}).get('text'):
                 said += sc['outputTranscription']['text']

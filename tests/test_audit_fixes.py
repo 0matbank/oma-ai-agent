@@ -233,6 +233,64 @@ class Lessons(unittest.TestCase):   # learning from the user's corrections (mult
 
     def test_every_model_gets_them(self):
         self.assertIn('lessons_for(task)', inspect.getsource(atticus.fast_chat))
+
+    def test_a_lesson_that_fails_twice_is_no_longer_used(self):   # one wrong guess never becomes a permanent rule
+        x = self.l.add('Chrome profile Roman', 'use Ruman', 'r', 'w', 'c', verified=True)
+        self.assertIn('use Ruman', self.l.prompt_text('Chrome profile Roman'))
+        self.assertEqual(self.l.relevant.last, [x['id']])
+        self.l.outcome([x['id']], False)
+        self.assertIn('use Ruman', self.l.prompt_text('Chrome profile Roman'))   # once is not enough
+        self.l.outcome([x['id']], False)
+        self.assertEqual(self.l.prompt_text('Chrome profile Roman'), '')
+        self.l.main(['undo'])
+        self.assertIn('use Ruman', self.l.prompt_text('Chrome profile Roman'))
+
+    def test_correction_without_tag_is_kept(self):   # the Telegram corrections of Oct 29 left no lesson
+        x = self.l.auto('বাংলা গান প্লে করো এবং সাউন্ড রাখো ৫০', 'Playing: Tecno Camon 50 Review', 'আমি বলেছি যে বাংলা গান প্লে করতে',
+                        ['atticus --player "বাংলা গান"'], True, 'telegram')
+        self.assertEqual((x['status'], x['kind']), ('verified', 'auto'))
+        self.assertIn('বাংলা গান', self.l.prompt_text('বাংলা গান প্লে করো'))
+        # the quick no-AI path would repeat the mistake: this same request now goes to the AI, other requests do not
+        self.assertTrue(self.l.overrides('বাংলা গান প্লে করো এবং সাউন্ড রাখো ৫০'))
+        self.assertFalse(self.l.overrides('volume komao'))
+
+
+class TelegramPlayerRound(unittest.TestCase):   # the user's own Telegram voice requests of Oct 29, 21:35-21:40
+    def test_song_with_a_volume_is_not_searched_for_the_number(self):
+        t = 'আচ্ছা YouTube এ একটা বাংলা গান প্লে করো এবং সাউন্ড রাখো ৫০ এর মধ্যে।'
+        self.assertEqual(atticus.media_request(t), 'বাংলা song')   # was "Tecno Camon 50 Review"
+        self.assertEqual(atticus.VOLUME_TOO.search(t)[1], '৫০')
+
+    def test_complaints_and_corrections_go_to_the_engine(self):
+        for t in ('তুমি তো ফোনের ভিডিও চালিয়েছো, আমি বলেছি যে বাংলা গান প্লে করতে।', 'কোই গান্তপ্লে হযনে.', 'gan to play hoyni',
+                  'আমি তুমা কে বলে সিজে, ইউটিউবে এক্টা বাংগলা গান পলে করো.',
+                  'একান ইউটিউবে এটা গান পলে হচে, দেখো তুমি ইসকিনে, এটা কে তুমি বাম পাশে কনালে রাখো?'):
+            self.assertIsNone(atticus.media_request(t), t)
+
+    def test_misheard_player_word_moves_the_player(self):
+        self.assertEqual(atticus.player_size_request('আছা, পলেযাটাকে বাম পাশে, কোনারে রাখো?'), 'left')
+        self.assertEqual(atticus.player_size_request('ভিডিও প্লেয়ারটা বাম পাশে মুভ করো'), 'left')
+
+    def test_next_song_words(self):   # "gan ta change koro, porer gan dao" went to the AI and answered before the title changed
+        from multi_ai import instant, intent
+        for t in ('gan ta change koro, porer gan dao', 'change the song', 'গানটা বদলাও', 'next song'):
+            self.assertEqual(instant.match(t), ('media', 'next'), t)
+        self.assertIsNone(instant.match('Megho Milono gan ta change kore Tumi chalao'))
+        self.assertIn('def player_next', inspect.getsource(atticus))
+        self.assertEqual(intent.reply_lang('player full screen koro'), 'bn')
+
+    def test_the_model_knows_the_player_window(self):
+        self.assertIn('--player-size', atticus.PLAYER_HINT)
+        self.assertIn('--player-next', atticus.PLAYER_HINT)
+
+
+class LiveSpeaksTheUsersLanguage(unittest.TestCase):   # "ami boli banglay, reply dey English-e" (Oct 29)
+    def test_result_is_said_in_bangla(self):
+        src = open(_os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), 'multi_ai', 'live_voice.py'), encoding='utf-8').read()
+        self.assertIn("'say_it_in': 'Bangla'", src)
+        from multi_ai import live_voice
+        import re as _re
+        self.assertTrue(_re.search(live_voice.BANGLISH, 'gan ta bondho koro', _re.I))
         self.assertIn('lessons_for(task)', inspect.getsource(atticus.text_only))
 
 
@@ -254,7 +312,7 @@ class CloudHearing(unittest.TestCase):   # Gemini free tier hung 20 s or gave 50
             self.skipTest('needs the app venv')
         import time
         from multi_ai import voice_server as vs, providers
-        def fake(model, think, data, key):
+        def fake(model, think, data, key, limit=5):
             if model == vs.CLOUD_MODELS[0][0]:
                 time.sleep(4)
                 return 'late'
@@ -277,7 +335,7 @@ class CloudHearing(unittest.TestCase):   # Gemini free tier hung 20 s or gave 50
             self.skipTest('needs the app venv')
         import time
         from multi_ai import voice_server as vs, providers
-        def hang(model, think, data, key):
+        def hang(model, think, data, key, limit=5):
             time.sleep(8)
         real, real_key = vs._ask_gemini, providers.get_secret
         vs._ask_gemini, providers.get_secret = hang, lambda k: 'k'

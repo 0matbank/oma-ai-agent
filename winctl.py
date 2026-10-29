@@ -231,8 +231,10 @@ def windows():
             continue
         exe = exe_of(real_pid(h))
         if not exe or os.path.basename(exe).lower() in ('textinputhost.exe', 'atticus.exe', 'searchhost.exe', 'startmenuexperiencehost.exe'):
-            continue
-        out.append({'hwnd': h, 'title': t, 'exe': exe, 'proc': os.path.splitext(os.path.basename(exe))[0], 'app': describe_exe(exe)})
+            if not (exe and t.startswith('Oma Player')):   # Oma's own windows stay out, except its player: "player-ta bame rakho" moves it
+                continue
+        out.append({'hwnd': h, 'title': t, 'exe': exe, 'proc': os.path.splitext(os.path.basename(exe))[0],
+                    'app': 'Oma Player' if t.startswith('Oma Player') else describe_exe(exe)})
     return out
 
 

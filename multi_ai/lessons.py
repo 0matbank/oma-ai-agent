@@ -12,6 +12,11 @@ The loop (Reflexion-style, kept in Oma's own memory; no model is retrained):
   5. Lessons never touch safety: one that tries to skip Allow cards, permissions, passwords or deletion rules is
      refused. The safety gate is code and stays in force whatever a lesson says.
   6. The user can list, delete and undo them: atticus --lessons [list | delete <id> | undo].
+  7. Confidence: after each request a lesson was given to, the result is counted (worked / failed). A lesson that failed
+     twice and helped less often than it failed becomes "doubtful" and is no longer used: one wrong guess never becomes
+     a permanent rule. undo brings it back.
+  8. When the AI forgets the [lesson] tag but the corrected task worked, the correction itself is kept (kind "auto"),
+     so a correction from Telegram or voice is never lost (none was kept on Oct 29: the corrections went to the player).
 Stored in %APPDATA%\\Atticus\\lessons.jsonl, one JSON object a line.
 """
 import json
@@ -87,7 +92,7 @@ def take_tag(reply):
     return (reply[:m.start()] + reply[m.end():]).strip(), (m.group(1).strip(), m.group(2).strip())
 
 
-def add(when, do, request, wrong, correction, verified, source=''):
+def add(when, do, request, wrong, correction, verified, source='', kind='correction'):
     """-> the saved lesson, or None when refused (unsafe or empty)."""
     when, do = when[:160], do[:300]
     if not when or not do:
@@ -95,7 +100,7 @@ def add(when, do, request, wrong, correction, verified, source=''):
     items = _all()
     lesson = {'id': f'L{int(time.time() * 1000) % 10**9:09d}', 'at': time.strftime('%Y-%m-%d %H:%M'), 'when': when, 'do': do,
               'request': request[:300], 'wrong': (wrong or '')[:300], 'correction': correction[:300], 'source': source,
-              'status': 'verified' if verified else 'pending', 'uses': 0}
+              'status': 'verified' if verified else 'pending', 'uses': 0, 'kind': kind, 'worked': 0, 'failed': 0}
     if UNSAFE.search(when + ' ' + do):
         lesson['status'] = 'refused'
         lesson['why'] = 'it would weaken safety or touch secrets'
@@ -113,12 +118,50 @@ def relevant(task, most=3):
     items = _all()
     scored = sorted(((len(words & _words(x['when'] + ' ' + x['request'])), i) for i, x in enumerate(items) if x.get('status') == 'verified'), reverse=True)
     hits = [i for n, i in scored if n >= 1][:most]
+    relevant.last = [items[i]['id'] for i in hits]
     if hits:
         for i in hits:
             items[i]['uses'] = items[i].get('uses', 0) + 1
             items[i]['last_used'] = time.strftime('%Y-%m-%d %H:%M')
         _save(items)
     return [items[i] for i in hits]
+
+
+relevant.last = []
+
+
+def overrides(task):
+    """A verified lesson was made from (nearly) this same request: the quick no-AI path (songs, volume, open/close) would
+    repeat the old mistake without reading it, so the request goes to the AI with the lesson instead."""
+    words = _words(task)
+    if not words:
+        return False
+    for x in _all():
+        req = _words(x.get('request', ''))
+        if x.get('status') == 'verified' and req and len(words & req) >= max(1, 0.7 * len(req)) and len(words & req) >= 0.6 * len(words):
+            return True
+    return False
+
+
+def outcome(ids, ok):
+    """The request the lessons ids were given to ended ok / not ok: their confidence moves; two failures that outweigh
+    the successes make a lesson doubtful (no longer used)."""
+    if not ids:
+        return
+    items = _all()
+    for x in items:
+        if x['id'] in ids and x.get('status') == 'verified':
+            x['worked' if ok else 'failed'] = x.get('worked' if ok else 'failed', 0) + 1
+            if x.get('failed', 0) >= 2 and x['failed'] > x.get('worked', 0):
+                x['status'], x['why'] = 'doubtful', 'it did not help twice'
+    _save(items)
+
+
+def auto(prev_q, prev_a, task, cmds, verified, source=''):
+    """A correction that worked but came without a [lesson] tag: the correction itself is the lesson."""
+    did = '; '.join(c for c in cmds if c)[:160]
+    return add(prev_q[:150], f'The user meant: "{task[:120]}"' + (f'. What worked: {did}' if did else ''), prev_q, prev_a, task,
+               verified, source, kind='auto')
 
 
 def prompt_text(task):
@@ -132,10 +175,10 @@ def prompt_text(task):
 def main(args):
     items = _all()
     if not args or args[0] == 'list':
-        shown = [x for x in items if x.get('status') in ('verified', 'pending', 'refused')]
+        shown = [x for x in items if x.get('status') in ('verified', 'pending', 'refused', 'doubtful')]
         if not shown:
             return print('No lessons yet.')
-        return print('\n'.join(f'{x["id"]} [{x["status"]}] {x["at"]} — When {x["when"]}: {x["do"]} (used {x.get("uses", 0)}x)' for x in shown))
+        return print('\n'.join(f'{x["id"]} [{x["status"]}, {x.get("kind", "correction")}] {x["at"]} — When {x["when"]}: {x["do"]} (used {x.get("uses", 0)}x, worked {x.get("worked", 0)}, failed {x.get("failed", 0)})' for x in shown))
     if args[0] == 'delete' and len(args) > 1:
         for x in items:
             if x['id'] == args[1]:
@@ -144,7 +187,7 @@ def main(args):
                 return print(f'Deleted lesson {args[1]}.')
         return print(f'No lesson {args[1]}.')
     if args[0] == 'undo':   # the last change goes back: a deletion or a replacement
-        changed = [x for x in items if x.get('status') in ('deleted', 'replaced')]
+        changed = [x for x in items if x.get('status') in ('deleted', 'replaced', 'doubtful')]
         if not changed:
             return print('Nothing to undo.')
         x = max(changed, key=lambda y: y.get('deleted_at') or y.get('at'))
@@ -153,7 +196,8 @@ def main(args):
                 if y['id'] == x['replaced_by']:
                     y['status'] = 'replaced'
         x['status'] = 'verified'
-        x.pop('replaced_by', None); x.pop('deleted_at', None)
+        x.pop('replaced_by', None); x.pop('deleted_at', None); x.pop('why', None)
+        x['failed'] = 0
         _save(items)
         return print(f'Restored lesson {x["id"]}: When {x["when"]}: {x["do"]}')
     print('Usage: atticus --lessons [list | delete <id> | undo]')

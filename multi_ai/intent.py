@@ -57,7 +57,9 @@ def reply_lang(text):
         return 'bn'
     words = re.findall(r'[a-z]+', t.lower())
     hits = len(BANGLISH.findall(t))
-    return 'bn' if hits >= 2 or (hits and len(words) <= 3) else 'en'
+    # "player full screen koro": English words, a Banglish verb at the end -> Bangla (it got an English reply, Oct 29)
+    ends = re.search(r'\b(koro|kor|koren|dao|daw|den|nao|naw|chalao|rakho|bolo|dekhao|sorao|kholo|bondho koro)\s*[.!?]*$', t.lower())
+    return 'bn' if hits >= 2 or (hits and len(words) <= 3) or (hits and ends) else 'en'
 
 
 def lang_rule(text):

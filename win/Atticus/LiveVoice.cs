@@ -17,6 +17,7 @@ sealed class LiveVoice
     BufferedWaveProvider played;
     DateTime quietAfter = DateTime.MinValue;   // Oma's voice still in the room until then
     readonly SettingsWindow w;
+    string heardLang = "";
     public bool On => proc != null;
 
     // Telegram and the PC microphone in one room: a voice note said into the phone was also heard by the PC and done
@@ -91,8 +92,15 @@ sealed class LiveVoice
         }
         if (j.TryGetProperty("ready", out _)) { OpenAudio(); w.Js("holoOrb?.setState('listening'); st.liveNote && st.liveNote('Live voice is on: just talk. Press the shortcut or START again to end.')"); Program.Err("Live: ready " + line); return; }
         if (j.TryGetProperty("error", out var e)) { Program.Err("Live: " + e.GetString()); w.Js($"st.liveNote && st.liveNote({Web.Json("✕ " + e.GetString())})"); Stop("error"); return; }
-        if (j.TryGetProperty("heard", out var h)) { w.Js($"st.liveHeard && st.liveHeard({Web.Json(h.GetString())})"); return; }
-        if (j.TryGetProperty("said", out var s)) { w.Js($"st.liveSaid && st.liveSaid({Web.Json(s.GetString())})"); return; }
+        // the language of each turn (never the words) goes to app.err: "ami boli banglay, reply dey English-e" could not be
+        // reproduced with synthetic speech (Oct 29), so the next real case shows which side switched
+        static string Lang(string t) => System.Text.RegularExpressions.Regex.IsMatch(t ?? "", "[ঀ-৿ऀ-ॿ]") ? "bn" : "latin";
+        if (j.TryGetProperty("heard", out var h)) { heardLang = Lang(h.GetString()); w.Js($"st.liveHeard && st.liveHeard({Web.Json(h.GetString())})"); return; }
+        if (j.TryGetProperty("said", out var s))
+        {
+            Program.Err($"Live: turn heard {heardLang}, said {Lang(s.GetString())} ({s.GetString()?.Length} chars)");
+            w.Js($"st.liveSaid && st.liveSaid({Web.Json(s.GetString())})"); return;
+        }
         if (j.TryGetProperty("interrupted", out _)) { played?.ClearBuffer(); quietAfter = DateTime.Now; return; }
         if (j.TryGetProperty("turn", out _)) { return; }
         if (j.TryGetProperty("answer", out var an)) { Program.Err("Live: spoken answer to a card"); w.RemoteAnswer(an.GetString() ?? ""); return; }

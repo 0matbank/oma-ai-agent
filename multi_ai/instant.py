@@ -65,7 +65,9 @@ def match(text):
         if re.search(DOWN, t):
             return ('brightness_step', -10)
         return None
-    if re.fullmatch(r'(?:next|porer|pore?r) ?(?:gan|gaan|song|track)?(?: dao| daw| chalao| koro)?|(?:next|পরের) ?(?:গান)?', t):
+    nxt = (r'(?:(?:next|porer|pore?r) ?(?:gan|gaan|song|track)?(?: dao| daw| chalao| koro)?|(?:next|পরের) ?(?:গান)?(?: দাও| চালাও)?'
+           r'|(?:change the song|(?:gan|gaan|song|music)(?: ?ta)? (?:change|bodlao|bodlaw|bodla|next)(?: koro| kor| dao| daw)?|গান(?: ?টা)? (?:বদলাও|চেঞ্জ করো|পাল্টাও)))')
+    if re.fullmatch(nxt + r'(?: ' + nxt + r')?', t):   # "gan ta change koro, porer gan dao" (Oct 29: went to the AI, 7 s)
         return ('media', 'next')
     if re.fullmatch(r'(?:previous|prev|ager|agher|age ?r) ?(?:gan|gaan|song|track)(?: dao| daw| chalao| koro)?|আগের গান', t):
         return ('media', 'previous')

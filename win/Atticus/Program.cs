@@ -71,6 +71,7 @@ static class Program
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Err("UnhandledException: " + e.ExceptionObject);
         TaskScheduler.UnobservedTaskException += (_, e) => { Err("UnobservedTaskException: " + e.Exception); e.SetObserved(); };
         var ctx = new ApplicationContext();
+        PlayerWindow.Reset();   // a player_on left by a closed or reinstalled app would send "sound komao" to no player
         Application.Idle += Started;
         void Started(object s, EventArgs e)
         {

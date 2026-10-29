@@ -108,13 +108,15 @@ def bangla_script(text):
 
 
 # Two models with their own free-tier quotas; gemini-3.6-flash was the most exact (4.4% character errors, 2.1 s) but allows
-# only 20 requests a day on the free tier and the chat needs them. (model, sends thinkingConfig)
-CLOUD_MODELS = [(m, True) for m in (os.environ.get('OMA_CLOUD_STT_MODEL') or '').split(',') if m] or [('gemini-3.1-flash-lite', True), ('gemini-3.5-flash-lite', False)]
+# only 20 requests a day on the free tier and the chat needs them. gemini-3-flash-preview answered 2 of 2 in 2.2-2.4 s while
+# the lite models gave 503 or hung on 3 of 5 voice notes (Oct 29). (model, sends thinkingConfig)
+CLOUD_MODELS = [(m, True) for m in (os.environ.get('OMA_CLOUD_STT_MODEL') or '').split(',') if m] or [('gemini-3.1-flash-lite', True), ('gemini-3-flash-preview', True), ('gemini-3.5-flash-lite', False)]
 CLOUD_PROMPT = ('Transcribe this speech exactly as spoken. The speaker is from Bangladesh and speaks Bangla, Banglish or English. '
                 'Write Bangla words in Bangla script, English words (app names like Notepad, Chrome, Google, YouTube) in English. '
                 'Output only the transcript.')
 CLOUD_SECOND = 2.5   # s without an answer before the second model is asked too
 CLOUD_LIMIT = 5.0    # s in all; then Whisper's words are used (at worst 5 s more than local alone)
+FILE_LIMIT = 15.0    # a Telegram voice note is not live: 503s and slow answers are waited out (half failed at 5 s, Oct 29)
 _pool = None
 
 
@@ -140,18 +142,18 @@ def _ogg(audio):
     return b.getvalue()
 
 
-def _ask_gemini(model, think, data, key):
+def _ask_gemini(model, think, data, key, limit=CLOUD_LIMIT):
     import base64, urllib.request
     cfg = {'temperature': 0, **({'thinkingConfig': {'thinkingBudget': 0}} if think else {})}
     body = {'contents': [{'parts': [{'text': CLOUD_PROMPT}, {'inlineData': {'mimeType': 'audio/ogg', 'data': base64.b64encode(data).decode()}}]}],
             'generationConfig': cfg}
     req = urllib.request.Request(f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
                                  json.dumps(body).encode(), {'x-goog-api-key': key, 'Content-Type': 'application/json'})
-    j = json.loads(urllib.request.urlopen(req, timeout=CLOUD_LIMIT).read())
+    j = json.loads(urllib.request.urlopen(req, timeout=limit).read())
     return ''.join(p.get('text', '') for p in j['candidates'][0]['content']['parts']).strip()
 
 
-def cloud_text(audio):
+def cloud_text(audio, limit=CLOUD_LIMIT):
     """The final words of a Bangla or mixed request from Gemini (the user turned on "voiceCloudStt"; the audio goes to Google).
     -> (text or None, why not). Measured Oct 29, 2026 on the user's own 11 clips: Gemini wrote them with 4-9% character
     errors against 17.9% for local large-v3-turbo, which turned 2 of them into loops ("কোলে কোলে কোলে…"); no decoding
@@ -169,9 +171,9 @@ def cloud_text(audio):
     t0, why = time.time(), ''
     ex = ThreadPoolExecutor(len(CLOUD_MODELS))
     try:
-        jobs, asked = [ex.submit(_ask_gemini, *CLOUD_MODELS[0], data, key)], 1
-        while time.time() - t0 < CLOUD_LIMIT:
-            left = CLOUD_LIMIT - (time.time() - t0)
+        jobs, asked = [ex.submit(_ask_gemini, *CLOUD_MODELS[0], data, key, limit)], 1
+        while time.time() - t0 < limit:
+            left = limit - (time.time() - t0)
             done = wait(jobs, timeout=min(left, CLOUD_SECOND) if asked < len(CLOUD_MODELS) else left, return_when=FIRST_COMPLETED)[0] if jobs else set()
             for f in done:
                 jobs.remove(f)
@@ -183,7 +185,11 @@ def cloud_text(audio):
                 except Exception as e:
                     why = str(e)[:120]
             if asked < len(CLOUD_MODELS):   # slow or failed: ask the next model too
-                jobs.append(ex.submit(_ask_gemini, *CLOUD_MODELS[asked], data, key))
+                jobs.append(ex.submit(_ask_gemini, *CLOUD_MODELS[asked], data, key, limit))
+                asked += 1
+            elif not jobs and limit - (time.time() - t0) > 3:   # a voice note: every model failed (503) -> once more each, a moment later
+                time.sleep(1)
+                jobs.append(ex.submit(_ask_gemini, *CLOUD_MODELS[asked % len(CLOUD_MODELS)], data, key, limit - (time.time() - t0)))
                 asked += 1
             elif not jobs:
                 break
@@ -192,7 +198,7 @@ def cloud_text(audio):
         ex.shutdown(wait=False, cancel_futures=True)
 
 
-def transcribe(model, audio, allowed, prompt='', partial=False, cloud=False):
+def transcribe(model, audio, allowed, prompt='', partial=False, cloud=False, limit=CLOUD_LIMIT):
     fut = None
     if cloud and not partial and len(audio) > 8000 and not english_sure(model, audio, allowed):
         global _pool
@@ -200,13 +206,13 @@ def transcribe(model, audio, allowed, prompt='', partial=False, cloud=False):
             from concurrent.futures import ThreadPoolExecutor
             _pool = ThreadPoolExecutor(1)
         t0 = time.time()
-        fut = _pool.submit(cloud_text, audio)   # runs while Whisper decodes too
+        fut = _pool.submit(cloud_text, audio, limit)   # runs while Whisper decodes too
     r = _transcribe(model, audio, allowed, prompt, partial)
     if r.get('lang') == 'bn':
         r['text'] = bangla_script(r['text'])   # measured on the user's own voice: 3 of 8 Bangla clips had Devanagari letters
     if fut is not None:
         try:
-            g, why = fut.result(timeout=CLOUD_LIMIT + 1)
+            g, why = fut.result(timeout=limit + 1)
         except Exception as e:
             g, why = None, str(e)[:120] or 'timed out'
         if g:
@@ -293,7 +299,7 @@ def serve():
             else:
                 audio = np.fromfile(j['pcm'], dtype=np.float32)
             allowed = j.get('langs') or langs
-            r = transcribe(model, audio, allowed, j.get('prompt', ''), bool(j.get('partial')), bool(j.get('cloud')))
+            r = transcribe(model, audio, allowed, j.get('prompt', ''), bool(j.get('partial')), bool(j.get('cloud')), FILE_LIMIT if j.get('file') else CLOUD_LIMIT)
         except Exception as e:
             r = {'text': '', 'error': str(e)[:300]}
         out.write(json.dumps({'id': j.get('id'), **r}, ensure_ascii=False) + '\n'); out.flush()
