@@ -131,8 +131,7 @@ body.lay-focus #sphere-panel { flex: 1 !important; width: auto; }
 .town-header #agent-chips-container { justify-content: safe center; }
 
 /* ===== Oma Halo (user's pick D1): orb in a 4-step halo, Memory/Skills left, Soul/Setting right, aurora lines between. No boxes. ===== */
-#upper-deck { position: relative; display: block !important; height: clamp(230px, 25vh, 280px) !important;   /* never taller than before: Agent Town keeps its room */ --spread: min(370px, calc(50% - 215px)); --pw: 200px; }
-@media (max-height: 820px) { #upper-deck { height: 220px !important; } }
+#upper-deck { position: relative; display: block !important; height: calc((100vh - 70px) * 0.38) !important;   /* Stonic proportions: the orb area ~38 % of the column, Agent Town the rest */ --spread: min(370px, calc(50% - 215px)); --pw: 200px; }
 @media (max-width: 1500px) { #upper-deck { --pw: 176px; --spread: min(300px, calc(50% - 190px)); } }
 #nodes-panel, #cables-panel { position: absolute !important; inset: 0; width: auto !important; height: auto !important; padding: 0 !important; margin: 0 !important;
   background: none !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; pointer-events: none; }
@@ -149,8 +148,8 @@ body.lay-focus #sphere-panel { flex: 1 !important; width: auto; }
 #node-memory, #node-skills { left: max(8px, calc(50% - var(--spread) - var(--pw))); }
 #node-soul, #node-setting { right: max(8px, calc(50% - var(--spread) - var(--pw))); flex-direction: row-reverse; text-align: right; padding: 0 9px 0 16px !important;
   background: linear-gradient(270deg, color-mix(in srgb, var(--node-color) 14%, #0b0d11), #0d0f13) !important; }
-#node-memory, #node-soul { top: calc(45% - 82px); }
-#node-skills, #node-setting { top: calc(45% + 24px); }
+#node-memory, #node-soul { top: calc(27% - 29px); }
+#node-skills, #node-setting { top: calc(63% - 29px); }
 #nodes-group .node-icon-box { width: 40px !important; height: 40px !important; flex: none; border-radius: 50% !important; display: grid !important; place-items: center;
   border: 1.5px solid var(--node-color) !important; background: color-mix(in srgb, var(--node-color) 10%, transparent) !important; box-shadow: 0 0 14px color-mix(in srgb, var(--node-color) 40%, transparent) inset; font-size: 16px; }
 #nodes-group .node-info { min-width: 0; display: flex; flex-direction: column; }
@@ -194,3 +193,6 @@ body.lay-focus #nodes-panel, body.lay-focus #cables-panel { display: none !impor
 .town-stats .tf b { overflow: visible !important; text-overflow: clip !important; }
 .qc-wrap .qc-row { flex-wrap: wrap; overflow: visible; padding-right: 10px; }
 .qc-wrap::after, .qc-wrap .qc-more { display: none !important; }
+/* a narrow orb area: slimmer pills pushed to the edges, so the aurora lines keep their length */
+#upper-deck { container-type: inline-size; }
+@container (max-width: 900px) { #nodes-group { --pw: 172px; --spread: calc(50% - 182px); } }
