@@ -48,18 +48,28 @@ sealed class FastWhisper
     }
 
     // null = failed (caller falls back)
-    public async Task<string> Transcribe(float[] a, string prompt, bool partial)
+    public Task<string> Transcribe(float[] a, string prompt, bool partial) => Ask(a, null, prompt, partial);
+
+    // A whole recording in a compressed format (a Telegram voice note, .oga): the server decodes it. null = failed.
+    public Task<string> TranscribeFile(string path, string prompt) => Ask(null, path, prompt, false);
+
+    async Task<string> Ask(float[] a, string audioFile, string prompt, bool partial)
     {
         if (!Ready || proc == null || proc.HasExited) { Ready = false; return null; }
         await one.WaitAsync();
-        var file = Path.Combine(Path.GetTempPath(), $"oma-voice-{Environment.ProcessId}-{++id}.f32");
+        var me = ++id;
+        var file = audioFile ?? Path.Combine(Path.GetTempPath(), $"oma-voice-{Environment.ProcessId}-{me}.f32");
         try
         {
-            var bytes = new byte[a.Length * 4];
-            Buffer.BlockCopy(a, 0, bytes, 0, bytes.Length);
-            await File.WriteAllBytesAsync(file, bytes);
-            var me = id;
-            await proc.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { id = me, pcm = file, prompt, partial }));
+            if (audioFile == null)
+            {
+                var bytes = new byte[a.Length * 4];
+                Buffer.BlockCopy(a, 0, bytes, 0, bytes.Length);
+                await File.WriteAllBytesAsync(file, bytes);
+            }
+            var cloud = !partial && Prefs.Bool("voiceCloudStt");   // Bangla words from Gemini (the user's choice: the audio goes to Google)
+            await proc.StandardInput.WriteLineAsync(audioFile == null ? JsonSerializer.Serialize(new { id = me, pcm = file, prompt, partial, cloud })
+                                                                      : JsonSerializer.Serialize(new { id = me, file, prompt, partial, cloud }));
             await proc.StandardInput.FlushAsync();
             while (true)
             {
@@ -68,7 +78,8 @@ sealed class FastWhisper
                 var j = JsonDocument.Parse(line).RootElement;
                 if (j.TryGetProperty("id", out var rid) && rid.ValueKind == JsonValueKind.Number && rid.GetInt32() != me) continue;
                 if (j.TryGetProperty("error", out var err)) { Program.Err("FastWhisper: " + err.GetString()); return null; }
-                if (!partial) Program.Err($"FastWhisper: {j.GetProperty("lang").GetString()} p={j.GetProperty("lang_prob")} {j.GetProperty("ms")} ms");
+                if (!partial) Program.Err($"FastWhisper: {j.GetProperty("lang").GetString()} p={j.GetProperty("lang_prob")} {j.GetProperty("ms")} ms"
+                    + (j.TryGetProperty("cloud_ms", out var cm) ? $", Gemini {(j.TryGetProperty("engine", out _) ? "used" : "not used (" + (j.TryGetProperty("cloud_error", out var ce) ? ce.GetString() : "?") + ")")} {cm} ms" : ""));
                 var text = j.GetProperty("text").GetString() ?? "";
                 if (!partial && Prefs.D.GetValueOrDefault("voiceKeepAudio") is true)   // diagnostics the user turns on: their own recordings, kept locally
                 {
@@ -80,6 +91,6 @@ sealed class FastWhisper
             }
         }
         catch (Exception e) { Program.Err("FastWhisper: " + e.Message); Stop(); return null; }   // a stuck read cannot be reused: restart
-        finally { try { File.Delete(file); } catch { } one.Release(); }
+        finally { if (audioFile == null) try { File.Delete(file); } catch { } one.Release(); }
     }
 }

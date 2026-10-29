@@ -853,6 +853,12 @@ UNSAFE = re.compile(r'(^|[;&|(`\s])(rm|rmdir|sudo|dd|diskutil|shutdown|reboot|ha
 
 NAMED = re.compile(r'(?:from now on,? )?when(?:ever)? i say (?:["“\']([^"”\']{2,40})["”\']|([^,:;"“]{2,40}?)\s*(?:[,:;]|\b(?:do|then|can you|please|you)\b))', re.I)   # "When I say work mode, …"
 MORE = re.compile(r'\b(and|then|after that|also)\b', re.I)   # a second step after an instant command's free text
+# "Close Notepad" went to the AI (10-26 s, and an Allow card for taskkill; Oct 29). Alt+F4 closes it the way a person does:
+# the app itself asks to save unsaved work, so nothing is lost and no Allow is needed. Simple apps only: a browser window
+# full of tabs is the AI's call.
+CLOSE_APPS = {'notepad': 'Notepad', 'নোটপ্যাড': 'Notepad', 'calculator': 'Calculator', 'calc': 'Calculator', 'ক্যালকুলেটর': 'Calculator',
+              'paint': 'Paint', 'পেইন্ট': 'Paint'}
+CLOSE_RE = re.compile(r'(?:close|quit|exit)\s+(?:the\s+)?(.+?)[\s.!?।]*|(.+?)[\s,]*(?:বন্ধ|বন্দ|bondho|bondo|bondhu|close)(?:\s*(?:করো|করুন|কর|করে দাও|koro|kor|kore dao|koren))*[\s.!?।]*', re.I)
 DIAGRAM_WORDS = re.compile(r'\b(diagram|flow ?chart|mind ?map|chart|graph|timeline|org ?chart)\b|ডায়াগ্রাম|চার্ট|গ্রাফ', re.I)
 FAILED = re.compile(r"\b(can't|cannot|couldn't|could not|unable|not able|failed|not done|not completed|didn't work)\b", re.I)   # the reply admits it did not work
 CODE_OR_QUOTE = re.compile(r'```.*?```|`[^`\n]*`|"[^"\n]{0,200}"|“[^”\n]{0,200}”', re.S)
@@ -862,7 +868,11 @@ _TO_BN = [(re.compile(r'^Opened (.+?)\.$', re.S), r'\1 খুলে দিয়
           (re.compile(r'^Searched (.+?) on (\w+)\.$', re.S), r'\2-এ \1 খুঁজেছি।'), (re.compile(r'^Searched (.+?)\.$', re.S), r'\1 খুঁজেছি।'),
           (re.compile(r'^Okay\.$'), 'ঠিক আছে।'),
           (re.compile(r"^Not done: you chose Don't Allow, so nothing was changed\.$"), "করা হয়নি: আপনি Don't Allow বেছেছেন, তাই কিছুই বদলানো হয়নি।"),
-          (re.compile(r'^Not done: nobody pressed Allow within 60 seconds, so nothing was changed\.$'), 'করা হয়নি: ৬০ সেকেন্ডের মধ্যে কেউ Allow চাপেনি, তাই কিছুই বদলানো হয়নি।')]
+          (re.compile(r'^Not done: nobody pressed Allow within 60 seconds, so nothing was changed\.$'), 'করা হয়নি: ৬০ সেকেন্ডের মধ্যে কেউ Allow চাপেনি, তাই কিছুই বদলানো হয়নি।'),
+          (re.compile(r'^Closed (.+?)\.$'), r'\1 বন্ধ করে দিয়েছি।'), (re.compile(r'^(.+?) is not open\.$'), r'\1 খোলা নেই।'),
+          (re.compile(r'^(.+?) is still open: it is asking whether to save your changes\.$'), r'\1 এখনো খোলা: সেভ করবেন কিনা জিজ্ঞেস করছে।'),
+          (re.compile(r'^The last tool failed, so I could not verify that the request was completed\. Please try again\.$'),
+           'শেষ ধাপটা ব্যর্থ হয়েছে, তাই কাজটা হয়েছে কিনা নিশ্চিত হতে পারিনি। আবার চেষ্টা করুন।')]
 _TO_EN = [(re.compile(r'^সাউন্ড মিউট করেছি।$'), 'Muted the sound.'), (re.compile(r'^সাউন্ড চালু করেছি \((\d+)%\)।$'), r'Sound is on (\1%).'),
           (re.compile(r'^ভলিউম (\d+)% থেকে (\d+)% করেছি।$'), r'Set the volume from \1% to \2%.'),
           (re.compile(r'^স্ক্রিনশট নিয়েছি: (.+)$', re.S), r'Took a screenshot: \1'),
@@ -1149,7 +1159,7 @@ def fast(text):
     verbs = r'(?:খোলো|খুলুন|খুলো|চালু করো|চালু করুন|ওপেন করো|অন করো|kholo|kolo|khulo|khulun|open koro|chalu koro|on koro)'
     bn_open = re.search(verbs + r'\s+(.+)', raw_str, re.I) or re.fullmatch(r'(.+?)[\s,]*' + verbs + r'[\s.!?।]*', raw_str, re.I)
     # The English-only speech model (base.en) hears "খোলো" as "color"/"colo": accepted only right after an exact known app name
-    misheard = not bn_open and re.fullmatch(r'(.+?)[\s,]*\b(?:colou?r|colo|khola|kola|open)[\s.!?।]*', raw_str, re.I)   # also "Calculator, open." (multilingual Whisper translating)
+    misheard = not bn_open and re.fullmatch(r'(.+?)[\s,]*\b(?:colou?r|colo|cooler|kooler|khola|kola|open)[\s.!?।]*', raw_str, re.I)   # also "Calculator, open." (multilingual Whisper translating)
     if misheard and ' '.join(re.sub(r'[,.!?।]', ' ', misheard.group(1)).lower().split()) in (
             'notepad', 'calculator', 'calc', 'chrome', 'chrome browser', 'browser', 'terminal', 'file explorer', 'explorer', 'paint', 'vs code', 'spotify', 'settings'):
         bn_open = misheard
@@ -1173,6 +1183,18 @@ def fast(text):
             if res and not res.startswith(('no app', 'could not')):
                 fast.cmds = [f'{SHOW} {shlex.quote(app_target)}']
                 return f"Opened {bn_target}."
+    closing = CLOSE_RE.fullmatch(raw_str)
+    if closing and os.environ.get('ATTICUS_LIVE') != '1':   # "Notepad bondho koro": Alt+F4, as a person would, no AI
+        name = ' '.join(w for w in re.sub(r'[,.!?।]', ' ', closing.group(1) or closing.group(2) or '').lower().split()
+                        if w not in ('ta', 'টা', 'টি', 'app', 'অ্যাপ', 'the', 'please', 'plz'))
+        app = CLOSE_APPS.get(name)
+        if app:
+            if not winctl.find(app):
+                return f'{app} is not open.'
+            winctl.hotkey(app, 'alt+f4')
+            fast.cmds = [f'{KEYS} {shlex.quote(app)} alt+f4']
+            time.sleep(1.2)
+            return f'{app} is still open: it is asking whether to save your changes.' if winctl.find(app) else f'Closed {app}.'
     named = NAMED.match(text.strip())
     if named and pref('learn', True):   # "When I say work mode, open Spotify": do it now, no AI, and save the words
         if os.environ.get('ATTICUS_LIVE') == '1': return None
@@ -2121,7 +2143,7 @@ def run(task, p=None, shots=()):
     elif run.unanswered:
         reply = localize('Not done: nobody pressed Allow within 60 seconds, so nothing was changed.', task)
     elif last_failed and not result_error and not p.returncode:
-        reply = 'The last tool failed, so I could not verify that the request was completed. Please try again.'
+        reply = localize('The last tool failed, so I could not verify that the request was completed. Please try again.', task)
     return reply or 'No answer came back. Please try again.', cost, steps
 
 
@@ -2278,7 +2300,7 @@ def ask():
 def retry_offer(sonnet):
     """After a task that did not finish: a card in the box offers Retry (same model) and, on Haiku, Try Sonnet.
     -> 'r' retry, 'y' Sonnet, '' not now or no answer in 60 s. No box (typed from the tray): no offer."""
-    if os.environ.get('ATTICUS_UI') != '1':
+    if os.environ.get('ATTICUS_UI') != '1' or os.environ.get('OMA_SOURCE') in ('telegram', 'live'):   # the phone has no Retry card: it waited 60 s (Oct 29); a Live conversation waits for the result
         return ''
     a = os.path.join(tempfile.mkdtemp(prefix='atticus-retry-'), 'a')
     atexit.register(shutil.rmtree, os.path.dirname(a), True)
@@ -2495,6 +2517,12 @@ def main():
     if args == ['--voice-server']:
         from multi_ai import voice_server
         return voice_server.serve()
+    if args == ['--tts-server']:   # the Bangla voice for spoken answers (Windows has none)
+        from multi_ai import tts_server
+        return tts_server.serve()
+    if args == ['--live-voice']:   # one real-time voice conversation through Gemini Live
+        from multi_ai import live_voice
+        return live_voice.serve()
     if args[:1] in (['--health-refresh'], ['--health-status']):
         from multi_ai import health_monitor
         return health_monitor.main(args)

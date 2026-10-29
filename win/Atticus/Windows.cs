@@ -98,9 +98,20 @@ sealed class SettingsWindow : PageWindow
         StartListening(false);
     }
 
+    LiveVoice live;
+    public bool LiveOn => live?.On == true;
+
     public void StartListening(bool isClick)
     {
         if (Prefs.Bool("paused")) return;
+        if (Prefs.Bool("liveVoice") || LiveOn)   // Real-time voice (Gemini Live): once begins the conversation, once more ends it
+        {
+            if (web == null) Open(); else Raise();
+            live ??= new LiveVoice(this);
+            if (live.Hush()) return;   // Oma was talking: just stop that
+            if (live.On) live.Stop("you ended it"); else live.Start();
+            return;
+        }
         if (Prefs.Bool("muted")) { if (web == null) Open(); else Raise(); Js("st.mutedNudge?.()"); return; }   // the orb's mic button muted the voice assistant
         Voice.Shush();
         if (web == null) Open();
@@ -186,6 +197,7 @@ sealed class SettingsWindow : PageWindow
         if (!string.IsNullOrWhiteSpace(transcript))
         {
             Js($"st.voiceDone({Web.Json(transcript)});");
+            if (!Prefs.Bool("muted") && System.Text.RegularExpressions.Regex.IsMatch(transcript, @"[ঀ-৿]")) BanglaVoice.Warm();   // the Bangla answer will be spoken: be ready
             _ = ExecuteDirective(transcript, isVoice: true);
         }
         else
@@ -572,7 +584,7 @@ sealed class SettingsWindow : PageWindow
             case "talk":
             case "micToggle":
                 Program.Post(() => {
-                    if (voiceRecording) StopListening();
+                    if (voiceRecording && !LiveOn) StopListening();
                     else StartListening(true);
                 });
                 break;
@@ -688,14 +700,18 @@ sealed class SettingsWindow : PageWindow
         if (refresh) BrowserSites();
     });
 
-    Action<string> remoteDone;   // a request from the phone (Telegram): its result goes back there too
-    public void RemoteAsk(string text, Action<string> done)
+    Action<string> remoteDone;   // a request from the phone (Telegram) or a Live voice conversation: its result goes back there too
+    string remoteSource;
+    public void RemoteAsk(string text, Action<string> done, string source = "telegram")
     {
-        remoteDone = done;
-        Js($"st.remoteIn({Web.Json(text)})");
-        _ = ExecuteDirective(text, isVoice: false, source: "telegram");
+        if (askLock.CurrentCount == 0) { done("✕ Oma is busy with another request. Try again in a moment, or send /stop."); return; }   // keep the running request's reply going to whoever asked it
+        remoteDone = done; remoteSource = source;
+        if (source == "telegram") Js($"st.remoteIn({Web.Json(text)})");
+        _ = ExecuteDirective(text, isVoice: false, source: source);
     }
     public void RemoteAnswer(string v) { Answer(v); Js("st.remoteAnswered && st.remoteAnswered()"); }
+    public string RemoteStatus() => currentProc != null ? "⏳ Working on a request" + (askFile != "" ? " (waiting for Allow)." : ".") : voiceRecording ? "🎤 Listening to the microphone." : "✓ Idle and ready.";
+    public void RemoteStop() => CancelCurrentTask();
 
     public async Task ExecuteDirective(string askText, bool isVoice, string image = "", string source = null)
     {
@@ -705,7 +721,7 @@ sealed class SettingsWindow : PageWindow
         {
             Program.Err($"Ask {reqId} ({source ?? (isVoice ? "voice" : "typed")}): not run, the previous request is still working");
             var busy = ReplyJson("FAILED", "Oma is still working on the previous request. Wait for it to finish or press TERMINATE.", "busy", reqId);
-            if (source == "telegram") { remoteDone?.Invoke("✕ Oma is busy with another request. Try again in a moment."); remoteDone = null; }
+            if (source is "telegram" or "live") { remoteDone?.Invoke("✕ Oma is busy with another request. Try again in a moment."); remoteDone = null; }
             Program.Post(() => Js($"st.feedLine({Web.Json(busy)})"));
             return;
         }
@@ -756,9 +772,11 @@ sealed class SettingsWindow : PageWindow
                 Program.Err($"Ask {reqId} ended without a reply: {why}");
                 Program.Post(() => Js($"st.feedLine({Web.Json(ReplyJson("FAILED", "The request ended without a result.", why, reqId))})"));
             }
-            if (source == "telegram" && remoteDone != null)
+            if (source is "telegram" or "live" && remoteDone != null)
             {
-                remoteDone((status == "COMPLETED" ? "✓ " : status == "PARTIAL" ? "⚠ " : "✕ ") + (status ?? "FAILED") + "\n" + (replyText ?? (cancelled ? "Stopped on the PC." : "No result.")));
+                var bn = System.Text.RegularExpressions.Regex.IsMatch(replyText ?? askText, @"[ঀ-৿]");   // the status line in the reply's language
+                var word = (status ?? "FAILED") switch { "COMPLETED" => bn ? "সম্পন্ন" : "COMPLETED", "PARTIAL" => bn ? "আংশিক" : "PARTIAL", "CANCELLED" => bn ? "থামানো হয়েছে" : "CANCELLED", var s => bn ? "হয়নি" : s };
+                remoteDone((status == "COMPLETED" ? "✓ " : status == "PARTIAL" ? "⚠ " : "✕ ") + word + "\n" + (replyText ?? (cancelled ? (bn ? "PC-তে থামানো হয়েছে।" : "Stopped on the PC.") : (bn ? "কোনো ফল আসেনি।" : "No result."))));
                 remoteDone = null;
             }
             if (cancelled || status == null) { }
@@ -768,7 +786,7 @@ sealed class SettingsWindow : PageWindow
                 if (!string.IsNullOrWhiteSpace(replyText))
                 {
                     if (Prefs.Bool("autoCopy")) { var t = replyText; Program.Post(() => { try { Clipboard.SetText(t); } catch { } }); }
-                    if ((isVoice || Prefs.Bool("speak")) && !Prefs.Bool("muted")) { var t = replyText; Program.Post(() => { Js("holoOrb?.setState('speaking')"); Voice.Say(t, () => Js("holoOrb?.setState('idle')")); }); }
+                    if ((isVoice || Prefs.Bool("speak")) && !Prefs.Bool("muted") && source != "live") { var t = replyText; Program.Post(() => { Js("holoOrb?.setState('speaking')"); Voice.Say(t, () => Js("holoOrb?.setState('idle')")); }); }
                 }
             }
         }
@@ -802,8 +820,9 @@ sealed class SettingsWindow : PageWindow
             askFile = q[2];
             var retry = q.Length == 5 && q[4] == "retry";
             Js($"st.askCard({Web.Json(new { q = q[0], cmd = retry ? "" : q[1], kind = retry ? "retry" : "permission", escalate = q.Length >= 4 && q[3] == "escalate" })})");
-            if (remoteDone != null && !retry) TelegramBridge.AskPhone(q[0], q[1]);   // the request came from the phone: ask there too
-            if (!Visible || WindowState == FormWindowState.Minimized) Raise();
+            if (remoteDone != null && remoteSource == "telegram" && !retry) TelegramBridge.AskPhone(q[0], q[1]);   // the request came from the phone: ask there too
+            if (remoteDone != null && remoteSource == "live" && !retry && LiveOn) live.Ask(q[0], q[1]);   // a Live conversation: asked aloud too
+            if ((!Visible || WindowState == FormWindowState.Minimized) && !(remoteDone != null && remoteSource == "telegram")) Raise();   // the phone asks there; the PC stays as it is
             return;
         }
         if (line.StartsWith("◇ "))   // "which one?"
@@ -813,6 +832,10 @@ sealed class SettingsWindow : PageWindow
                 using var d = JsonDocument.Parse(line[2..]);
                 askFile = d.RootElement.GetProperty("a").GetString() ?? "";
                 Js($"st.pickCard({Web.Json(new { q = d.RootElement.GetProperty("q").GetString(), options = d.RootElement.GetProperty("options") })})");
+                if (remoteDone != null && remoteSource == "live" && LiveOn)
+                    live.Pick(d.RootElement.GetProperty("q").GetString() ?? "", d.RootElement.GetProperty("options").EnumerateArray().Select(o => o.ValueKind == JsonValueKind.String ? o.GetString() ?? "" : o.ToString()).ToList());
+                if (remoteDone != null && remoteSource == "telegram")   // from the phone: nobody may be at the PC to pick (it waited 110 s, Oct 29)
+                    TelegramBridge.AskPick(d.RootElement.GetProperty("q").GetString() ?? "", d.RootElement.GetProperty("options").EnumerateArray().Select(o => o.ValueKind == JsonValueKind.String ? o.GetString() ?? "" : o.ToString()).ToList());
             }
             catch { }
             return;

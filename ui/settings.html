@@ -2202,7 +2202,10 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
 
       <h3>Answers</h3>
       <div class="group">
-        <div class="row"><div class="t"><b>Read answers aloud</b><span>In Windows’ voice. Esc stops it. Voice requests are always read aloud.</span></div><label class="sw"><input type="checkbox" data-k="speak"></label></div>
+        <div class="row"><div class="t"><b>Read answers aloud</b><span>English in Windows’ voice, Bangla in Microsoft’s online Bangla voice. Esc stops it. Voice requests are always read aloud.</span></div><label class="sw"><input type="checkbox" data-k="speak"></label></div>
+        <div class="row"><div class="t"><b>Real-time voice (Gemini Live)</b><span>Talk naturally: Oma answers in a natural voice in about a second, in your language. Press the shortcut or START once to begin, again to end (it also ends after 2 quiet minutes). PC work still goes through Oma and its Allow cards. Your voice goes to Google while it is on.</span></div><label class="sw"><input type="checkbox" data-k="liveVoice"></label></div>
+        <div class="row"><div class="t"><b>Real-time voice: most natural model</b><span>Gemini’s native-audio voice: warmer, but the first word comes after 2–4 s instead of under 1 s.</span></div><label class="sw"><input type="checkbox" data-k="liveNatural"></label></div>
+        <div class="row"><div class="t"><b>Better Bangla hearing (Gemini)</b><span>Bangla and mixed requests are written out by Gemini: far fewer mistakes, about 2 s slower. Your voice recording goes to Google each time. Clear English stays on this PC.</span></div><label class="sw"><input type="checkbox" data-k="voiceCloudStt"></label></div>
         <div class="row"><div class="t"><b>Copy answers automatically</b><span>Every answer lands on your clipboard, ready to paste.</span></div><label class="sw"><input type="checkbox" data-k="autoCopy"></label></div>
         <div class="row"><div class="t"><b>Tips</b><span>Once in a while, a small tip under the answer. After a miss, how to teach Oma to do it right.</span></div><label class="sw"><input type="checkbox" data-k="tips"></label></div>
         <div class="row"><div class="t"><b>Ask me when unsure</b><span>When more than one thing fits, Oma shows you the choices instead of guessing.</span></div><label class="sw"><input type="checkbox" data-k="askMe"></label></div>
@@ -3101,6 +3104,9 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
       $('tgToken').style.display = $('tgConnect').style.display = ['connected', 'pairing', 'checking'].includes(t.state) ? 'none' : '';
     },
     remoteIn(text) { appendFeedMessage('user', '📱 Telegram', text); holoOrb?.setState('thinking'); },
+    liveHeard(text) { appendFeedMessage('user', '🎙 You (Live)', text); },
+    liveSaid(text) { appendFeedMessage('oma', 'OMA AI', text); },
+    liveNote(text) { appendFeedMessage('oma', 'OMA AI · Live', text); },
     remoteAnswered() { document.querySelectorAll('.ask-card button').forEach(b => b.disabled = true); },
     memory(d) { window.omaPanels?.data(d); },
     skillSaved(r) { window.omaPanels?.saved(r); },
