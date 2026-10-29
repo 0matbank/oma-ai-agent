@@ -8,6 +8,7 @@ command waits for the user's Allow card (same ask folder / relay as the PreToolU
 no other model or command is tried. A command is never run twice in one task. Text alone is never reported as an
 action: run.ok for an action needs at least one command that ran.
 """
+import atexit
 import json
 import os
 import shutil
@@ -150,6 +151,7 @@ def run_agent(task, provider, model, base_url, key, system, eng, tracker=None):
     if not bash:
         return {'ok': False, 'reply': '', 'cmds': [], 'steps': [], 'denied': False, 'error_type': 'not_available', 'error': 'Git Bash not found'}
     ask = tempfile.mkdtemp(prefix='atticus-ask-')
+    atexit.register(shutil.rmtree, ask, True)   # however this run ends (Atticus.exe also sweeps old ones)
     os.environ['ATTICUS_ASK'] = ask
 
     class _Live:   # relay() serves the Allow card while this object "runs"

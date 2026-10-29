@@ -145,7 +145,7 @@ def rank_chat_models(provider, ids, preferred=()):
     return list(dict.fromkeys(pref + ordered))
 
 
-def probe(base_url, api_key, provider, model, timeout=25):
+def probe(base_url, api_key, provider, model, timeout=12):   # a 5-token reply from a healthy model takes a few seconds; a hung one should not hold Settings for 25 s per model
     """One tiny real request. -> (state, detail)."""
     body = json.dumps({'model': model, 'messages': [{'role': 'user', 'content': 'Reply with OK.'}], 'max_tokens': 5}).encode()
     req = urllib.request.Request(f"{base_url.rstrip('/')}/chat/completions", data=body,

@@ -17,20 +17,49 @@ sealed class Speech
     int session;
     public string Prompt = "";   // app names and the user's own words: Whisper leans toward them
     public bool Running => mic != null;
-    public bool Ready => factory != null || Fast.Ready;
+    public bool Ready => factory != null || Fast.Ready || File.Exists(FallbackModel());   // the fallback loads on first use
     public readonly FastWhisper Fast = new();   // warm GPU large-v3-turbo; Whisper.net below is the fallback
     public string Error = "";
+    string loaded = "";   // the whisper.cpp model file in `factory`
 
     public static string Url(string model) => $"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{model}.bin";
 
+    // whisper.cpp model for the fallback. An English-only model (*.en) cannot hear Bangla, so a non-English voice language
+    // takes a multilingual model already on disk (best first); the saved setting itself is left as the user chose it.
+    public static string FallbackModel()
+    {
+        var lang = Prefs.Str("speechLanguage");
+        if (!Prefs.Str("speechModel").EndsWith(".en") || lang is "" or "en") return Paths.Model;
+        var dir = Path.GetDirectoryName(Paths.Model)!;
+        foreach (var m in new[] { "small", "large-v3-turbo-q5_0", "large-v3-turbo", "base" })   // small first: the CPU fallback must answer in seconds
+            if (File.Exists(Path.Combine(dir, $"ggml-{m}.bin"))) return Path.Combine(dir, $"ggml-{m}.bin");
+        return Paths.Model;
+    }
+
+    readonly object loadLock = new();
+    void LoadFallback()
+    {
+        lock (loadLock)   // startup and a first transcription may both ask
+        {
+            var want = FallbackModel();
+            if (factory != null && loaded == want) return;
+            if (!File.Exists(want)) return;
+            factory = WhisperFactory.FromPath(want); loaded = want;
+            Program.Err("speech fallback: whisper.cpp " + Path.GetFileName(want));
+        }
+    }
+
+    // The warm GPU server is the speech engine; whisper.cpp stays on disk unless that server is off or fails
+    // (it used to load at start next to the server: RAM spent on a model that was never used).
     public Task Load() => Task.Run(() =>
     {
-        try { if (File.Exists(Paths.Model) && factory == null) factory = WhisperFactory.FromPath(Paths.Model); Error = ""; }
-        catch (Exception e) { Error = e.Message; }
         if (FastWhisper.Wanted) Fast.Start().Wait();
+        if (Fast.Ready) { Error = ""; return; }
+        try { LoadFallback(); Error = ""; }
+        catch (Exception e) { Error = e.Message; }
     });
 
-    public void Reload() { Fast.Stop(); _ = Load(); }   // engine or language changed
+    public void Reload() { Fast.Stop(); factory = null; _ = Load(); }   // engine or language changed (the old model is let go)
 
     // Settings / setup: fetch the model once (~150 MB for base.en). progress: 0..1
     public static async Task<bool> Download(Action<double> progress)
@@ -145,12 +174,17 @@ sealed class Speech
             if (f != null) return Clean(f);
             if (!Fast.Ready) _ = Fast.Start();   // the server died: restart it in the background, whisper.cpp answers now
         }
+        if (factory == null || loaded != FallbackModel())
+            try { await Task.Run(LoadFallback); } catch (Exception e) { Error = e.Message; }
         if (factory == null) return "";
+        bool enOnly = loaded.EndsWith(".en.bin");
         string lang = Prefs.Str("speechLanguage");
         if (string.IsNullOrEmpty(lang))
-            lang = Prefs.Str("speechModel").EndsWith(".en") ? "en" : "auto";
-        else if (Prefs.Str("speechModel").EndsWith(".en") && lang != "en")
+            lang = enOnly ? "en" : "auto";
+        else if (enOnly && lang != "en")
             lang = "en"; // English-only models cannot transcribe other languages
+        else if (lang == "bn")
+            lang = "auto";   // "বাংলা + English": the user mixes both, as the GPU server allows (forcing bn turns English into Bangla letters)
             
         var b = factory.CreateBuilder().WithLanguage(lang)
             .WithThreads(Math.Clamp(Environment.ProcessorCount - 1, 2, 8)).WithNoContext().WithSingleSegment();

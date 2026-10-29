@@ -106,10 +106,11 @@ class OmaMindMap {
 
   animate(ts) {
     requestAnimationFrame(t => this.animate(t));
-    if (document.hidden || !this.ctx || !this.width || ts - this.last < 32) return;   // ~30 fps is plenty for slow waves
-    const dt = Math.min(0.05, (ts - (this.last || ts)) / 1000);
-    this.last = ts;
     const busy = { thinking: 2, planning: 2, executing: 1.6, working: 1.6, verifying: 1.6, listening: 1.4, speaking: 1.4 }[this.state] || 1;
+    // slow waves: ~20 fps while Oma waits, ~30 fps while she works (same speed either way: time moves by real dt)
+    if (document.hidden || !this.ctx || !this.width || ts - this.last < (busy > 1 ? 32 : 48)) return;
+    const dt = Math.min(0.08, (ts - (this.last || ts)) / 1000);
+    this.last = ts;
     this.time += dt * 0.9 * busy;
     const c = this.ctx;
     c.clearRect(0, 0, this.width, this.height);

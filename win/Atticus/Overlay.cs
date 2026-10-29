@@ -162,6 +162,7 @@ addEventListener('DOMContentLoaded', () => {
         {
             js("size", Prefs.Num("boxH"));
             Web.Js(web, "document.documentElement.style.background='rgba(18,18,20,.5)'");   // the Mac app tints natively now; the acrylic here needs the page's tint
+            js("visible", Visible && Opacity > 0);   // the box never shows now (ShowBox opens the Oma window): its orb must not animate unseen
         }
         if (b.TryGetProperty("safe", out _)) { Prefs.Set("safe", true); js("mode", true); Program.Settings.Push(); }
         if (b.TryGetProperty("pick", out var pk) && askFile != "") { Answer(pk.GetString() ?? ""); }

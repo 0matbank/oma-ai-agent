@@ -128,6 +128,13 @@ def serve():
         out.write(json.dumps({'ready': False, 'error': str(e)[:400]}) + '\n'); out.flush()
         return
     out.write(json.dumps({**info, 'langs': langs}) + '\n'); out.flush()
+    if os.name == 'nt':   # loading leaves ~0.5 GB of one-time pages (file reads, CUDA init); hand them back now, not hours later
+        try:
+            import ctypes
+            ctypes.windll.psapi.EmptyWorkingSet.argtypes = [ctypes.c_void_p]   # a 64-bit handle: the default int would cut -1 to 0xFFFFFFFF
+            ctypes.windll.psapi.EmptyWorkingSet(ctypes.c_void_p(-1))   # -1 = this process
+        except Exception:
+            pass
     for line in sys.stdin:
         try:
             j = json.loads(line)

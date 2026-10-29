@@ -31,7 +31,7 @@ BREAKER = 3   # consecutive failures that open the circuit
 # request error_type -> (state, default seconds until it may be tried again; 0 = until something changes)
 ERRORS = {'quota_exhausted': ('QUOTA_EXHAUSTED', 1800), 'rate_limited': ('RATE_LIMITED', 60), 'busy': ('RATE_LIMITED', 60),
           'auth_error': ('AUTH_REQUIRED', 0), 'auth': ('AUTH_REQUIRED', 0), 'model_unavailable': ('MODEL_RETIRED', 7 * 86400),
-          'gone': ('MODEL_RETIRED', 7 * 86400), 'network_error': ('OFFLINE', 60), 'timeout': ('DEGRADED', 120),
+          'gone': ('MODEL_RETIRED', 7 * 86400), 'network_error': ('OFFLINE', 60), 'timeout': ('DEGRADED', 600),
           'empty_output': ('DEGRADED', 120), 'not_available': ('OFFLINE', 300), 'not_configured': ('AUTH_REQUIRED', 0),
           'billing_required': ('BILLING_REQUIRED', 0)}
 

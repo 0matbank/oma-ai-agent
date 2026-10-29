@@ -816,6 +816,13 @@ NAMED = re.compile(r'(?:from now on,? )?when(?:ever)? i say (?:["“\']([^"”\'
 MORE = re.compile(r'\b(and|then|after that|also)\b', re.I)   # a second step after an instant command's free text
 DIAGRAM_WORDS = re.compile(r'\b(diagram|flow ?chart|mind ?map|chart|graph|timeline|org ?chart)\b|ডায়াগ্রাম|চার্ট|গ্রাফ', re.I)
 FAILED = re.compile(r"\b(can't|cannot|couldn't|could not|unable|not able|failed|not done|not completed|didn't work)\b", re.I)   # the reply admits it did not work
+CODE_OR_QUOTE = re.compile(r'```.*?```|`[^`\n]*`|"[^"\n]{0,200}"|“[^”\n]{0,200}”', re.S)
+
+
+def admits_failure(reply):
+    """The reply itself says the task did not work. Code and quoted text are not the model speaking:
+    a correct fix containing raise ZeroDivisionError("cannot divide by zero") is not a failure."""
+    return bool(FAILED.search(CODE_OR_QUOTE.sub(' ', reply or '')))
 
 
 def skills():
@@ -882,7 +889,7 @@ def learn(task, cmds, reply):
     cmds = shortcut_commands(task, cmds)
     act = (SHOW, PLACE, PLAY, TYPE, MEDIA, 'start ', 'explorer ')
     # 'make new': a reminder or note holds this moment's words ("make the task list" must not re-add old items)
-    if not cmds or DEICTIC.search(k) or FAILED.search(reply) or not all(c.startswith(act) and 'make new' not in c and not risky(c) for c in cmds):
+    if not cmds or DEICTIC.search(k) or admits_failure(reply) or not all(c.startswith(act) and 'make new' not in c and not risky(c) for c in cmds):
         return
     sk = skills()
     new = sk.get(k, {}).get('cmds') != cmds
@@ -1001,7 +1008,7 @@ def remember_workflow(task, reply, ok, cmds):
     if not match:
         return reply, False
     reply = (reply[:match.start()] + reply[match.end():]).strip()
-    saved = bool(pref('learn', True) and ok and cmds and reply and not FAILED.search(reply))
+    saved = bool(pref('learn', True) and ok and cmds and reply and not admits_failure(reply))
     title, sep, method = match[1].partition('|')
     saved = saved and bool(sep and title.strip() and method.strip())
     if saved:
@@ -1531,7 +1538,7 @@ def history_list(rows, n=200):
         reply = str(r.get('reply') or '')
         secs = r.get('secs', 0)
         out.append({'at': str(r.get('at', '')), 'task': r['task'][:600], 'reply': reply[:600], 'secs': secs if isinstance(secs, (int, float)) else 0,
-                    'ok': bool(reply.strip()) and not FAILED.search(reply) and not re.match(r'(?i)\s*error\b', reply) and not re.search(r'(?i)hit your .*limit', reply)})
+                    'ok': bool(reply.strip()) and not admits_failure(reply) and not re.match(r'(?i)\s*error\b', reply) and not re.search(r'(?i)hit your .*limit', reply)})
         if len(out) >= n:
             break
     return out
@@ -1574,7 +1581,7 @@ def tip(reply, taught='', task='', elapsed=0):
     every time; slow successful tasks get a memory hint; otherwise a general tip at most every 6 h. Off in Settings."""
     if not pref('tips', True) or os.environ.get('ATTICUS_UI') != '1':
         return
-    if taught or FAILED.search(reply):
+    if taught or admits_failure(reply):
         return say('i', taught or MISS)
     if elapsed >= 15 and task and not re.search(r'(?i)\bremember\b', task):
         return say('i', 'For next time, say "remember how to ' + task.strip().rstrip('.?!')[:180] + '".')
@@ -2593,7 +2600,7 @@ def verification_checks(task, reply, cmds, tracker, before=frozenset()):
         failed = [s for s in tracker.steps if s['status'] == 'FAILED']
         if failed:
             checks.append(('Tool errors', lambda failed=failed: (None, f"{len(failed)} step(s) failed: {failed[-1]['label']}")))
-    if FAILED.search(reply or ''):
+    if admits_failure(reply):
         checks.append(('Answer', lambda: (False, 'the answer itself says it could not be done')))
     return checks
 
@@ -2723,7 +2730,7 @@ def serve(task, warm=None, snap=None):
         if fix:
             learn(turns[-1]['q'], run.cmds, reply)   # and the fix becomes the shortcut for the original words
     if fix and turns: report(turns[-1]['q'], turns[-1]['a'], (), 0, 'the user said it was wrong')
-    if not run.ok or FAILED.search(reply): report(task, reply, run.ran, time.time() - t, 'error' if not run.ok else 'could not do it')
+    if not run.ok or admits_failure(reply): report(task, reply, run.ran, time.time() - t, 'error' if not run.ok else 'could not do it')
     remember_turn(task, reply)
     log_turn(task, reply, t, cost, steps, run.ran, len(images or ()))
     # clicks inside an app pull it forward; give the user back the app the user was in unless the user asked to go somewhere
@@ -2743,7 +2750,7 @@ def serve(task, warm=None, snap=None):
     tip(reply, f'Learned: say “{shortcut}” any time.' if shortcut else 'Saved the procedure for next time.' if workflow else f'Learned: {learned[-1]}' if learned else taught[1].strip() if taught else '',
         task, time.time() - t)
     asked = os.path.join(DIR, 'improve-asked')   # people who updated never saw setup's question: ask once a day after a task that worked, until they answer
-    if run.ok and not FAILED.search(reply) and POSTHOG_KEY and not pref('improveAsked', False) and os.environ.get('ATTICUS_UI') == '1' \
+    if run.ok and not admits_failure(reply) and POSTHOG_KEY and not pref('improveAsked', False) and os.environ.get('ATTICUS_UI') == '1' \
             and not (os.path.exists(asked) and open(asked).read() == time.strftime('%Y-%m-%d')):
         open(asked, 'w').write(time.strftime('%Y-%m-%d')); say('!', 'improve')
     if os.environ.get('ATTICUS_UI') != '1' and TRACK is None:   # typed from the menu bar: no overlay, so a notification

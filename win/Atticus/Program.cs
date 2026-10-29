@@ -54,6 +54,7 @@ static class Program
         using var one = new Mutex(true, @"Local\Atticus", out var first);
         Err("Mutex first: " + first);
         if (!first) { Send("open"); Err("Exiting because not first"); return; }
+        Task.Run(SweepTemp);
         ApplicationConfiguration.Initialize();
         Application.SetColorMode(SystemColorMode.Dark);
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
@@ -120,6 +121,22 @@ static class Program
     }
 
     public static void Post(Action a) => ui?.Post(_ => a(), null);
+
+    // Engine runs that were stopped (Stop button, tree kill) never reach their own cleanup: their temp folders
+    // (Allow-card files, retry and player pages) are dropped here once they are 6 hours old, so a running task is never touched.
+    static void SweepTemp()
+    {
+        int n = 0;
+        try
+        {
+            var tmp = new DirectoryInfo(Path.GetTempPath());
+            foreach (var pat in new[] { "atticus-ask-*", "atticus-retry-*", "atticus-player-*" })
+                foreach (var d in tmp.EnumerateDirectories(pat))
+                    if (DateTime.Now - d.LastWriteTime > TimeSpan.FromHours(6)) try { d.Delete(true); n++; } catch { }
+        }
+        catch { }
+        if (n > 0) Err($"temp sweep: removed {n} old engine folders");
+    }
 
     public static void Err(string line)
     {

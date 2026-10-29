@@ -25,6 +25,17 @@ static class Web
         s.AreDevToolsEnabled = Environment.GetEnvironmentVariable("ATTICUS_DEVTOOLS") == "1";
         s.AreDefaultContextMenusEnabled = false; s.IsZoomControlEnabled = false; s.IsStatusBarEnabled = false; s.AreBrowserAcceleratorKeysEnabled = false;
         v.CoreWebView2.ProcessFailed += (_, e) => Program.Err("WebView2 ProcessFailed: " + e.ProcessFailedKind);
+        // A minimized or hidden Oma window asks its WebView2 processes to give memory back; the page keeps running
+        // (feed, voice states, timers) and comes back to Normal when shown.
+        if (host.FindForm() is Form form)
+        {
+            void Level()
+            {
+                var low = !form.Visible || form.WindowState == FormWindowState.Minimized;
+                try { v.CoreWebView2.MemoryUsageTargetLevel = low ? CoreWebView2MemoryUsageTargetLevel.Low : CoreWebView2MemoryUsageTargetLevel.Normal; } catch { }
+            }
+            form.VisibleChanged += (_, _) => Level(); form.Resize += (_, _) => Level(); Level();
+        }
         v.CoreWebView2.NavigationCompleted += (_, e) => {
             Program.Err($"NavigationCompleted for {page}: Success={e.IsSuccess} ErrorStatus={e.WebErrorStatus} Http={e.HttpStatusCode}");
             if (e.IsSuccess && onLoaded != null) onLoaded();

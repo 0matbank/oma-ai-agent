@@ -196,11 +196,31 @@ def cloaked(hwnd):
     return bool(v.value)
 
 
+_desk_tried = False
+
+
+def _on_user_desktop():
+    """A process started outside the user's interactive desktop (a service, a scheduled task) enumerates an empty desktop.
+    Atticus.exe attaches itself to "Default" for the same reason (Program.cs); do it once here when nothing is seen."""
+    global _desk_tried
+    if _desk_tried:
+        return False
+    _desk_tried = True
+    try:
+        user32.OpenDesktopW.restype = W.HANDLE
+        h = user32.OpenDesktopW('Default', 0, False, 0x01FF)
+        return bool(h and user32.SetThreadDesktop(h))
+    except Exception:
+        return False
+
+
 def windows():
     """Top-level app windows a person can see, front to back: [{hwnd, title, exe, proc, app}]."""
     hs = []
     PROC = ctypes.WINFUNCTYPE(W.BOOL, W.HWND, W.LPARAM)
     user32.EnumWindows(PROC(lambda h, _: hs.append(h) or True), 0)
+    if not hs and _on_user_desktop():
+        user32.EnumWindows(PROC(lambda h, _: hs.append(h) or True), 0)
     out = []
     for h in hs:
         if not user32.IsWindowVisible(h) or user32.GetWindow(h, 4) or cloaked(h):   # 4 = GW_OWNER: dialogs and popups belong to another window

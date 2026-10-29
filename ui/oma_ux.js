@@ -263,7 +263,7 @@
     document.querySelectorAll('#setMode button').forEach(b => b.onclick = () => { set('settingsMode', b.dataset.m); settingsMode(b.dataset.m); });
     document.querySelectorAll('#layoutSeg button').forEach(b => b.onclick = () => layout(b.dataset.l, true));
     $('setSearch')?.addEventListener('input', e => searchSettings(e.target.value));
-    $('setSearch')?.addEventListener('keydown', e => { if (e.key === 'Escape') { e.target.value = ''; searchSettings(''); } });
+    $('setSearch')?.addEventListener('keydown', e => { if (e.key === 'Escape' && e.target.value) { e.stopPropagation(); e.target.value = ''; searchSettings(''); } });   // an empty search lets Esc close the drawer
     // History and Oma's Browser load when their page opens
     document.querySelector('.nav-btn[data-s="history"]')?.addEventListener('click', () => post({ do: 'history' }));
     document.querySelector('.nav-btn[data-s="browser"]')?.addEventListener('click', () => post({ do: 'browserSites' }));
@@ -294,7 +294,13 @@
     });
     document.addEventListener('keydown', e => {
       if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'k') { e.preventDefault(); $('palette').classList.contains('open') ? palClose() : palOpen(); }
+      // Esc closes an open drawer (Settings, or the node drawer); a filled settings search takes the first Esc itself
+      if (e.key === 'Escape' && !$('palette')?.classList.contains('open')) {
+        const open = ['settings-drawer', 'node-drawer'].map($).find(d => d?.classList.contains('open'));
+        if (open) { open.classList.remove('open'); e.preventDefault(); }
+      }
     });
+    $('drawer-close')?.addEventListener('click', () => $('node-drawer')?.classList.remove('open'));   // its handler lived in the unused app.js
   });
   // st.load runs again after every saved setting: keep labels, mode and layout in step
   const load0 = window.st.load;

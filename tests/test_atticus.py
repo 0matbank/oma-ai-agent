@@ -227,7 +227,9 @@ atticus.fast = fast
 sys.argv = ['atticus.py', '--fast', 'test']
 atticus.main()
 '''
-            p = subprocess.Popen([sys.executable, '-c', script], env={**os.environ, 'ATTICUS_DIR': root})
+            repo = str(Path(__file__).resolve().parents[1])   # the child imports atticus from any working folder
+            p = subprocess.Popen([sys.executable, '-c', script], env={**os.environ, 'ATTICUS_DIR': root,
+                                 'PYTHONPATH': os.pathsep.join(filter(None, [repo, os.environ.get('PYTHONPATH', '')]))})
             try:
                 deadline = time.monotonic() + 3
                 while not ready.exists() and time.monotonic() < deadline:
