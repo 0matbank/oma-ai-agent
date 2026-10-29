@@ -83,7 +83,7 @@ class OmaParticleOrb {
     this.canvas.width = Math.round(this.w * dpr); this.canvas.height = Math.round(this.h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.R = Math.min(this.w, this.h) * (this.halo ? 0.27 : 0.36);   // the orb fills its panel; the halo needs room around it
-    this.cy = this.h * (this.halo ? 0.45 : this.h > 260 ? 0.44 : 0.5);
+    this.cy = this.h * (this.halo ? 0.43 : this.h > 260 ? 0.44 : 0.5);
   }
 
   // The halo ring in page coordinates, so the aurora lines can end on it
