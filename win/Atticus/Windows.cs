@@ -214,7 +214,7 @@ sealed class SettingsWindow : PageWindow
     {
         base.OnResize(e);
         if (WindowState == FormWindowState.Minimized && Prefs.D.GetValueOrDefault("floatOrb") is not false) (floating ??= new FloatWindow()).Open();
-        else if (WindowState != FormWindowState.Minimized) floating?.Close2();
+        else if (WindowState != FormWindowState.Minimized) { floating?.Close2(); Zoom(); }
     }
     public void RestoreFromFloat() { floating?.Close2(); Raise(); }
 
@@ -391,13 +391,18 @@ sealed class SettingsWindow : PageWindow
         if (k == "uiScale") Zoom();
     }
 
-    // the page zoom from Settings (uiScale, 80-130 %, default 100)
+    // the page zoom from Settings (uiScale, 80-130 %, default 100). A smaller window zooms the whole page out instead of
+    // letting the layout drop or cut parts: the page always lays out at least FitW x FitH CSS px, just drawn smaller.
+    const double FitW = 1520, FitH = 860;
     void Zoom()
     {
-        if (web == null) return;
+        if (web == null || WindowState == FormWindowState.Minimized) return;
         var s = Prefs.Num("uiScale");
         if (s <= 0 && double.TryParse(Prefs.Str("uiScale"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var p)) s = p;
-        try { web.ZoomFactor = Math.Clamp(s > 0 ? s : 100, 80, 130) / 100.0; } catch (Exception e) { Program.Err("zoom: " + e.Message); }
+        double want = Math.Clamp(s > 0 ? s : 100, 80, 130) / 100.0, css = 96.0 / DeviceDpi;
+        double fit = Math.Min(ClientSize.Width * css / FitW, ClientSize.Height * css / FitH);
+        double z = Math.Max(0.45, Math.Min(want, fit));
+        try { if (Math.Abs(web.ZoomFactor - z) > 0.005) web.ZoomFactor = z; } catch (Exception e) { Program.Err("zoom: " + e.Message); }
     }
 
     public static void Startup(bool on)
