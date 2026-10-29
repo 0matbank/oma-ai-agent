@@ -1,8 +1,7 @@
 /**
- * Oma AI Agent - Neural Mind Map & Glowing Connector Cables
- * Connects Memory, Skills, Soul, Setting to the Central Holographic AI Face.
- * Recreates the exact multi-colored curved bezier cables, bus junction, and
- * seamless data-flow connection toward the central OMA visualization.
+ * Oma AI Agent - Mind map: Memory, Skills, Soul, Setting around the orb (Oma Halo).
+ * Each module joins the orb's halo by an aurora ribbon: a few see-through coloured strands that wave
+ * slowly and meet at both ends. Faster while Oma thinks or works. ~30 fps, paused while hidden.
  */
 
 class OmaMindMap {
@@ -16,26 +15,15 @@ class OmaMindMap {
       { id: 'soul', name: 'Soul', subtitle: 'Persona & Logic', color: '#00e676', glow: 'rgba(0, 230, 118, 0.45)', icon: '✨', tab: 'brain' },
       { id: 'setting', name: 'Setting', subtitle: 'System Config', color: '#e0e0ff', glow: 'rgba(224, 224, 255, 0.45)', icon: '⚙️', tab: 'general' }
     ];
-    this.pulses = [];
     this.time = 0;
     this.state = 'active';
+    this.last = 0;
 
     this.initDOM();
     this.resize();
     window.addEventListener('resize', () => this.resize());
-    this.animate();
-
-    // Smooth, restrained pulse generator (data packet flow)
-    setInterval(() => {
-      if (document.hidden || this.pulses.length > 24) return;   // rAF is paused while hidden: don't queue a burst
-      const idx = Math.floor(Math.random() * this.nodes.length);
-      this.pulses.push({
-        nodeIndex: idx,
-        progress: 0,
-        speed: 0.012 + Math.random() * 0.008, // Slow, comfortable data-flow
-        color: this.nodes[idx].color
-      });
-    }, 600);
+    if (window.ResizeObserver && this.canvas.parentElement) new ResizeObserver(() => this.resize()).observe(this.canvas.parentElement);
+    requestAnimationFrame(ts => this.animate(ts));
   }
 
   initDOM() {
@@ -47,6 +35,7 @@ class OmaMindMap {
       const el = document.createElement('div');
       el.className = 'system-node';
       el.id = `node-${node.id}`;
+      el.title = `${node.name} · ${node.subtitle}`;   // narrow windows show only the icon
       el.style.setProperty('--node-color', node.color);
       el.style.setProperty('--node-glow', node.glow);
 
@@ -83,137 +72,61 @@ class OmaMindMap {
     this.height = rect.height || 280;
     this.canvas.width = this.width * dpr;
     this.canvas.height = this.height * dpr;
-    this.ctx.scale(dpr, dpr);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   setState(newState) {
     this.state = newState;
   }
 
-  animate() {
-    requestAnimationFrame(() => this.animate());
-    this.time += 0.015;
+  static rgb(hex) { const n = parseInt(hex.slice(1), 16); return `${n >> 16},${(n >> 8) & 255},${n & 255}`; }
 
-    if (!this.ctx || !this.width) return;
-    this.ctx.clearRect(0, 0, this.width, this.height);
-
-    const junctionX = this.width - 18;
-    const junctionY = this.height / 2;
-    const busEndX = this.width;
-
-    // Cable origins from the 4 DOM nodes
-    const nodeYPositions = [];
-    const parentRect = this.canvas.getBoundingClientRect();
-
-    this.nodes.forEach((node, idx) => {
-      const el = document.getElementById(`node-${node.id}`);
-      let startY = 35 + idx * 65;
-      if (el) {
-        const r = el.getBoundingClientRect();
-        startY = r.top - parentRect.top + r.height / 2;
-      }
-      nodeYPositions.push(startY);
-    });
-
-    // 1. Draw glowing multi-colored bezier cables
-    this.nodes.forEach((node, idx) => {
-      const startX = 0;
-      const startY = nodeYPositions[idx];
-
-      // Subtle backing track
-      this.ctx.save();
-      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-      this.ctx.lineWidth = 1.2;
-      this.ctx.beginPath();
-      this.ctx.moveTo(startX, startY);
-      this.ctx.bezierCurveTo(startX + (junctionX - startX) * 0.45, startY, startX + (junctionX - startX) * 0.65, junctionY, junctionX, junctionY);
-      this.ctx.stroke();
-
-      // Glowing neon cable
-      this.ctx.strokeStyle = node.color;
-      this.ctx.lineWidth = 1.8;
-      this.ctx.shadowColor = node.color;
-      this.ctx.shadowBlur = 8;
-      this.ctx.beginPath();
-      this.ctx.moveTo(startX, startY);
-      this.ctx.bezierCurveTo(startX + (junctionX - startX) * 0.45, startY, startX + (junctionX - startX) * 0.65, junctionY, junctionX, junctionY);
-      this.ctx.stroke();
-      this.ctx.restore();
-    });
-
-    // 2. Horizontal Main Bus Line from Junction directly into AI Face Card
-    this.ctx.save();
-    this.ctx.strokeStyle = '#00e5ff';
-    this.ctx.lineWidth = 2.4;
-    this.ctx.shadowColor = '#00e5ff';
-    this.ctx.shadowBlur = 10;
-    this.ctx.beginPath();
-    this.ctx.moveTo(junctionX, junctionY);
-    this.ctx.lineTo(busEndX, junctionY);
-    this.ctx.stroke();
-
-    // 3. Junction Node with subtle pulsing ring
-    const pulseRing = Math.sin(this.time * 2) * 2;
-    this.ctx.fillStyle = '#00e5ff';
-    this.ctx.shadowColor = '#00e5ff';
-    this.ctx.shadowBlur = 10;
-    this.ctx.beginPath();
-    this.ctx.arc(junctionX, junctionY, 4.5, 0, Math.PI * 2);
-    this.ctx.fill();
-
-    this.ctx.strokeStyle = 'rgba(0, 229, 255, 0.45)';
-    this.ctx.lineWidth = 1.0;
-    this.ctx.beginPath();
-    this.ctx.arc(junctionX, junctionY, 7.5 + pulseRing, 0, Math.PI * 2);
-    this.ctx.stroke();
-    this.ctx.restore();
-
-    // 4. Moving Data Packet Pulses
-    let speedMult = 1.0;
-    if (this.state === 'thinking' || this.state === 'planning') speedMult = 1.6;
-    else if (this.state === 'executing' || this.state === 'working') speedMult = 1.4;
-
-    for (let i = this.pulses.length - 1; i >= 0; i--) {
-      const p = this.pulses[i];
-      p.progress += p.speed * speedMult;
-
-      if (p.progress >= 1.0) {
-        this.pulses.splice(i, 1);
-        continue;
-      }
-
-      const startX = 0;
-      const startY = nodeYPositions[p.nodeIndex];
-      let px, py;
-
-      if (p.progress < 0.8) {
-        // Traveling along the curved cable into the junction
-        const t = p.progress / 0.8;
-        const p0x = startX, p0y = startY;
-        const p1x = startX + (junctionX - startX) * 0.45, p1y = startY;
-        const p2x = startX + (junctionX - startX) * 0.65, p2y = junctionY;
-        const p3x = junctionX, p3y = junctionY;
-
-        // Cubic Bezier interpolation
-        const u = 1 - t;
-        px = u * u * u * p0x + 3 * u * u * t * p1x + 3 * u * t * t * p2x + t * t * t * p3x;
-        py = u * u * u * p0y + 3 * u * u * t * p1y + 3 * u * t * t * p2y + t * t * t * p3y;
-      } else {
-        // Traveling along the horizontal bus into the face card
-        const t = (p.progress - 0.8) / 0.2;
-        px = junctionX + (busEndX - junctionX) * t;
-        py = junctionY;
-      }
-
-      this.ctx.save();
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.shadowColor = p.color;
-      this.ctx.shadowBlur = 8;
-      this.ctx.beginPath();
-      this.ctx.arc(px, py, 2.4, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.restore();
+  // one ribbon along a cubic curve P: strands wave around it and meet at both ends
+  ribbon(P, cols, time, seed, amp) {
+    const c = this.ctx, N = 56, at = t => { const m = 1 - t; return [0, 1].map(k => m * m * m * P[0][k] + 3 * m * m * t * P[1][k] + 3 * m * t * t * P[2][k] + t * t * t * P[3][k]); };
+    const base = [], nrm = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N, a = at(t), b = at(Math.min(1, t + 0.01)), d = at(Math.max(0, t - 0.01)), dx = b[0] - d[0], dy = b[1] - d[1], l = Math.hypot(dx, dy) || 1;
+      base.push(a); nrm.push([-dy / l, dx / l]);
     }
+    cols.forEach((col, k) => {
+      const ph = seed + k * 1.9, f1 = 0.55 + (k % 3) * 0.2, f2 = 1.1 + k * 0.15, sp = 0.6 + k * 0.15;
+      c.beginPath();
+      base.forEach((p, i) => {
+        const t = i / N, env = Math.pow(Math.sin(Math.PI * t), 0.9);
+        const o = amp * env * (Math.sin(t * 6.283 * f1 + time * sp + ph) * 0.75 + Math.sin(t * 6.283 * f2 - time * sp * 0.7 + ph * 1.3) * 0.35);
+        const x = p[0] + nrm[i][0] * o, y = p[1] + nrm[i][1] * o;
+        i ? c.lineTo(x, y) : c.moveTo(x, y);
+      });
+      c.strokeStyle = `rgba(${col},0.07)`; c.lineWidth = 16 + (k % 3) * 9; c.stroke();   // wide soft band
+      c.strokeStyle = `rgba(${col},0.12)`; c.lineWidth = 5; c.stroke();
+      c.strokeStyle = `rgba(${col},0.45)`; c.lineWidth = 1; c.stroke();                 // bright thread
+    });
+  }
+
+  animate(ts) {
+    requestAnimationFrame(t => this.animate(t));
+    if (document.hidden || !this.ctx || !this.width || ts - this.last < 32) return;   // ~30 fps is plenty for slow waves
+    const dt = Math.min(0.05, (ts - (this.last || ts)) / 1000);
+    this.last = ts;
+    const busy = { thinking: 2, planning: 2, executing: 1.6, working: 1.6, verifying: 1.6, listening: 1.4, speaking: 1.4 }[this.state] || 1;
+    this.time += dt * 0.9 * busy;
+    const c = this.ctx;
+    c.clearRect(0, 0, this.width, this.height);
+    const orb = window.holoOrb, box = this.canvas.getBoundingClientRect();
+    if (!orb || !orb.ringAt || !this.canvas.offsetParent) return;
+    const ring = orb.ringAt(), cx = ring.x - box.left, cy = ring.y - box.top;
+    c.globalCompositeOperation = 'lighter';
+    this.nodes.forEach((node, i) => {
+      const el = document.getElementById(`node-${node.id}`); if (!el || !el.offsetParent) return;
+      const r = el.getBoundingClientRect(), left = r.left + r.width / 2 < ring.x;
+      const x0 = (left ? r.right : r.left) - box.left - (left ? 2 : -2), y0 = r.top + r.height / 2 - box.top;
+      if (left ? x0 > cx - ring.r : x0 < cx + ring.r) return;                    // too narrow: no room for a line
+      const ang = Math.atan2(y0 - cy, x0 - cx), xe = cx + Math.cos(ang) * ring.r, ye = cy + Math.sin(ang) * ring.r, xm = (x0 + xe) / 2;
+      node.rgb = node.rgb || OmaMindMap.rgb(node.color);
+      this.ribbon([[x0, y0], [xm, y0], [xm, ye], [xe, ye]], [node.rgb, node.rgb, '255,181,71', '150,110,255'], this.time, i * 1.7, Math.min(26, Math.abs(xe - x0) / 7));
+    });
+    c.globalCompositeOperation = 'source-over';
   }
 }
 

@@ -107,6 +107,7 @@
       return `<span class="st ${cls}"><i></i>${name}</span>`;
     });
     t.el.innerHTML = `<div class="tl-steps">${parts.map((p, i) => i ? `<span class="bar ${i <= t.max ? 'on' : ''}"></span>` + p : p).join('')}</div>`;
+    window.holoOrb?.setStep?.(t.max + 1, t.end);   // the same steps light the orb's halo
   }
   function wrapTask() {
     const T = window.OmaTask; if (!T || T._ux) return;
@@ -359,7 +360,11 @@
       img.style.outline = '2px solid var(--neon-green)'; setTimeout(() => img.style.outline = '', 900);
     } catch (e) { note('Could not copy the picture: ' + (e.message || e)); }
   }
-  function copyButtons(root) {   // every chat message gets a small copy button (shows on hover)
+  function copyButtons(root) {   // every chat message gets a small copy button (shows on hover); Oma's get her logo
+    root.querySelectorAll('.feed-card.oma').forEach(c => {
+      const who = c.querySelector('.feed-meta > span'); if (!who || who.querySelector('.oma-logo')) return;
+      who.insertAdjacentHTML('afterbegin', '<span class="oma-logo"></span>');
+    });
     root.querySelectorAll('.feed-card.oma, .feed-card.user').forEach(c => {
       if (c.querySelector('.cp')) return;
       const meta = c.querySelector('.feed-meta > span') || c.querySelector('.feed-meta'); if (!meta) return;

@@ -1606,9 +1606,7 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
 <!-- Top System Telemetry Bar (Across full width) -->
 <header id="top-header" class="telemetry-bar">
   <div class="brand-section" style="display:flex; align-items:center; gap:8px;">
-    <div class="brand-logo" style="width:26px; height:26px; background:linear-gradient(135deg, var(--neon-cyan), #0077ff); border-radius:6px; display:flex; align-items:center; justify-content:center;">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-    </div>
+    <span class="oma-logo" style="--s:28px;" title="Oma"></span>
     <div>
       <b style="font-family:'Orbitron', sans-serif; font-size:13px; letter-spacing:0.8px; color:#fff;">OMA AI</b>
       <span style="font-size:9.5px; color:var(--neon-cyan); letter-spacing:0.5px; margin-left:4px;">PC 2070</span>
@@ -3326,12 +3324,13 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
   // Wire UI Controls
   window.addEventListener('DOMContentLoaded', () => {
     try {
-      holoOrb = new window.OmaHoloOrb('orb-canvas', { theme: (P && P.theme) || 'oma', count: 2000 });
+      holoOrb = new window.OmaHoloOrb('orb-canvas', { theme: (P && P.theme) || 'oma', count: 2000, halo: true });
       holoOrb.onLabel = (label, s) => {   // the orb's real state names the footer and the button
         const l = $('orb-state-label'), c = holoOrb.colorsFor(s).a;
         if (l) { l.textContent = label + (P && P.muted ? ' · MUTED' : ''); l.parentElement.style.color = `rgb(${c})`; }
         const b = $('btn-terminate'); if (b) b.textContent = s === 'idle' ? 'START AI' : 'TERMINATE';
         post({ do: 'orbState', s, theme: P.theme || 'oma' });   // the floating orb mirrors it while Oma is minimized
+        mindMap?.setState(s);   // the aurora lines wave faster while Oma works
       };
       holoOrb.onLabel('STANDBY', 'idle');
       agentTown = new window.AgentTown('town-canvas');

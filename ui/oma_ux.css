@@ -137,3 +137,62 @@ body.lay-focus #sphere-panel { flex: 1 !important; width: auto; }
   .town-header #agent-chips-container .chip-face { width: 20px; height: 20px; }
 }
 @media (max-width: 1500px) { .town-stats .tf:has(#tfModel), .town-stats .tf:has(#town-last-task) { display: none !important; } .town-stats .tf.tf-status { max-width: none; } }
+
+/* ===== Oma Halo (user's pick D1): orb in a 4-step halo, Memory/Skills left, Soul/Setting right, aurora lines between. No boxes. ===== */
+#upper-deck { position: relative; display: block !important; height: clamp(250px, 27vh, 360px) !important; --spread: min(370px, calc(50% - 215px)); --pw: 200px; }
+@media (max-height: 820px) { #upper-deck { height: 230px !important; } }
+@media (max-width: 1500px) { #upper-deck { --pw: 176px; --spread: min(300px, calc(50% - 190px)); } }
+#nodes-panel, #cables-panel { position: absolute !important; inset: 0; width: auto !important; height: auto !important; padding: 0 !important; margin: 0 !important;
+  background: none !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; pointer-events: none; }
+#nodes-panel { z-index: 2; } #cables-panel { z-index: 1; }
+#nodes-panel, #cables-panel, #sphere-panel { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; filter: none !important; }   /* a card blur on top would smear the orb and the lines */
+#nodes-panel::before, #nodes-panel::after, #sphere-panel::before, #sphere-panel::after { display: none !important; }
+#nodes-panel > :not(#nodes-group) { display: none !important; }
+#nodes-group { position: absolute; inset: 0; display: block !important; }
+#nodes-group .system-node { position: absolute; pointer-events: auto; cursor: pointer; width: var(--pw); height: 58px; margin: 0 !important; box-sizing: border-box;
+  display: flex; align-items: center; gap: 11px; padding: 0 16px 0 9px !important; border-radius: 30px !important;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--node-color) 14%, #0b0d11), #0d0f13) !important;
+  border: 1px solid color-mix(in srgb, var(--node-color) 45%, transparent) !important; box-shadow: none !important; transition: transform .15s, border-color .15s; }
+#nodes-group .system-node:hover { transform: translateY(-2px); border-color: var(--node-color) !important; box-shadow: 0 0 18px color-mix(in srgb, var(--node-color) 25%, transparent) !important; }
+#node-memory, #node-skills { left: max(8px, calc(50% - var(--spread) - var(--pw))); }
+#node-soul, #node-setting { right: max(8px, calc(50% - var(--spread) - var(--pw))); flex-direction: row-reverse; text-align: right; padding: 0 9px 0 16px !important;
+  background: linear-gradient(270deg, color-mix(in srgb, var(--node-color) 14%, #0b0d11), #0d0f13) !important; }
+#node-memory, #node-soul { top: calc(45% - 82px); }
+#node-skills, #node-setting { top: calc(45% + 24px); }
+#nodes-group .node-icon-box { width: 40px !important; height: 40px !important; flex: none; border-radius: 50% !important; display: grid !important; place-items: center;
+  border: 1.5px solid var(--node-color) !important; background: color-mix(in srgb, var(--node-color) 10%, transparent) !important; box-shadow: 0 0 14px color-mix(in srgb, var(--node-color) 40%, transparent) inset; font-size: 16px; }
+#nodes-group .node-info { min-width: 0; display: flex; flex-direction: column; }
+#nodes-group .node-title { font: 700 12px/1 "Cascadia Mono", Consolas, monospace !important; letter-spacing: .12em; text-transform: uppercase; color: #fff !important; }
+#nodes-group .node-subtitle { margin-top: 5px; font-size: 11px !important; color: var(--text-muted) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#nodes-group .node-anchor { display: none !important; }
+#sphere-panel { position: absolute !important; left: 50%; top: 0; bottom: 0; height: 100%; width: auto !important; aspect-ratio: 1.15 / 1; transform: translateX(-50%); z-index: 1;
+  padding: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; }
+#sphere-panel .sphere-header { display: none !important; }
+#sphere-panel .sphere-viewport { position: absolute !important; inset: 0; }
+#sphere-panel .sphere-footer { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); padding: 0 !important; z-index: 3; }
+#sphere-panel .sphere-footer > div:first-child { display: none !important; }
+body.lay-focus #upper-deck { height: auto !important; }
+body.lay-focus #sphere-panel { position: absolute !important; left: 0; right: 0; width: auto !important; aspect-ratio: auto; transform: none; }
+@media (max-width: 1280px) { #sphere-panel { flex: none !important; width: auto !important; } }
+
+/* Oma's logo: the user's portrait, coloured by the theme (ink = accent fading dark, face = cream, accent ring) */
+.oma-logo { --s: 20px; position: relative; display: inline-block; flex: none; width: var(--s); height: var(--s); border-radius: 50%; overflow: hidden; vertical-align: middle;
+  background: linear-gradient(rgba(var(--accent-rgb), .14), rgba(var(--accent-rgb), .14)), #100d09;
+  box-shadow: 0 0 0 1.5px var(--neon-cyan), 0 0 10px rgba(var(--accent-rgb), .35); }
+.oma-logo::before, .oma-logo::after { content: ""; position: absolute; inset: 0; -webkit-mask: center / cover no-repeat; mask: center / cover no-repeat; }
+.oma-logo::before { background: #faf4e8; -webkit-mask-image: url(oma_logo_fill.png); mask-image: url(oma_logo_fill.png); }
+.oma-logo::after { background: linear-gradient(160deg, var(--neon-cyan) 10%, color-mix(in srgb, var(--neon-cyan) 28%, #000) 75%); -webkit-mask-image: url(oma_logo_ink.png); mask-image: url(oma_logo_ink.png); }
+.feed-card.oma .feed-meta .oma-logo { margin-right: 7px; vertical-align: -6px; }   /* inline, so the header text still wraps as before */
+#sphere-panel #btn-terminate { color: var(--neon-cyan) !important; background: rgba(var(--accent-rgb), .08) !important; border: 1px solid rgba(var(--accent-rgb), .7) !important;
+  border-radius: 20px !important; box-shadow: none !important; padding: 7px 26px !important; letter-spacing: .2em; }
+#sphere-panel #btn-terminate:hover { background: rgba(var(--accent-rgb), .18) !important; }
+#sphere-panel #btn-terminate { white-space: nowrap; }
+/* narrow windows: the four modules stay as round icons beside the orb (names on hover) */
+@media (max-width: 1280px) {
+  html body #nodes-panel, html body #cables-panel { display: block !important; }
+  #upper-deck { --pw: 46px; --spread: min(200px, calc(50% - 60px)); }
+  #nodes-group .system-node { padding: 0 !important; justify-content: center; border-radius: 50% !important; }
+  #nodes-group .node-info { display: none !important; }
+  #nodes-group .node-icon-box { margin: 0 !important; }
+}
+body.lay-focus #nodes-panel, body.lay-focus #cables-panel { display: none !important; }

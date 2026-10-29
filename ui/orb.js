@@ -20,6 +20,8 @@ class OmaParticleOrb {
     this.swirl = 0; this.swirlTarget = 0;               // differential rotation (thinking)
     this.burst = 0;                                      // completion / error shock ring 0..1
     this.t = 0; this.last = 0; this.hidden = false;
+    this.halo = !!opts.halo;                             // Oma Halo: a 4-part ring (understand, work, check, done) instead of the tilted orbit
+    this.stepN = 0; this.stepEnd = null;
     this.build(opts.count || 3000);
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -80,8 +82,18 @@ class OmaParticleOrb {
     this.w = Math.max(1, r.width); this.h = Math.max(1, r.height); this.dpr = dpr;
     this.canvas.width = Math.round(this.w * dpr); this.canvas.height = Math.round(this.h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.R = Math.min(this.w, this.h) * 0.36;   // the orb fills its panel (Stonic look)
-    this.cy = this.h * (this.h > 260 ? 0.44 : 0.5);
+    this.R = Math.min(this.w, this.h) * (this.halo ? 0.27 : 0.36);   // the orb fills its panel; the halo needs room around it
+    this.cy = this.h * (this.halo ? 0.45 : this.h > 260 ? 0.44 : 0.5);
+  }
+
+  // The halo ring in page coordinates, so the aurora lines can end on it
+  ringAt() { const r = this.canvas.getBoundingClientRect(); return { x: r.left + this.w / 2, y: r.top + this.cy, r: this.R * 1.42 }; }
+  // n = parts lit (1 understand .. 4 done); end = COMPLETED | PARTIAL | FAILED | CANCELLED, after which the halo empties again
+  setStep(n, end) {
+    this.stepN = Math.max(0, Math.min(4, n | 0)); this.stepEnd = end || null;
+    clearTimeout(this.stepTimer);
+    if (end) this.stepTimer = setTimeout(() => { this.stepN = 0; this.stepEnd = null; this.kick(); }, 5000);
+    this.kick();
   }
 
   wireDrag() {
@@ -174,7 +186,7 @@ class OmaParticleOrb {
         c.fillStyle = gg; c.beginPath(); c.arc(sx, sy, 8, 0, 6.283); c.fill();
       }
     };
-    ring(false);
+    if (!this.halo) ring(false);
 
     // particles
     const cosY = Math.cos(this.rotY + this.ry), sinY = Math.sin(this.rotY + this.ry);
@@ -210,7 +222,7 @@ class OmaParticleOrb {
       c.fillStyle = rgb(m.b, (0.05 + (z2 + 1.5) / 3 * 0.25) * en);
       c.fillRect(cx + x * R, cy + y2 * R, 1.3, 1.3);
     }
-    ring(true);
+    if (!this.halo) ring(true);
 
     // completion / error shock wave
     if (this.burst > 0) {
@@ -218,6 +230,18 @@ class OmaParticleOrb {
       c.beginPath(); c.arc(cx, cy, R * (1.05 + (1 - this.burst) * 0.7), 0, 6.283); c.stroke();
     }
     c.globalCompositeOperation = 'source-over';
+    if (this.halo) {   // 4 parts from the top, clockwise; lit = steps reached, the current one breathes
+      const rr = R * 1.42, th = (OmaParticleOrb.THEMES[this.theme] || OmaParticleOrb.THEMES.stonic).a;
+      const on = this.stepEnd === 'COMPLETED' ? [0, 245, 155] : this.stepEnd === 'FAILED' || this.stepEnd === 'CANCELLED' ? [255, 64, 80] : th;
+      c.lineWidth = 4; c.lineCap = 'round';
+      for (let s = 0; s < 4; s++) {
+        const a0 = -Math.PI / 2 + s * Math.PI / 2 + 0.07, cur = s === this.stepN - 1 && !this.stepEnd;
+        c.strokeStyle = s < this.stepN ? rgb(on, cur ? 0.6 + 0.4 * Math.sin(t * 6) : 0.95) : 'rgba(255,255,255,0.1)';
+        c.beginPath(); c.arc(cx, cy, rr, a0, a0 + Math.PI / 2 - 0.14); c.stroke();
+      }
+      c.strokeStyle = rgb(th, 0.18); c.lineWidth = 1;
+      c.beginPath(); c.arc(cx, cy, rr + 9, 0, 6.283); c.stroke();
+    }
   }
 }
 window.OmaParticleOrb = OmaParticleOrb;

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="bn"><head><meta charset="utf-8"><title>Oma Halo with aurora lines</title>
+<style>
+:root { --acc:#ffb547; --acc-rgb:255,181,71; --txt:#e9e2d6; --mut:#8a7f70; }
+* { box-sizing:border-box; }
+body { margin:0; background:#07090d; color:var(--txt); font-family:"Segoe UI",system-ui,sans-serif; padding:22px 30px 40px; }
+h2 { font:600 15px/1.3 "Segoe UI"; margin:26px 0 4px; color:#fff; } h2 b { color:var(--acc); }
+p.note { margin:0 0 10px; color:var(--mut); font-size:13px; max-width:1440px; }
+.frame { position:relative; width:1440px; height:360px; background:#0a0c10; border:1px dashed #262b33; border-radius:6px; overflow:hidden; }
+.frame > canvas { position:absolute; inset:0; width:100%; height:100%; }
+.c1{--c:#2fd4ff}.c2{--c:#ff7a3d}.c3{--c:#38e08a}.c4{--c:#e8e8e8}
+.hex { position:absolute; width:200px; height:64px; display:flex; align-items:center; gap:12px; padding:0 18px 0 12px; z-index:2;
+  background:linear-gradient(90deg, color-mix(in srgb, var(--c) 14%, #0a0c10), #0d0f13); border:1px solid color-mix(in srgb, var(--c) 45%, transparent); border-radius:32px; }
+.hex.r { flex-direction:row-reverse; text-align:right; padding:0 12px 0 18px; background:linear-gradient(270deg, color-mix(in srgb, var(--c) 14%, #0a0c10), #0d0f13); }
+.hex .ic { width:42px; height:42px; flex:none; display:grid; place-items:center; border-radius:50%; color:var(--c); border:1.5px solid var(--c); box-shadow:0 0 14px color-mix(in srgb, var(--c) 45%, transparent) inset; font-size:17px; }
+.hex b { font:700 12.5px/1 "Cascadia Mono",Consolas; letter-spacing:.12em; color:#fff; } .hex small { display:block; margin-top:5px; font-size:11px; color:var(--mut); }
+.badge { position:absolute; left:24px; top:16px; padding:4px 10px; border:1px solid rgba(var(--acc-rgb),.5); border-radius:20px; font-size:11.5px; color:var(--acc); background:rgba(0,0,0,.35); z-index:3; }
+.badge::before { content:"● "; }
+.go { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); display:flex; gap:10px; align-items:center; z-index:3; }
+.go .btn { padding:9px 30px; color:var(--acc); font:700 12px/1 "Cascadia Mono",Consolas; letter-spacing:.22em; background:rgba(var(--acc-rgb),.08); border:1px solid rgba(var(--acc-rgb),.7); border-radius:20px; }
+.go .mic { width:32px; height:32px; border-radius:50%; border:1px solid rgba(var(--acc-rgb),.6); display:grid; place-items:center; color:var(--acc); font-size:14px; }
+</style></head><body>
+<h1 style="font:600 20px 'Segoe UI';margin:0">D · Oma Halo, লাইনগুলো আপনার দেওয়া ছবির মতো aurora ঢেউ</h1>
+<p class="note">শুধু preview। প্রতিটা লাইন এখন কয়েকটা স্বচ্ছ রঙিন ফিতা, একে অপরের উপর দিয়ে ঢেউ খেলে। দুই মাথায় (module আর halo) ফিতাগুলো এক জায়গায় মিলে যায়। সংখ্যাগুলো উদাহরণ।</p>
+
+<h2><b>D1</b> · প্রতিটা module থেকে আলাদা aurora (আমার পছন্দ)</h2>
+<p class="note">চারটা module থেকে চারটা ঢেউ-ফিতা halo-তে ঢোকে। প্রতিটার মূল রং module-এর রং, সাথে amber, বেগুনি আর লালের হালকা ছোঁয়া।</p>
+<div class="frame" id="D1"><canvas></canvas>
+  <span class="badge">কাজ করছি · ধাপ ২/৪</span>
+  <div class="hex c1" style="left:150px;top:70px" data-p="l"><span class="ic">◉</span><div><b>MEMORY</b><small>১৭৮টা মনে রাখা কথা</small></div></div>
+  <div class="hex c2" style="left:150px;top:226px" data-p="l"><span class="ic">⚡</span><div><b>SKILLS</b><small>৪২টা কাজ জানে</small></div></div>
+  <div class="hex r c3" style="left:1090px;top:70px" data-p="r"><span class="ic">✦</span><div><b>SOUL</b><small>Oma · বাংলা</small></div></div>
+  <div class="hex r c4" style="left:1090px;top:226px" data-p="r"><span class="ic">⚙</span><div><b>SETTING</b><small>Simple mode</small></div></div>
+  <div class="go"><span class="btn">STOP</span><span class="mic">🎙</span></div>
+</div>
+
+<h2><b>D2</b> · একটাই aurora নদী</h2>
+<p class="note">বাম আর ডান module-গুলোকে জুড়ে একটাই চওড়া aurora ঢেউ orb-এর পেছন দিয়ে বয়ে যায়, ঠিক আপনার ছবির মতো। রং বাম থেকে ডানে বদলায়।</p>
+<div class="frame" id="D2"><canvas></canvas>
+  <span class="badge">প্রস্তুত</span>
+  <div class="hex c1" style="left:150px;top:70px" data-p="l"><span class="ic">◉</span><div><b>MEMORY</b><small>১৭৮টা মনে রাখা কথা</small></div></div>
+  <div class="hex c2" style="left:150px;top:226px" data-p="l"><span class="ic">⚡</span><div><b>SKILLS</b><small>৪২টা কাজ জানে</small></div></div>
+  <div class="hex r c3" style="left:1090px;top:70px" data-p="r"><span class="ic">✦</span><div><b>SOUL</b><small>Oma · বাংলা</small></div></div>
+  <div class="hex r c4" style="left:1090px;top:226px" data-p="r"><span class="ic">⚙</span><div><b>SETTING</b><small>Simple mode</small></div></div>
+  <div class="go"><span class="btn">START AI</span><span class="mic">🎙</span></div>
+</div>
+
+<script>
+const still = location.hash === '#still';
+let frames = 0; const RAF = still ? (f => { if (++frames < 120) setTimeout(f, 5); }) : requestAnimationFrame;
+const COL = { c1:[47,212,255], c2:[255,122,61], c3:[56,224,138], c4:[225,225,235] };
+const EXTRA = [[255,181,71], [150,110,255], [255,95,110]];        // amber, violet, red: the aurora's mix
+function canvasOf(cv) { const d = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; cv.width = W * d; cv.height = H * d; const g = cv.getContext('2d'); g.scale(d, d); return [g, W, H]; }
+function sphere(n) { const p = []; for (let i = 0; i < n; i++) { const u = Math.random() * 2 - 1, t = Math.random() * 6.283; p.push([Math.sqrt(1 - u * u) * Math.cos(t), u, Math.sqrt(1 - u * u) * Math.sin(t)]); } return p; }
+const bez = (p, t) => { const m = 1 - t; return [m*m*m*p[0][0] + 3*m*m*t*p[1][0] + 3*m*t*t*p[2][0] + t*t*t*p[3][0], m*m*m*p[0][1] + 3*m*m*t*p[1][1] + 3*m*t*t*p[2][1] + t*t*t*p[3][1]]; };
+// one aurora ribbon: several see-through strands that wave around a curve and meet at both ends
+function ribbon(g, P, cols, time, seed, amp, grad) {
+  const N = 70, base = [], nrm = [];
+  for (let i = 0; i <= N; i++) { const t = i / N, a = bez(P, t), b = bez(P, Math.min(1, t + .01)), c = bez(P, Math.max(0, t - .01)), dx = b[0] - c[0], dy = b[1] - c[1], l = Math.hypot(dx, dy) || 1;
+    base.push(a); nrm.push([-dy / l, dx / l]); }
+  cols.forEach((col, k) => {
+    const ph = seed + k * 1.9, f1 = .55 + (k % 3) * .2, f2 = 1.1 + k * .15, sp = .6 + k * .15;
+    const pts = base.map((p, i) => { const t = i / N, env = Math.pow(Math.sin(Math.PI * t), .9);
+      const o = amp * env * (Math.sin(t * 6.283 * f1 + time * sp + ph) * .75 + Math.sin(t * 6.283 * f2 - time * sp * .7 + ph * 1.3) * .35);
+      return [p[0] + nrm[i][0] * o, p[1] + nrm[i][1] * o]; });
+    const path = () => { g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); };
+    const stroke = (a) => { if (!grad) return `rgba(${col},${a})`; const gr = g.createLinearGradient(P[0][0], 0, P[3][0], 0);
+      gr.addColorStop(0, `rgba(${grad[0]},${a})`); gr.addColorStop(.5, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${grad[1]},${a})`); return gr; };
+    path(); g.strokeStyle = stroke(.07); g.lineWidth = 16 + (k % 3) * 9; g.stroke();         // wide soft band
+    path(); g.strokeStyle = stroke(.12); g.lineWidth = 5; g.stroke();
+    path(); g.strokeStyle = stroke(.45); g.lineWidth = 1; g.stroke();                     // bright thread
+  });
+}
+function scene(id) {
+  const f = document.getElementById(id), [g, W, H] = canvasOf(f.querySelector('canvas')), fr = f.getBoundingClientRect();
+  const cx = W / 2, cy = 158, R = 90, ring = R * 1.42, pts = sphere(1500), river = id === 'D2';
+  const pills = [...f.querySelectorAll('[data-p]')].map((c, i) => { const r = c.getBoundingClientRect(), side = c.dataset.p;
+    const x0 = (side === 'l' ? r.right : r.left) - fr.left, y0 = r.top + r.height / 2 - fr.top;
+    const ang = Math.atan2(y0 - cy, x0 - cx), xe = cx + Math.cos(ang) * ring, ye = cy + Math.sin(ang) * ring;
+    return { i, side, col: COL[[...c.classList].find(k => COL[k])].join(','), P: [[x0, y0], [(x0 + xe) / 2, y0], [(x0 + xe) / 2, ye], [xe, ye]], x0, y0 }; });
+  let a = 0;
+  (function draw() {
+    g.clearRect(0, 0, W, H); a += .004; const time = a * 6;
+    g.globalCompositeOperation = 'lighter';
+    if (river) {             // left pill -> through the orb -> right pill, two broad rivers
+      const L = pills.filter(p => p.side === 'l'), Rr = pills.filter(p => p.side === 'r');
+      L.forEach((p, k) => { const q = Rr[k], P = [[p.x0, p.y0], [cx - 200, p.y0], [cx - 120, cy + (k ? 18 : -18)], [cx, cy + (k ? 14 : -14)]], Q = [[cx, cy + (k ? 14 : -14)], [cx + 120, cy + (k ? 18 : -18)], [cx + 200, q.y0], [q.x0, q.y0]];
+        const cols = [p.col, q.col, ...EXTRA.map(e => e.join(','))];
+        ribbon(g, P, cols, time, k * 2.1, 38, null); ribbon(g, Q, cols, time + 1.3, k * 2.1 + .8, 38, null); });
+    } else pills.forEach(p => ribbon(g, p.P, [p.col, p.col, ...EXTRA.slice(0, 2).map(e => e.join(','))], time, p.i * 1.7, 26, null));
+    g.globalCompositeOperation = 'source-over';
+    // orb (drawn over the river so it passes behind)
+    const glow = g.createRadialGradient(cx, cy, 0, cx, cy, R * 1.5); glow.addColorStop(0, 'rgba(12,10,8,1)'); glow.addColorStop(.62, 'rgba(12,10,8,.9)'); glow.addColorStop(1, 'rgba(10,12,16,0)');
+    g.fillStyle = glow; g.beginPath(); g.arc(cx, cy, R * 1.5, 0, 7); g.fill();
+    const gl2 = g.createRadialGradient(cx, cy, 0, cx, cy, R * 1.1); gl2.addColorStop(0, 'rgba(255,190,90,.35)'); gl2.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gl2; g.beginPath(); g.arc(cx, cy, R * 1.1, 0, 7); g.fill();
+    for (const [x, y, z] of pts) { const X = x * Math.cos(a) - z * Math.sin(a), Z = x * Math.sin(a) + z * Math.cos(a), k = (Z + 1.4) / 2.4;
+      g.fillStyle = `rgba(255,${170 + 60 * k | 0},${80 + 80 * k | 0},${.25 + .6 * k})`; g.fillRect(cx + X * R, cy + y * R, 1.5, 1.5); }
+    const lit = river ? 0 : 2;                        // halo: 4 steps, lit = done
+    for (let s = 0; s < 4; s++) { const a0 = -Math.PI / 2 + s * Math.PI / 2 + .07; g.lineWidth = 4; g.lineCap = 'round';
+      g.strokeStyle = s < lit ? (s === lit - 1 ? `rgba(255,181,71,${.6 + .4 * Math.sin(a * 12)})` : 'rgba(255,181,71,.95)') : 'rgba(255,255,255,.1)';
+      g.beginPath(); g.arc(cx, cy, ring, a0, a0 + Math.PI / 2 - .14); g.stroke(); }
+    g.strokeStyle = 'rgba(255,181,71,.18)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, ring + 9, 0, 7); g.stroke();
+    RAF(draw);
+  })();
+}
+addEventListener('load', () => ['D1', 'D2'].forEach(scene));
+</script>
+</body></html>
