@@ -121,14 +121,24 @@
     spots = items.filter(i => i.lat != null);
     const box = $('headlineList'); if (!box) return;
     box.innerHTML = items.slice(0, 12).map((i, n) => `<a class="hl ${i.alert ? 'alert' : ''}" href="${esc(i.link)}" target="_blank" data-n="${n}" title="${esc(i.source)}${i.place ? ' · ' + esc(i.place) : ''}">
-      <span class="n">${String(n + 1).padStart(2, '0')}</span><span>${esc(i.title)}</span></a>`).join('')
+      <span class="n">${String(n + 1).padStart(2, '0')}</span><span>${i.isNew ? '<b class="hl-new">NEW</b>' : ''}${esc(i.title)}</span></a>`).join('')
       || `<div class="hl">${all.length ? (view === 'alerts' ? 'No alert headlines right now.' : 'Nothing matches.') : 'No headlines (offline?)'}</div>`;
     box.querySelectorAll('.hl[data-n]').forEach(a => { a.onmouseenter = () => turnTo(items[+a.dataset.n]); });
     if (view === 'search' && q && spots[0]) turnTo(spots[0]);
     kick();
   }
+  // Auto refresh: new headlines go on top with a NEW tag for half an hour (the first load marks nothing as new)
+  let seen = null, lastFetch = Date.now();
+  const fresh = {}, NEW_FOR = 30 * 60 * 1000, EVERY = 5 * 60 * 1000;
   function headlines(d) {
-    all = (d && d.items) || [];
+    lastFetch = Date.now();
+    const items = (d && d.items) || [], now = Date.now();
+    if (!seen) seen = new Set(items.map(i => i.title));
+    else for (const i of items) if (!seen.has(i.title)) { seen.add(i.title); fresh[i.title] = now; }
+    for (const k in fresh) if (now - fresh[k] > NEW_FOR) delete fresh[k];
+    const isNew = i => !!fresh[i.title];
+    all = items.map(i => ({ ...i, isNew: isNew(i) }))
+      .sort((a, b) => (b.isNew - a.isNew) || (a.isNew && b.isNew ? fresh[b.title] - fresh[a.title] : 0));
     const s = $('headlineStamp'); if (s) s.textContent = d && d.at ? new Date(d.at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + (d.stale ? ' · offline' : '') : '';
     tex = null;   // the red washes follow today's alert places
     show();
@@ -203,6 +213,10 @@
     document.addEventListener('visibilitychange', kick);
     kick();
     post({ do: 'headlines' });
+    // fresh headlines every 5 minutes while Oma is on screen, and at once when she comes back after a while
+    const pull = () => post({ do: 'headlines', refresh: true });
+    setInterval(() => { if (!document.hidden) pull(); }, EVERY);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastFetch > EVERY) pull(); });
   });
   window.omaWorld = { headlines, frame, live: () => !!stream, stopMedia };
 })();

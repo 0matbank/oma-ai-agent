@@ -199,3 +199,6 @@ body.lay-focus #nodes-panel, body.lay-focus #cables-panel { display: none !impor
 /* START AI exactly under the orb's centre; the mic hangs off its right side */
 #sphere-panel .sphere-footer > div:last-child { position: relative; }
 #sphere-panel #btn-mute { position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
+/* Today Headlines: a fresh headline (auto refresh every 5 min) carries a NEW tag for half an hour */
+.hl .hl-new { display: inline-block; margin-right: 6px; padding: 0 5px; border-radius: 4px; font: 700 9px/15px Consolas, monospace; letter-spacing: .08em;
+  color: #0b0d11; background: var(--neon-cyan); vertical-align: 1px; }
