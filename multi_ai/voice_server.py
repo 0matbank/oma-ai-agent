@@ -98,7 +98,20 @@ def _decode(model, audio, lang, prompt, partial):
     return ' '.join(s.text.strip() for s in segs).strip(), score
 
 
+def bangla_script(text):
+    """Whisper writes some Bangla words in Devanagari ("एবার", "आসকে"; once a whole line, "आज के की बार"). Bangla never
+    needs it, and the two blocks share one layout (U+0900 + 0x80 = U+0980), so each letter moves to its Bangla twin."""
+    return ''.join(chr(ord(c) + 0x80) if 0x0900 <= ord(c) <= 0x097F and ord(c) not in (0x0964, 0x0965) else c for c in text)
+
+
 def transcribe(model, audio, allowed, prompt='', partial=False):
+    r = _transcribe(model, audio, allowed, prompt, partial)
+    if r.get('lang') == 'bn':
+        r['text'] = bangla_script(r['text'])   # measured on the user's own voice: 3 of 8 Bangla clips had Devanagari letters
+    return r
+
+
+def _transcribe(model, audio, allowed, prompt='', partial=False):
     """Clear English -> English; clearly Bangla (or Hindi/Urdu, which Whisper confuses it with) -> Bangla;
     otherwise (short commands like "Notepad kholo") both are decoded and the more confident one wins."""
     t0 = time.time()

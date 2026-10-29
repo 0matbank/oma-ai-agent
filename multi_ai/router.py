@@ -99,9 +99,14 @@ class ModelRouter:
             if pid in excluded or not get_secret(f'ai_key_{pid}'):
                 continue
             d = provider_mgr.definition(pid) or {}
-            mids, listed = cloud_candidates(pid, d.get('base_url', ''), get_secret(f'ai_key_{pid}'), d.get('preferred_models', ()), limit=2)
+            mids, listed = cloud_candidates(pid, d.get('base_url', ''), get_secret(f'ai_key_{pid}'), d.get('preferred_models', ()), limit=6)
             if not listed and d.get('custom'):   # a custom endpoint without /models: its configured model
                 mids = d.get('default_models', [])[:1]
+            # the live list, minus models the health monitor knows are not working now (rate limited, timing out):
+            # a blocked newer model must not crowd out an older one that answers (gemini-3.8 hung while 3.6 answered)
+            from multi_ai import health_monitor as hm
+            working = [m for m in mids if not hm.waiting(pid, m)]
+            mids = sorted(working, key=lambda m: hm.status(pid, m)[0] != 'READY')[:2]
             out += [(pid, m) for m in mids]
         return out
 

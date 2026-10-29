@@ -190,6 +190,13 @@ static class Voice
     {
         Shush();
         synth ??= new System.Speech.Synthesis.SpeechSynthesizer();
+        // An English voice reading a Bangla answer says only its English words ("calculator"): the user heard English for
+        // Bangla. Without a Bangla voice on the PC the answer stays on screen only.
+        if (System.Text.RegularExpressions.Regex.IsMatch(text, @"[ঀ-৿]") && !synth.GetInstalledVoices().Any(v => v.Enabled && v.VoiceInfo.Culture.Name.StartsWith("bn")))
+        {
+            Program.Err("Voice: no Bangla voice on this PC; the Bangla answer is shown, not read aloud");
+            Program.Post(done); return;
+        }
         synth.SetOutputToDefaultAudioDevice();
         Speaking = true;
         var prompt = synth.SpeakAsync(text);

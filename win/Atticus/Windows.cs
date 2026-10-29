@@ -182,6 +182,7 @@ sealed class SettingsWindow : PageWindow
             transcript = liveText?.Trim() ?? "";
         }
 
+        Program.Err($"voice: final transcript {transcript.Trim().Length} chars");   // an empty one used to vanish without a trace
         if (!string.IsNullOrWhiteSpace(transcript))
         {
             Js($"st.voiceDone({Web.Json(transcript)});");
@@ -702,6 +703,7 @@ sealed class SettingsWindow : PageWindow
         var reqId = Guid.NewGuid().ToString("N")[..8];
         if (!await askLock.WaitAsync(100))
         {
+            Program.Err($"Ask {reqId} ({source ?? (isVoice ? "voice" : "typed")}): not run, the previous request is still working");
             var busy = ReplyJson("FAILED", "Oma is still working on the previous request. Wait for it to finish or press TERMINATE.", "busy", reqId);
             if (source == "telegram") { remoteDone?.Invoke("✕ Oma is busy with another request. Try again in a moment."); remoteDone = null; }
             Program.Post(() => Js($"st.feedLine({Web.Json(busy)})"));

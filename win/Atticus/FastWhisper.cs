@@ -69,7 +69,14 @@ sealed class FastWhisper
                 if (j.TryGetProperty("id", out var rid) && rid.ValueKind == JsonValueKind.Number && rid.GetInt32() != me) continue;
                 if (j.TryGetProperty("error", out var err)) { Program.Err("FastWhisper: " + err.GetString()); return null; }
                 if (!partial) Program.Err($"FastWhisper: {j.GetProperty("lang").GetString()} p={j.GetProperty("lang_prob")} {j.GetProperty("ms")} ms");
-                return j.GetProperty("text").GetString() ?? "";
+                var text = j.GetProperty("text").GetString() ?? "";
+                if (!partial && Prefs.D.GetValueOrDefault("voiceKeepAudio") is true)   // diagnostics the user turns on: their own recordings, kept locally
+                {
+                    var dir = Path.Combine(Paths.Local, "voice-samples"); Directory.CreateDirectory(dir);
+                    try { File.Copy(file, Path.Combine(dir, $"{DateTime.Now:HHmmss}-{me}.f32"), true); } catch { }
+                    Program.Err("FastWhisper text: " + text);
+                }
+                return text;
             }
         }
         catch (Exception e) { Program.Err("FastWhisper: " + e.Message); Stop(); return null; }   // a stuck read cannot be reused: restart

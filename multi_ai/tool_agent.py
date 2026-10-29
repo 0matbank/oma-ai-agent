@@ -194,10 +194,11 @@ def run_agent(task, provider, model, base_url, key, system, eng, tracker=None):
                 all_ok = all_ok and not failed
                 messages.append({'role': 'tool', 'tool_call_id': cid, 'content': result} if provider != 'ollama' else
                                 {'role': 'tool', 'content': result, 'tool_name': 'bash'})
-                if out['denied']:
+                if out['denied'] or out.get('unanswered'):
                     break
-            if out['denied']:
-                out['reply'] = "Not done: you chose Don't Allow, so nothing was changed."
+            if out['denied'] or out.get('unanswered'):
+                out['reply'] = getattr(eng, 'localize', lambda r, _t: r)("Not done: you chose Don't Allow, so nothing was changed." if out['denied'] else
+                                            'Not done: nobody pressed Allow within 60 seconds, so nothing was changed.', task)
                 break
             if all_ok and raw.get('final_reply'):   # the planner said this one command finishes the task, and it did
                 out['reply'] = raw['final_reply']
@@ -236,10 +237,11 @@ def _one(cmd, cid, eng, bash, seen, cmds, steps, tracker, out):
         return msg, True
     q = eng.risky(cmd)
     if q and eng.pref('safe', True):
-        if eng.ask_user({'q': q, 'cmd': cmd[:800]}, 60) != 'y':
-            out['denied'] = True
+        answer = eng.ask_user({'q': q, 'cmd': cmd[:800]}, 60)
+        if answer != 'y':
+            out['denied'], out['unanswered'] = answer is not None, answer is None   # None: the card expired, nobody said no
             if tracker is not None:
-                tracker.step_end(cid, False, 'The user said no.')
+                tracker.step_end(cid, False, 'The user said no.' if answer is not None else 'Nobody answered the Allow card in 60 s.')
             return 'The user said no. Do not try another way; say it was not done.', True
     try:
         r = subprocess.run([bash, '-c', cmd], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60,

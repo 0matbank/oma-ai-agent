@@ -45,7 +45,9 @@ BANGLISH = re.compile(
     r'dao|daw|diba|dibo|bolo|bolen|bolte|bolba|ache|asa|ase|achhe|nai|naii|nei|hobe|hoba|hoy|hoise|hoisa|hossa|hocche|kothay|'
     r'kothai|kobe|keta|kivabe|kibhabe|ekta|akta|eta|aeita|aita|oita|sob|shob|ektu|akto|valo|bhalo|kharap|thik|kintu|tahole|'
     r'taila|jodi|jokhon|tokhon|tokon|niye|niya|diye|diya|theke|thaka|gula|gulo|shathe|sathe|bujhi|bujhlam|janao|jano|jani|'
-    r'er|ke|ta|bangla|vai|bhai|apu|accha|acha|haan|hya|na|naki|abar|aber|ekhane|okhane|shuru|ses|shesh|uttor)\b', re.I)
+    r'er|ke|ta|bangla|vai|bhai|apu|accha|acha|haan|hya|na|naki|abar|aber|ekhane|okhane|shuru|ses|shesh|uttor|'
+    r'kholo|kolo|khulo|khulun|bondho|bondo|chalao|chalaw|chalan|bajao|bajaw|thamao|thamaw|barao|baraw|komao|komaw|kamao|'   # command verbs:
+    r'naw|nao|dekhao|dekhaw|khojo|khujo|khuje|likho|lekho|pathao|pathaw|shono|shunao|sunao|koren|korun|e|te)\b', re.I)   # "notepad kholo"
 
 
 def reply_lang(text):

@@ -49,5 +49,44 @@ class Desktop(unittest.TestCase):
         self.assertIsInstance(winctl.windows(), list)
 
 
+class PlayerSize(unittest.TestCase):   # the user's "player ta halka akto boro koro" (Oct 29) found no window: the player is a panel
+    def test_size_words(self):
+        cases = {'player ta halka akto boro koro': 'bigger', 'প্লেয়ারটা বড় করো': 'bigger', 'video choto koro': 'smaller',
+                 'player full screen koro': 'full', 'player ager moto koro': 'normal', 'big video play koro': None, 'boro kore bolo': None}
+        for t, want in cases.items():
+            self.assertEqual(atticus.player_size_request(t), want, t)
+
+    def test_player_bondho_stops(self):   # "player" holds "play": it used to look like a new song
+        self.assertEqual(atticus.media_request('player bondho koro'), '<stop>')
+        self.assertEqual(atticus.media_request('gan play koro'), 'bangla song')
+
+
+class ReplyInRequestLanguage(unittest.TestCase):   # the user asked in Bangla and got "Opened calculator." (Oct 29)
+    def test_bangla_and_banglish_get_bangla(self):
+        self.assertEqual(atticus.localize('Opened calculator.', 'calculator খুলো.'), 'calculator খুলে দিয়েছি।')
+        self.assertEqual(atticus.localize('Opened Notepad.', 'notepad kholo'), 'Notepad খুলে দিয়েছি।')
+
+    def test_english_gets_english(self):
+        self.assertEqual(atticus.localize('Opened calculator.', 'open calculator'), 'Opened calculator.')
+        self.assertEqual(atticus.localize('সাউন্ড মিউট করেছি।', 'mute the sound'), 'Muted the sound.')
+        self.assertEqual(atticus.localize('ভলিউম 30% থেকে 50% করেছি।', 'set the volume to 50'), 'Set the volume from 30% to 50%.')
+
+    def test_english_sentences_stay_english(self):
+        from multi_ai import intent
+        for t in ('open notepad', 'What is the capital of Japan?', 'send an e-mail to john', 'close the window'):
+            self.assertEqual(intent.reply_lang(t), 'en', t)
+
+
+class ExpiredAllowCard(unittest.TestCase):   # an Allow card nobody answered was reported as "you chose Don't Allow" (Oct 29)
+    def test_gate_tells_expiry_from_no(self):
+        src = inspect.getsource(atticus.gate)
+        self.assertIn('Nobody answered the Allow card', src)
+        self.assertIn('answer is not None', src)
+
+    def test_messages_follow_the_request_language(self):
+        self.assertTrue(atticus.localize('Not done: nobody pressed Allow within 60 seconds, so nothing was changed.', 'নোটপ্যাড বন্ধ করো').startswith('করা হয়নি'))
+        self.assertTrue(atticus.localize("Not done: you chose Don't Allow, so nothing was changed.", 'close notepad').startswith('Not done'))
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -3106,6 +3106,14 @@ details.ph .ph-models { padding:0 14px 8px 26px; }
     skillSaved(r) { window.omaPanels?.saved(r); },
     player(it) {   // the engine's {ME} --player: a YouTube video in the Agent Town panel ({stop:true} closes it)
       if (it && it.stop) { $('npFrame').src = 'about:blank'; $('neuralPlayer').style.display = 'none'; return; }
+      if (it && it.size) {   // "player boro / choto / full koro": 360 -> 520 -> 720 px -> the whole town panel
+        const np = $('neuralPlayer'), area = np.parentElement.getBoundingClientRect(), steps = [360, 520, 720, 'full'];
+        let i = Math.max(0, steps.indexOf(np.dataset.size === 'full' ? 'full' : +np.dataset.size || 360));
+        i = it.size === 'bigger' ? Math.min(i + 1, 3) : it.size === 'smaller' ? Math.max(i - 1, 0) : it.size === 'full' ? 3 : 0;
+        const w = steps[i] === 'full' ? Math.min(area.width - 20, (area.height - 20 - 26) * 16 / 9) : Math.min(steps[i], area.width - 20);
+        np.dataset.size = steps[i]; np.style.width = Math.round(w) + 'px';
+        return;
+      }
       if (!it || !/^[\w-]{11}$/.test(it.id || '')) return;
       $('npFrame').src = 'https://oma.ui/player.html?v=' + it.id;
       $('npTitle').textContent = it.title || '';

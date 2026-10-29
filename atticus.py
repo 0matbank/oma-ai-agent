@@ -241,6 +241,44 @@ def player_stop():
     return 'Error: the Oma player did not answer'
 
 
+def _no_player(t):
+    """The text without the word "player": it holds "play" / "প্লে", which made "player bondho koro" look like a new song."""
+    return re.sub(r'player\w*|pleyar\w*|plyer\w*|প্লেয়ার\S*|প্লেয়ার\S*', ' ', t)
+
+
+def player_resize(size):
+    """bigger | smaller | full | normal. The Oma player is a panel inside the Oma window, not a Windows window: window
+    tools cannot find it (the user's "player ta akto boro koro" failed that way), so the size goes the play/stop way."""
+    ask = os.environ.get('ATTICUS_ASK') or os.environ.get('ATTICUS_PLAYER')
+    if not ask:
+        return 'Error: no Oma window'
+    with open(os.path.join(ask, 'q.tmp'), 'w', encoding='utf-8') as f:
+        json.dump({'player': {'size': size}}, f)
+    os.replace(os.path.join(ask, 'q.tmp'), os.path.join(ask, 'q'))
+    for _ in range(30):
+        if os.path.exists(os.path.join(ask, 'a')):
+            os.remove(os.path.join(ask, 'a'))
+            return 'resized'
+        time.sleep(0.1)
+    return 'Error: the Oma player did not answer'
+
+
+def player_size_request(text):
+    """"player ta akto boro koro" -> 'bigger'; "video choto koro" -> 'smaller'; "player full screen" -> 'full'; else None."""
+    t = ' '.join(re.sub(r'[,.!?।]', ' ', text.lower()).split())
+    if not re.search(r'player|pleyar|plyer|প্লেয়ার|প্লেয়ার|video|ভিডিও', t) or re.search(_PLAY, _no_player(t)):
+        return None   # "big video play koro" is a new song, not a size
+    if re.search(r'full ?screen|\bfull\b|ফুল ?স্ক্রিন|পুরো (?:পর্দা|স্ক্রিন)', t):
+        return 'full'
+    if re.search(r'\b(normal|default|age(?:r)? moto|ager size)\b|আগের (?:মত|মতো|মাপ)|স্বাভাবিক', t):
+        return 'normal'
+    if re.search(r'\b(boro|bor|baro|bigger|big|large|larger|enlarge|expand)\b|বড়|বড়', t):
+        return 'bigger'
+    if re.search(r'\b(choto|soto|chhoto|chuto|smaller|small|shrink)\b|ছোট', t):
+        return 'smaller'
+    return None
+
+
 _PLAY = r'(?:play|plz play|bajao|bajaw|bajan|chalao|chalaw|chalan|shunao|sunao|প্লে|বাজাও|বাজান|চালাও|চালান|শোনাও)'
 _MEDIA = r'(?:youtube|you tube|ইউটিউব|gan|gaan|gana|গান|song|songs|music|musik|মিউজিক|সঙ্গীত|video|ভিডিও|nasheed|naat|waz)'
 _STOP = r'(?:band|bondho|bondo|off|stop|বন্ধ|থামাও|thamao)'
@@ -253,7 +291,7 @@ def media_request(text):
     t = ' '.join(re.sub(r'[,.!?।]', ' ', text.lower()).split())
     if not t or 'spotify' in t or 'স্পটিফাই' in t or re.search(r'\b(keno|why|kno|কেন|nai keno)\b', t):
         return None   # "play koro nai keno" is a complaint, not a new request
-    if re.search(_STOP, t) and re.search(r'(?:music|gan|gaan|গান|song|video|ভিডিও|player|youtube)', t) and not re.search(_PLAY, t):
+    if re.search(_STOP, t) and re.search(r'(?:music|gan|gaan|গান|song|video|ভিডিও|player|youtube)', t) and not re.search(_PLAY, _no_player(t)):
         return '<stop>'
     if not (re.search(_PLAY, t) and re.search(_MEDIA, t)):
         return None
@@ -503,10 +541,11 @@ def gate():
     q = (integrations.mcp_risky(tool, inp) if tool.startswith('mcp__') else risky(cmd)) or ('Run outside the safe folder?' if inp.get('dangerouslyDisableSandbox') else '')
     if not q or not os.environ.get('ATTICUS_ASK') or not pref('safe', True):
         return
-    ok = ask_user({'q': q, 'cmd': cmd[:800]}, 60) == 'y'
-    print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'allow', 'updatedInput': {**inp, 'dangerouslyDisableSandbox': True}}} if ok else
-                     {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny',
-                                             'permissionDecisionReason': 'The user said no. Do not try another way; say it was not done.'}}))
+    answer = ask_user({'q': q, 'cmd': cmd[:800]}, 60)
+    why = ('The user said no. Do not try another way; say it was not done.' if answer is not None else   # None: nobody answered in 60 s
+           'Nobody answered the Allow card in time. Do not try another way; say it was not done because nobody allowed it.')
+    print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'allow', 'updatedInput': {**inp, 'dangerouslyDisableSandbox': True}}} if answer == 'y' else
+                     {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny', 'permissionDecisionReason': why}}))
 
 
 def ask_user(j, secs):
@@ -819,6 +858,37 @@ FAILED = re.compile(r"\b(can't|cannot|couldn't|could not|unable|not able|failed|
 CODE_OR_QUOTE = re.compile(r'```.*?```|`[^`\n]*`|"[^"\n]{0,200}"|“[^”\n]{0,200}”', re.S)
 
 
+_TO_BN = [(re.compile(r'^Opened (.+?)\.$', re.S), r'\1 খুলে দিয়েছি।'),
+          (re.compile(r'^Searched (.+?) on (\w+)\.$', re.S), r'\2-এ \1 খুঁজেছি।'), (re.compile(r'^Searched (.+?)\.$', re.S), r'\1 খুঁজেছি।'),
+          (re.compile(r'^Okay\.$'), 'ঠিক আছে।'),
+          (re.compile(r"^Not done: you chose Don't Allow, so nothing was changed\.$"), "করা হয়নি: আপনি Don't Allow বেছেছেন, তাই কিছুই বদলানো হয়নি।"),
+          (re.compile(r'^Not done: nobody pressed Allow within 60 seconds, so nothing was changed\.$'), 'করা হয়নি: ৬০ সেকেন্ডের মধ্যে কেউ Allow চাপেনি, তাই কিছুই বদলানো হয়নি।')]
+_TO_EN = [(re.compile(r'^সাউন্ড মিউট করেছি।$'), 'Muted the sound.'), (re.compile(r'^সাউন্ড চালু করেছি \((\d+)%\)।$'), r'Sound is on (\1%).'),
+          (re.compile(r'^ভলিউম (\d+)% থেকে (\d+)% করেছি।$'), r'Set the volume from \1% to \2%.'),
+          (re.compile(r'^স্ক্রিনশট নিয়েছি: (.+)$', re.S), r'Took a screenshot: \1'),
+          (re.compile(r'^Brightness (\d+)% থেকে (\d+)% করেছি।$'), r'Set the brightness from \1% to \2%.'),
+          (re.compile(r'^এই monitor-এর brightness .+', re.S), "This monitor's brightness cannot be changed from Windows (usually only a laptop screen can). Use the monitor's own buttons."),
+          (re.compile(r'^পরের গানে গেছি।$'), 'Skipped to the next song.'), (re.compile(r'^আগের গানে গেছি।$'), 'Back to the previous song.'),
+          (re.compile(r'^Play/Pause চেপেছি।$'), 'Pressed Play/Pause.'), (re.compile(r'^ডেস্কটপ দেখাচ্ছি।$'), 'Showing the desktop.'),
+          (re.compile(r'^Oma player-এ চালাচ্ছি: (.+)$', re.S), r'Playing in the Oma player: \1'), (re.compile(r'^বন্ধ করে দিয়েছি।$'), 'Stopped it.'),
+          (re.compile(r'^Oma player বড় করে দিয়েছি।$'), 'Made the Oma player bigger.'), (re.compile(r'^Oma player ছোট করে দিয়েছি।$'), 'Made the Oma player smaller.'),
+          (re.compile(r'^Oma player পুরো জায়গা জুড়ে দিয়েছি।$'), 'The Oma player fills the panel now.'),
+          (re.compile(r'^Oma player আগের মাপে ফিরিয়ে দিয়েছি।$'), 'The Oma player is back to its normal size.'),
+          (re.compile(r'^কাজটা হয়নি: (.+)$', re.S), r"That didn't work: \1")]
+
+
+def localize(reply, task):
+    """Instant-command replies are fixed text (some English, some Bangla): give them in the request's language, like every
+    model reply (the user asked in Bangla and got "Opened calculator.")."""
+    from multi_ai import intent
+    if not isinstance(reply, str) or not reply:
+        return reply
+    for rx, to in (_TO_BN if intent.reply_lang(task) == 'bn' else _TO_EN):
+        if rx.match(reply.strip()):
+            return rx.sub(to, reply.strip())
+    return reply
+
+
 def admits_failure(reply):
     """The reply itself says the task did not work. Code and quoted text are not the model speaking:
     a correct fix containing raise ZeroDivisionError("cannot divide by zero") is not a failure."""
@@ -1057,6 +1127,14 @@ def fast(text):
         fast.cmds = [f'{ME} --browser ask {sa[0]} {shlex.quote(sa[1])}']
         fast.failed = r.startswith('Error')
         return r.replace('Error: ', '', 1)
+    size = player_size_request(raw_str)
+    if size and os.environ.get('ATTICUS_LIVE') != '1' and player_channel():   # the Oma player's own size, in the Oma window
+        r = player_resize(size)
+        if r.startswith('Error'):
+            return r
+        fast.cmds = [f'{ME} --player-size {size}']
+        return {'bigger': 'Oma player বড় করে দিয়েছি।', 'smaller': 'Oma player ছোট করে দিয়েছি।',
+                'full': 'Oma player পুরো জায়গা জুড়ে দিয়েছি।', 'normal': 'Oma player আগের মাপে ফিরিয়ে দিয়েছি।'}[size]
     yt = media_request(raw_str)
     if yt is not None and os.environ.get('ATTICUS_LIVE') != '1' and player_channel():   # songs and videos play in Oma's own player, never a browser tab
         if yt == '<stop>':
@@ -1334,6 +1412,8 @@ def label(name, inp):
                 'remove-site': 'Removing a site from Oma\'s browser', 'signout-all': 'Signing out of every site in Oma\'s browser'}.get(a[0], 'Using Oma\'s browser') + (f": {a[1].split('&&')[0].strip().strip(chr(34))[:60]}" if len(a) > 1 and a[0] in ('open', 'click') else '')
     if c.startswith(ME + ' --player-stop'):
         return 'Stopping the Oma player'
+    if c.startswith(ME + ' --player-size'):
+        return 'Resizing the Oma player'
     if c.startswith(ME + ' --player'):
         return 'Playing in the Oma player: ' + c[len(ME + ' --player'):].strip(' "\'')
     if c.startswith(PLAY):
@@ -1923,6 +2003,7 @@ def run(task, p=None, shots=()):
     run.model = ''
     run.fallback = None
     run.denied = False   # the user answered Don't Allow on the safety gate
+    run.unanswered = False   # nobody answered it in 60 s (the card expired): not the user's "no"
     run.t0 = time.time()
     alias = getattr(p, 'model', '') or pref('model', 'haiku')
     off = claude_off()
@@ -1984,6 +2065,7 @@ def run(task, p=None, shots=()):
             if results:
                 last_failed = any(b.get('is_error') for b in results)
                 run.denied = run.denied or any(b.get('is_error') and 'The user said no' in str(b.get('content')) for b in results)
+                run.unanswered = run.unanswered or any(b.get('is_error') and 'Nobody answered the Allow card' in str(b.get('content')) for b in results)
                 bad |= {ids.get(b.get('tool_use_id')) for b in results if b.get('is_error')}
                 if TRACK is not None:
                     for b in results:
@@ -2035,7 +2117,9 @@ def run(task, p=None, shots=()):
     run.cmds = [] if last_failed or result_error or p.returncode or not completed or not reply else [c for i, c in enumerate(cmds) if i not in bad]
     run.ok = bool(completed and reply and not result_error and not p.returncode and not last_failed)
     if run.denied:
-        reply = "Not done: you chose Don't Allow, so nothing was changed."
+        reply = localize("Not done: you chose Don't Allow, so nothing was changed.", task)
+    elif run.unanswered:
+        reply = localize('Not done: nobody pressed Allow within 60 seconds, so nothing was changed.', task)
     elif last_failed and not result_error and not p.returncode:
         reply = 'The last tool failed, so I could not verify that the request was completed. Please try again.'
     return reply or 'No answer came back. Please try again.', cost, steps
@@ -2399,6 +2483,8 @@ def main():
         return print(cli_login(args[1]))
     if args[:1] == ['--player-stop']:
         return print(player_stop())
+    if args[:1] == ['--player-size'] and len(args) > 1:
+        return print(player_resize(args[1]))
     if args[:1] == ['--player'] and len(args) > 1:
         return print(player(' '.join(args[1:])))
     if args[:1] == ['--headlines']:   # Sat-Link globe + Today Headlines (RSS, no AI)
@@ -2615,6 +2701,7 @@ def serve(task, warm=None, snap=None):
     if TRACK is not None:
         TRACK.set_stage('analyzing', 'Checking instant commands and learned shortcuts')
     quick = (not commit or os.path.exists(commit)) and pref('instant', True) and fast(task)
+    quick = localize(quick, task) if quick else quick   # the request's language, not the canned text's
     if quick:
         if warm:
             stop_claude(warm)

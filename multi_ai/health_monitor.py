@@ -101,6 +101,12 @@ def usable(pid, mid=''):
     return status(pid, mid)[0] not in BLOCKING
 
 
+def waiting(pid, mid=''):
+    """Not worth a request now: blocked, or DEGRADED (it timed out / answered empty) and still inside its retry window."""
+    st, _, until = status(pid, mid)
+    return st in BLOCKING or (st == 'DEGRADED' and until > _now())
+
+
 def record(pid, mid, ok, error_type='', detail='', latency=0.0, retry_at=0.0):
     """The outcome of one real request. Quota / rate limits are provider-wide; a retired model is per model."""
     d = load()
@@ -331,16 +337,22 @@ def snapshot(d=None):
 def order(cands, settings=None, need_tools=False):
     """Router candidates [(pid, mid)] -> healthy, task-capable ones first; blocked ones dropped. -> (ordered, skipped)."""
     d = load()
-    keep, skipped = [], []
+    keep, skipped, resting = [], [], []
     for pid, mid in cands:
         st, why, until = status_in(d, pid, mid)
         caps = ((d.get('providers', {}).get(pid) or {}).get('models', {}).get(mid) or {}).get('caps') or {}
         if st in BLOCKING:
             skipped.append({'provider': pid, 'model': mid, 'state': st, 'reason': why, 'retry_at': until})
+        elif st == 'DEGRADED' and until > _now():   # timed out a moment ago: skipped while anything else can answer
+            resting.append(({'provider': pid, 'model': mid, 'state': st, 'reason': why, 'retry_at': until}, (pid, mid, st)))
         elif need_tools and caps.get('tools') is False:
             skipped.append({'provider': pid, 'model': mid, 'state': st, 'reason': 'cannot call tools'})
         else:
             keep.append((pid, mid, st))
+    if keep:
+        skipped += [s for s, _ in resting]
+    else:
+        keep = [k for _, k in resting]   # nothing else is available: a slow model beats no answer
     rank = {'READY': 0, 'UNKNOWN': 1, 'DEGRADED': 2}
     keep.sort(key=lambda c: rank.get(c[2], 3))   # stable: user order kept within a state
     return [(p, m) for p, m, _ in keep], skipped
