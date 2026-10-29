@@ -196,3 +196,6 @@ body.lay-focus #nodes-panel, body.lay-focus #cables-panel { display: none !impor
 /* a narrow orb area: slimmer pills pushed to the edges, so the aurora lines keep their length */
 #upper-deck { container-type: inline-size; }
 @container (max-width: 900px) { #nodes-group { --pw: 172px; --spread: calc(50% - 182px); } }
+/* START AI exactly under the orb's centre; the mic hangs off its right side */
+#sphere-panel .sphere-footer > div:last-child { position: relative; }
+#sphere-panel #btn-mute { position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
